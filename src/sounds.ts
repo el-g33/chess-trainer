@@ -1,7 +1,8 @@
 // Sound effects (Kenney's CC0 sounds, public/sounds): a wooden knock for a
 // move, a slap for a capture, a metal click for check, a cloth swish for
 // castling, a bell when the game ends, and tones for quiz answers.
-// Played with Web Audio, which phones allow once the page has been touched.
+// Played with Web Audio (pitched up, see PITCH), which phones allow once the
+// page has been touched.
 
 export type Sound = "move" | "capture" | "check" | "castle" | "gameover" | "right" | "wrong";
 
@@ -19,6 +20,8 @@ let context: AudioContext | null = null;
 const buffers = new Map<string, Promise<AudioBuffer | null>>();
 let enabled = true;
 let volume = 0.7;
+// Played faster than recorded, so higher (1.8 = about 10 semitones up) and snappier
+const PITCH = 1.8;
 
 export function setSound(on: boolean, level: number) {
   enabled = on;
@@ -65,6 +68,7 @@ export async function play(sound: Sound) {
   const gain = ctx.createGain();
   gain.gain.value = volume;
   source.buffer = buffer;
+  source.playbackRate.value = PITCH;
   source.connect(gain).connect(ctx.destination);
   source.start();
 }
