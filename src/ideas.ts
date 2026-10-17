@@ -305,8 +305,9 @@ function stuckPieceNotes(position: Chess, you: Color): string[] {
 // Putting it together
 // ---------------------------------------------------------------------------
 
-/** The full "Explain the ideas" text for a position. */
-export function explainIdeas(position: Chess, threat: Threat, plan: Plan): string {
+/** The full "Explain the ideas" text for a position. With `extra`, the web
+ *  version's middlegame notes (outposts, bad bishops...) are added too. */
+export function explainIdeas(position: Chess, threat: Threat, plan: Plan, extra: string[] = []): string {
   const you = position.turn;
   const themName = colourName(opposite(you));
 
@@ -367,6 +368,7 @@ export function explainIdeas(position: Chess, threat: Threat, plan: Plan): strin
     ...stuckPieceNotes(position, you),
     ...pawnNotes(position, you),
     ...fileNotes(position, you),
+    ...extra,
   ];
 
   const lines = [

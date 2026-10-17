@@ -122,7 +122,7 @@ function hangingPieces(position: Chess, colour: Color): Set<Square> {
 
 /** Does this move offer up a piece? The square of the piece left to be taken
  *  (newly attacked and not adequately defended), or undefined. */
-function isSacrifice(before: Chess, move: NormalMove, after: Chess): Square | undefined {
+export function isSacrifice(before: Chess, move: NormalMove, after: Chess): Square | undefined {
   const mover = before.turn;
   const captured = before.board.get(move.to);
   const gained = captured && captured.color !== mover ? PIECE_VALUES[captured.role] : 0;

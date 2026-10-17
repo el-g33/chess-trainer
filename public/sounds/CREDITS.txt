@@ -1,0 +1,14 @@
+Sound effects
+=============
+
+From Kenney's free game-asset packs (www.kenney.nl), licensed
+Creative Commons Zero (CC0): http://creativecommons.org/publicdomain/zero/1.0/
+Converted from OGG to short mono WAV files (trimmed) for the Chess Trainer.
+
+  move1-3.wav   Impact Sounds: impactWood_medium_000-002
+  capture.wav   Impact Sounds: impactPunch_medium_001
+  check.wav     RPG Audio: metalClick
+  castle.wav    RPG Audio: cloth2
+  gameover.wav  Impact Sounds: impactBell_heavy_004
+  right.wav     Interface Sounds: confirmation_001
+  wrong.wav     Interface Sounds: error_004

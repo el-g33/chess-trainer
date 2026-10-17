@@ -113,6 +113,21 @@ any difference. The tests folder isn't part of the built site.
 | `tests/make_coach_cases.py` | http://localhost:5173/tests/coach.html | threat check, plan ahead, explain the ideas, quiz marking (`strategy.py`, `ideas.py`) | 1143 / 1143 identical |
 | `tests/verify_adaptations.py` | http://localhost:5173/tests/adaptations.html | the opening adaptations (web only, no desktop version): full-strength Stockfish confirms each answer; the page checks the web version spots each situation | 35 / 35 confirmed, 35 / 35 spotted |
 
+## Also in the web version only
+
+- **Sound effects** (`src/sounds.ts`): wooden knock, capture slap, metal click
+  for check, cloth swish for castling, bell at game end, quiz tones. On/off and
+  volume next to the Board choice.
+- **PGN** (`src/pgn.ts`): "Open PGN..." (or "Review a game from a PGN file" in
+  the start menu) to paste or open a game and review it with every tool;
+  "Download PGN" saves the current game.
+- **Brilliant moves** (`src/brilliant.ts`): "Is there a brilliant move?" in the
+  coach gives a hint first, then shows the sacrifice; the Move review adds
+  "Missed brilliant" when the best move was a working sacrifice.
+- **Middlegame notes** (`src/middlegame.ts`) in Explain the ideas: outposts,
+  weak squares, bad bishops, rooks on the 7th, the isolated queen's pawn, the
+  minority attack.
+
 ## Plan ahead with your opening (web only)
 
 While practising an opening, Plan ahead can follow it ("Plan ahead:" in the
@@ -140,4 +155,5 @@ too (stage 7: a public GitHub repository).
 - Merida pieces: GPL-2.0-or-later - `public/pieces/CREDITS.txt`
 - lichess opening names: CC0
 - Permanent Marker font: Apache-2.0 (`node_modules/@fontsource/permanent-marker/LICENSE`)
+- Sound effects: Kenney (kenney.nl), CC0 - `public/sounds/CREDITS.txt`
 - App icon: the Merida knight (GPL-2.0-or-later), drawn by `scripts/make_icons.py`

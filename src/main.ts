@@ -23,6 +23,7 @@ import { afterMove as positionAfter, colourName, isCastling, standardUci, variat
 import { Engine } from "./engine";
 import { Game, type Outcome } from "./game";
 import { explainIdeas } from "./ideas";
+import { middlegameNotes } from "./middlegame";
 import { DEFAULT_LEVEL, LEVELS, OPPONENT_MIN_DELAY, shortName } from "./levels";
 import {
   OpeningBook,
@@ -43,6 +44,9 @@ import {
 } from "./openings";
 import { openingPlanAhead, reviewOpeningChoice, type OpeningPlan, type PlanMode } from "./openingPlan";
 import { FALL_ANGLES, fallenKing, loadPieces } from "./pieces";
+import { play, setSound, soundForMove, unlockSounds } from "./sounds";
+import { brilliantCandidates, findBrilliant, missedBrilliant, type Brilliant } from "./brilliant";
+import { readPgn, saveFile, today, writePgn, type Headers, type PgnGame } from "./pgn";
 import { addMisses, fenOf, formatScore, isDrawnPosition, reviewMove, type Review } from "./review";
 import { gradeGuess, planAhead, threatCheck, type CoachEngine, type Plan, type Threat } from "./strategy";
 
@@ -57,6 +61,7 @@ const OPPONENT_ARROW = "#C62828"; // your opponent's moves in the line
 const THREAT_ARROW = "#E67E22"; // your opponent's threat (dashed)
 const GUESS_ARROW = "#1565C0"; // your quiz guess
 const DEVIATE_ARROW = "#C9A227"; // leaving your opening plan
+const BRILLIANT_ARROW = "#26C2A3"; // the brilliant move, once shown
 const BEST_ARROW = "#5E6B73"; // Stockfish's own choice where your opening plan differs (dashed)
 const ARROWS_AT_ONCE = 4; // how many moves of Stockfish's line are drawn at a time
 
@@ -111,6 +116,7 @@ const toolButtons = {
   plan: $<HTMLButtonElement>("plan-button"),
   quiz: $<HTMLButtonElement>("quiz-button"),
   ideas: $<HTMLButtonElement>("ideas-button"),
+  brilliant: $<HTMLButtonElement>("brilliant-button"),
 };
 const lineBack = $<HTMLButtonElement>("line-back");
 const lineForward = $<HTMLButtonElement>("line-forward");
@@ -121,6 +127,8 @@ const fenRow = $<HTMLFormElement>("fen-row");
 const fenInput = $<HTMLInputElement>("fen");
 const loadButton = $<HTMLButtonElement>("load-fen");
 const themeBox = $<HTMLSelectElement>("board-theme");
+const soundOn = $<HTMLInputElement>("sound-on");
+const soundVolume = $<HTMLInputElement>("sound-volume");
 const planModeBox = $<HTMLSelectElement>("plan-mode");
 const planModeRow = $("plan-mode-row");
 // « ‹ › » - above the move list, and (on phones) right under the board
@@ -150,6 +158,7 @@ interface Analysis {
 }
 
 interface Insight {
+  brilliant?: Brilliant;
   threat?: Threat;
   plan?: Plan;
   ideas?: string;
@@ -182,13 +191,16 @@ let result = ""; // how the last match ended, e.g. "You resigned - Stockfish win
 let menuOpen = true;
 let canReview = false; // a finished Play game can be reviewed in Practice mode
 let reviewing = false; // reviewing a Play game in Practice mode
+let reviewTitle = ""; // for a game opened from PGN, e.g. "Reviewing: Carlsen - Nakamura (1-0)"
 let showReply = false; // in a match, the review shows Stockfish's reply instead of your move
 let plyNotes = new Map<number, string[]>(); // opening notes for a move (1 = the first)
+let gameHeaders: Headers = {}; // the game's PGN headers: who played, when, the result
 
 // Strategy coach
 const insights = new Map<string, Insight>(); // keyed by position
 let quiz: Quiz | null = null;
 const quizScore = [0, 0]; // [right, asked]
+const brilliantShown = new Set<string>(); // positions where you asked to see the brilliant move
 let busy = false;
 let busySince = 0;
 let statusMessage = "";
@@ -266,6 +278,7 @@ Object.assign(ground.state.drawable.brushes, {
   guess: { key: "guess", color: GUESS_ARROW, opacity: 0.85, lineWidth: 10 },
   deviate: { key: "deviate", color: DEVIATE_ARROW, opacity: 0.9, lineWidth: 10 },
   best: { key: "best", color: BEST_ARROW, opacity: 0.55, lineWidth: 7 },
+  brilliant: { key: "brilliant", color: BRILLIANT_ARROW, opacity: 0.9, lineWidth: 10 },
 });
 
 // ---------------------------------------------------------------------------
@@ -329,6 +342,8 @@ interface Settings {
   evalBar?: boolean;
   boardTheme?: string;
   planMode?: string;
+  soundOn?: boolean;
+  soundVolume?: number;
 }
 
 function loadSettings(): Settings {
@@ -351,6 +366,8 @@ function saveSettings() {
     evalBar: evalCheck.checked,
     boardTheme: themeBox.value,
     planMode: planModeBox.value,
+    soundOn: soundOn.checked,
+    soundVolume: Number(soundVolume.value),
   };
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -389,6 +406,9 @@ function buildMenu() {
   if (saved.boardTheme) themeBox.value = saved.boardTheme;
   if (saved.planMode) planModeBox.value = saved.planMode;
   if (planModeBox.selectedIndex < 0) planModeBox.selectedIndex = 0;
+  if (saved.soundOn !== undefined) soundOn.checked = saved.soundOn;
+  if (saved.soundVolume !== undefined) soundVolume.value = String(saved.soundVolume);
+  applySound();
   if (themeBox.selectedIndex < 0) themeBox.selectedIndex = 0;
   applyTheme();
 
@@ -400,6 +420,12 @@ function buildMenu() {
   });
   backButton.addEventListener("click", hideMenu);
   updateMenu();
+}
+
+/** Sound effects on or off, and how loud. */
+function applySound() {
+  setSound(soundOn.checked, Number(soundVolume.value) / 100);
+  soundVolume.disabled = !soundOn.checked;
 }
 
 /** The board theme: "wood" or "grey" (a class on the board). */
@@ -460,7 +486,8 @@ function onStartGame() {
 }
 
 /** A fresh game from a position, with nothing else going on. */
-function resetBoard(newGame: Game) {
+function resetBoard(newGame: Game, headers: Headers = { White: "?", Black: "?", Date: today() }) {
+  gameHeaders = { ...headers };
   match = null;
   analysis = null;
   viewPly = null;
@@ -492,6 +519,8 @@ function startMatch() {
     myOpening: mode === "practice" ? myOpening : null,
     myActive: mode === "practice" && myOpening !== null,
   };
+  const stockfish = `Stockfish (${shortName(LEVELS[level])})`;
+  gameHeaders = { White: user === "white" ? "You" : stockfish, Black: user === "white" ? stockfish : "You", Date: today() };
   orientation = user; // your pieces at the bottom
   void engine.newGame();
 }
@@ -520,6 +549,9 @@ function coachMyOpening(move: NormalMove) {
 
 /** Called after every move of the game, yours or Stockfish's. */
 function afterMove() {
+  const last = game.moves[game.length - 1];
+  if (last) void play(soundForMove(last.san));
+  if (!match && game.outcome()) setTimeout(() => void play("gameover"), 350);
   viewPly = null;
   preview = null;
   analysis = null;
@@ -603,6 +635,7 @@ async function maybeOpponentMove() {
 function finishMatch() {
   const outcome = game.outcome() as Outcome;
   let text: string;
+  gameHeaders.Result = !outcome.winner ? "1/2-1/2" : outcome.winner === "white" ? "1-0" : "0-1";
   if (!outcome.winner) text = `It's a draw (${outcome.reason}).`;
   else if (outcome.winner === match!.user) text = "You won! Well played.";
   else text = "Stockfish won this time.";
@@ -611,6 +644,7 @@ function finishMatch() {
 
 /** The match is over: Play games can then be reviewed in Practice mode. */
 function endMatch(text: string) {
+  void play("gameover");
   match = null;
   thinking = false;
   canReview = mode === "play" && game.length > 0;
@@ -624,6 +658,7 @@ function endMatch(text: string) {
 
 /** After a Play game: switch to Practice to see the ratings and the coach. */
 function onReviewGame() {
+  reviewTitle = "";
   mode = "practice";
   canReview = false;
   reviewing = true;
@@ -634,6 +669,8 @@ async function onResign() {
   if (!match) return;
   if (!(await message("Resign", "Resign this game? Stockfish will win the match.", true))) return;
   result = "You resigned - Stockfish wins";
+  gameHeaders.Result = match.user === "white" ? "0-1" : "1-0";
+  gameHeaders.Termination = `${match.user === "white" ? "White" : "Black"} resigns`;
   endMatch("You resigned.");
 }
 
@@ -682,7 +719,8 @@ function analysisMove(move: NormalMove) {
     analysis = { fromPly: currentPly(), line: new Game(fenOf(base())) };
     quiz = null;
   }
-  analysis.line.play(move);
+  const played = analysis.line.play(move);
+  void play(soundForMove(played.san));
   preview = null;
   refresh();
 }
@@ -715,6 +753,7 @@ function exitAnalysis() {
 
 function goTo(ply: number) {
   ply = Math.max(0, Math.min(ply, game.length));
+  if (ply === currentPly() + 1 && !analysis) void play(soundForMove(game.moves[ply - 1].san));
   analysis = null; // moving through the game leaves any analysis line
   viewPly = ply === game.length ? null : ply;
   refresh();
@@ -754,7 +793,7 @@ async function onLoadFen(event: Event) {
 // The strategy coach
 // ---------------------------------------------------------------------------
 
-type Task = "threat" | "plan" | "quiz" | "ideas";
+type Task = "threat" | "plan" | "quiz" | "ideas" | "brilliant";
 
 async function startTask(kind: Task) {
   preview = null;
@@ -762,7 +801,8 @@ async function startTask(kind: Task) {
   const position = base();
   const fen = fenOf(position);
   const insight = insights.get(fen) ?? {};
-  const needThreat = kind !== "plan" && !insight.threat;
+  const needThreat = kind !== "plan" && kind !== "brilliant" && !insight.threat;
+  const needBrilliant = kind === "brilliant" && !insight.brilliant;
   const planMode = currentPlanMode(position);
   // A plan made in the other mode is made again (Explain the ideas uses whichever is there)
   const needPlan = (kind === "plan" && (!insight.plan || planModeOf(insight.plan) !== planMode)) ||
@@ -779,13 +819,18 @@ async function startTask(kind: Task) {
     checkQuizReady();
   }
 
-  if (!(needThreat || needPlan || needIdeas)) {
+  if (!(needThreat || needPlan || needIdeas || needBrilliant)) {
     refresh();
     return;
   }
   setBusy(true, "Stockfish is thinking...");
   try {
     const found: Insight = { ...insight };
+    if (needBrilliant) {
+      statusMessage = "Stockfish is looking for a sacrifice that works...";
+      found.brilliant = await findBrilliant(coachAnalysis, position);
+      saveInsight(fen, found);
+    }
     if (needThreat) {
       statusMessage = "Stockfish is looking for threats...";
       found.threat = await threatCheck(coachAnalysis, position);
@@ -809,7 +854,7 @@ async function startTask(kind: Task) {
       refresh();
     }
     if (needIdeas) {
-      found.ideas = explainIdeas(position, found.threat!, found.plan!);
+      found.ideas = explainIdeas(position, found.threat!, found.plan!, middlegameNotes(position, position.turn));
       saveInsight(fen, found);
     }
   } catch (error) {
@@ -874,6 +919,7 @@ function answerQuiz(guess: NormalMove) {
   const [correct, text] = gradeGuess(quiz!.threat!, guess);
   quizScore[1] += 1;
   if (correct) quizScore[0] += 1;
+  void play(correct ? "right" : "wrong");
   quiz!.answered = true;
   quiz!.guess = guess;
   quiz!.result = [correct, text];
@@ -955,7 +1001,9 @@ function requestEval() {
     if (analysis) wanted.push(...Array.from({ length: analysis.line.length + 1 }, (_, i) => analysis!.line.positionAt(i)));
     const ply = reviewPly();
     if (ply > 0) wanted.push(game.positionAt(ply - 1), game.positionAt(ply));
-    wanted.push(...Array.from({ length: game.length + 1 }, (_, i) => game.positionAt(i)));
+    const all = Array.from({ length: game.length + 1 }, (_, i) => game.positionAt(i));
+    wanted.push(...all);
+    wanted.push(...brilliantCandidates(all.slice(0, -1), analyser.evals));
   }
   analyser.request(wanted);
 }
@@ -1022,6 +1070,14 @@ function arrowShapes(): DrawShape[] {
       if (i === 0 && step.side === you && choice && makeUci(choice.best) !== makeUci(step.move)) {
         shapes.push({ orig: makeSquare(choice.best.from) as Key, dest: arrowEnd(before, choice.best), brush: "best" });
       }
+    });
+  }
+  if (insight.brilliant?.found && insight.brilliant.move && brilliantShown.has(fenOf(base())) && !hidden && !preview) {
+    shapes.push({
+      orig: makeSquare(insight.brilliant.move.from) as Key,
+      dest: arrowEnd(base(), insight.brilliant.move),
+      brush: "brilliant",
+      label: { text: "!!", fill: BRILLIANT_ARROW },
     });
   }
   const threat = insight.threat;
@@ -1281,7 +1337,11 @@ function drawReview(reviews: (Review | undefined)[], info: OpeningInfo[]) {
     if (!ratingsOn()) paragraph("Move ratings are switched off.");
     else if (ply === 0) paragraph("Make a move, or click a move in the list, to see what Stockfish thinks of it.");
     else if (!reviews[ply - 1]) paragraph("Stockfish is checking this move...");
-    else showRating(reviews[ply - 1]!);
+    else {
+      showRating(reviews[ply - 1]!);
+      const missed = missedBrilliant(game.positionAt(ply - 1), game.moves[ply - 1].move, analyser.evals);
+      if (missed) paragraph(missed, "review-missed");
+    }
   }
 
   const { done, total } = analyser.progress();
@@ -1310,7 +1370,7 @@ function drawTurn() {
     const colour = match.user === "white" ? "White" : "Black";
     gameInfo.textContent = `vs Stockfish (${shortName(LEVELS[match.level])}), you play ${colour}`;
   } else if (canReview && mode === "play") gameInfo.textContent = "Game over. See how every move rated:";
-  else if (mode === "practice" && reviewing) gameInfo.textContent = "Reviewing your game against Stockfish";
+  else if (mode === "practice" && reviewing) gameInfo.textContent = reviewTitle || "Reviewing your game against Stockfish";
   else if (mode === "practice") gameInfo.textContent = "Free board: you move both sides";
   else gameInfo.textContent = game.length ? "Match over" : "";
 }
@@ -1350,7 +1410,7 @@ function drawButtons() {
   const gameOver = position.isEnd() || isDrawnPosition(position);
   const quizOpen = quiz !== null && !quiz.answered;
 
-  for (const button of [toolButtons.threat, toolButtons.plan, toolButtons.ideas]) {
+  for (const button of [toolButtons.threat, toolButtons.plan, toolButtons.ideas, toolButtons.brilliant]) {
     button.disabled = waiting || gameOver || quizOpen;
   }
   toolButtons.quiz.disabled = waiting || gameOver || preview !== null;
@@ -1434,6 +1494,31 @@ function drawCoach() {
     }
     section(heading, ...parts);
   }
+  if (insight.brilliant && !hidden) {
+    const brilliant = insight.brilliant;
+    const fen = fenOf(base());
+    if (!brilliant.found) {
+      section("Is there a brilliant move?", brilliant.text);
+    } else if (!brilliantShown.has(fen)) {
+      const reveal = document.createElement("button");
+      reveal.type = "button";
+      reveal.className = "coach-reveal";
+      reveal.textContent = "Show the move";
+      reveal.addEventListener("click", () => {
+        brilliantShown.add(fen);
+        refresh();
+      });
+      section(
+        "Is there a brilliant move? Yes!",
+        "There's a sacrifice here that works: you can offer up a piece and still come out on top.\n\n" +
+          `Look at what your ${brilliant.role} can do: which move gives something away but opens the enemy king, ` +
+          "forks, or wins more back? Check every capture, check and threat - and calculate what happens if they take.",
+        reveal,
+      );
+    } else {
+      section("The brilliant move", `${brilliant.text}\n\nStockfish's line: ${brilliant.line}`);
+    }
+  }
   if (insight.threat && !hidden) textSection(insight.threat.text);
   if (insight.plan && !hidden) {
     textSection(insight.plan.text);
@@ -1468,6 +1553,74 @@ function textBlock(text: string, className = ""): HTMLElement {
   p.className = `coach-body ${className}`.trim();
   p.textContent = text;
   return p;
+}
+
+// ---------------------------------------------------------------------------
+// PGN: reviewing a game from a file or pasted text, and downloading games
+// ---------------------------------------------------------------------------
+
+const pgnDialog = $<HTMLDialogElement>("pgn-dialog");
+const pgnText = $<HTMLTextAreaElement>("pgn-text");
+const pgnPick = $<HTMLSelectElement>("pgn-pick");
+const pgnStatus = $("pgn-status");
+const pgnReview = $<HTMLButtonElement>("pgn-review");
+let pgnGames: PgnGame[] = [];
+
+function openPgnDialog() {
+  readPgnText();
+  pgnDialog.showModal();
+  pgnText.focus();
+}
+
+/** Look for games in the text box (as you type or paste, or after opening a file). */
+function readPgnText() {
+  const text = pgnText.value.trim();
+  pgnGames = text ? readPgn(text).filter((g) => g.load().game.length > 0 || g.headers.FEN) : [];
+  pgnPick.replaceChildren(...pgnGames.map((g, i) => new Option(`${i + 1}. ${g.title}`, String(i))));
+  $("pgn-pick-row").hidden = pgnGames.length < 2;
+  pgnReview.disabled = !pgnGames.length;
+  pgnStatus.classList.toggle("problem", !!text && !pgnGames.length);
+  pgnStatus.textContent = !text
+    ? ""
+    : !pgnGames.length
+      ? "No game found in this text. A PGN game looks like: 1. e4 e5 2. Nf3 Nc6 ..."
+      : pgnGames.length === 1
+        ? `Found: ${pgnGames[0].title}`
+        : `Found ${pgnGames.length} games - choose one.`;
+}
+
+async function reviewPgnGame(event: Event) {
+  event.preventDefault();
+  const chosen = pgnGames[Number(pgnPick.value) || 0];
+  if (!chosen) return;
+  const { game: loaded, problem } = chosen.load();
+  pgnDialog.close();
+  mode = "practice";
+  resetBoard(loaded, chosen.headers);
+  canReview = false;
+  reviewing = true;
+  reviewTitle = `Reviewing: ${chosen.title}`;
+  viewPly = loaded.length ? 0 : null; // start from the first position and step through
+  orientation = "white";
+  if (menuOpen) hideMenu();
+  refresh();
+  if (problem) await message("PGN", problem);
+}
+
+/** The game as a .pgn file, for keeping, sharing or opening elsewhere. */
+function downloadPgn() {
+  if (!game.length) {
+    void message("Download PGN", "There are no moves to save yet.");
+    return;
+  }
+  const outcome = game.outcome();
+  const headers = { ...gameHeaders };
+  if (!headers.Result || headers.Result === "*") {
+    headers.Result = !outcome ? "*" : !outcome.winner ? "1/2-1/2" : outcome.winner === "white" ? "1-0" : "0-1";
+  }
+  const name = `${headers.White ?? "White"}-vs-${headers.Black ?? "Black"}-${(headers.Date ?? today()).replace(/\./g, "-")}`
+    .replace(/[^A-Za-z0-9-]+/g, "_");
+  saveFile(`${name}.pgn`, writePgn(game, headers));
 }
 
 // ---------------------------------------------------------------------------
@@ -1545,6 +1698,29 @@ function wireButtons() {
     refresh();
   });
   fenRow.addEventListener("submit", (event) => void onLoadFen(event));
+  for (const control of [soundOn, soundVolume]) {
+    control.addEventListener("input", () => {
+      applySound();
+      saveSettings();
+    });
+  }
+  soundVolume.addEventListener("change", () => void play("move")); // let you hear the new volume
+  // Browsers only play sound after the page has been touched or clicked
+  document.addEventListener("pointerdown", unlockSounds, { once: true });
+  document.addEventListener("keydown", unlockSounds, { once: true });
+  $("open-pgn").addEventListener("click", openPgnDialog);
+  $("menu-open-pgn").addEventListener("click", openPgnDialog);
+  $("download-pgn").addEventListener("click", downloadPgn);
+  $("pgn-cancel").addEventListener("click", () => pgnDialog.close());
+  $("pgn-form").addEventListener("submit", (event) => void reviewPgnGame(event));
+  pgnText.addEventListener("input", readPgnText);
+  $<HTMLInputElement>("pgn-file").addEventListener("change", async (event) => {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    $("pgn-file-name").textContent = file.name;
+    pgnText.value = await file.text();
+    readPgnText();
+  });
   planModeBox.addEventListener("change", () => {
     saveSettings();
     refresh();
@@ -1556,6 +1732,7 @@ function wireButtons() {
   toolButtons.threat.addEventListener("click", () => void startTask("threat"));
   toolButtons.plan.addEventListener("click", () => void startTask("plan"));
   toolButtons.ideas.addEventListener("click", () => void startTask("ideas"));
+  toolButtons.brilliant.addEventListener("click", () => void startTask("brilliant"));
   toolButtons.quiz.addEventListener("click", onQuizButton);
   lineBack.addEventListener("click", () => stepPreview(-1));
   lineForward.addEventListener("click", () => stepPreview(1));
@@ -1563,7 +1740,8 @@ function wireButtons() {
 
   document.addEventListener("keydown", (event) => {
     if (menuOpen || dialog.open) return;
-    if (event.target instanceof HTMLSelectElement || event.target instanceof HTMLInputElement) return;
+    if (event.target instanceof HTMLSelectElement || event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement || pgnDialog.open) return;
     const keys: Record<string, () => void> = {
       ArrowLeft: () => (preview ? stepPreview(-1) : analysis ? analysisTakeBack() : goTo(currentPly() - 1)),
       ArrowRight: () => (preview ? stepPreview(1) : goTo(currentPly() + 1)),

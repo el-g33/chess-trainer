@@ -473,6 +473,20 @@ cg-container svg.cg-shapes line[stroke="#5E6B73" i] {
   stroke-dasharray: 0.14 0.1;
 }
 
+.coach-tools .wide {
+  grid-column: span 2;
+}
+
+.coach-reveal {
+  margin-top: 8px;
+}
+
+.review-missed {
+  margin-top: 10px !important;
+  color: #159c82;
+  font-weight: 600;
+}
+
 .coach-text {
   flex: 1;
   min-height: 120px;
@@ -933,6 +947,85 @@ cg-board square.check {
 .look-row select {
   padding-block: 4px;
   min-height: 32px;
+}
+
+.pgn-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.menu-pgn {
+  margin: 12px 0 0;
+  text-align: center;
+}
+
+.menu-pgn button {
+  width: 100%;
+}
+
+.pgn-dialog {
+  width: min(calc(100vw - 32px), 560px);
+}
+
+.pgn-dialog textarea {
+  width: 100%;
+  font: 0.85rem/1.4 Consolas, "Courier New", monospace;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  resize: vertical;
+  margin: 8px 0;
+  color: inherit;
+  background: var(--card);
+}
+
+.pgn-file-row,
+.pgn-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+}
+
+.pgn-pick-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+.file-button {
+  display: inline-block;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-bottom-color: #cfcfcf;
+  border-radius: 5px;
+  background: var(--button);
+  cursor: pointer;
+}
+
+.file-button:hover {
+  background: var(--button-hover);
+}
+
+.pgn-status {
+  min-height: 1.3em;
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+}
+
+.pgn-status.problem {
+  color: #c62828;
+}
+
+.look-row .sound-check {
+  margin-left: auto;
+}
+
+.look-row input[type="range"] {
+  width: 90px;
+  accent-color: var(--accent);
 }
 
 /* Coordinates in the corners, in the colour that shows on each square */

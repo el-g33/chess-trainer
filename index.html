@@ -65,6 +65,7 @@
           <button type="button" id="back-to-game">Back to current game</button>
           <button type="submit" id="start" class="accent">Start game</button>
         </div>
+        <p class="menu-pgn"><button type="button" id="menu-open-pgn">Review a game from a PGN file&hellip;</button></p>
         <p class="about-link"><a href="./about.html">About &amp; licences</a></p>
       </form>
     </div>
@@ -133,6 +134,7 @@
             <button type="button" id="plan-button">Plan ahead</button>
             <button type="button" id="quiz-button">Spot their idea (quiz)</button>
             <button type="button" id="ideas-button">Explain the ideas</button>
+            <button type="button" id="brilliant-button" class="wide">Is there a brilliant move?</button>
           </div>
           <!-- Only while practising an opening: what Plan ahead follows -->
           <div id="plan-mode-row" class="plan-mode-row" hidden>
@@ -160,12 +162,18 @@
           <button type="button" id="new-game">New game</button>
           <label class="check" id="eval-check-label" hidden><input type="checkbox" id="eval-check" checked /> Eval bar</label>
         </div>
+        <div class="pgn-row">
+          <button type="button" id="open-pgn">Open PGN&hellip;</button>
+          <button type="button" id="download-pgn">Download PGN</button>
+        </div>
         <div class="look-row">
           <label for="board-theme">Board:</label>
           <select id="board-theme">
             <option value="wood">Wood</option>
             <option value="grey">Grey &amp; white</option>
           </select>
+          <label class="check sound-check"><input type="checkbox" id="sound-on" checked /> Sounds</label>
+          <input type="range" id="sound-volume" min="0" max="100" value="70" aria-label="Sound volume" />
         </div>
         <form id="fen-row" class="fen-row" hidden>
           <label for="fen">FEN:</label>
@@ -175,6 +183,28 @@
         <p class="about-link"><a href="./about.html">About &amp; licences</a></p>
       </section>
     </main>
+
+    <!-- Reviewing a game from PGN -->
+    <dialog id="pgn-dialog" class="pgn-dialog">
+      <form id="pgn-form">
+        <h3>Review a game</h3>
+        <p class="muted">Paste a game in PGN format (e.g. copied from lichess or chess.com), or open a .pgn file.</p>
+        <textarea id="pgn-text" rows="8" spellcheck="false" placeholder='[White "..."]&#10;[Black "..."]&#10;&#10;1. e4 e5 2. Nf3 Nc6 ...'></textarea>
+        <div class="pgn-file-row">
+          <label class="file-button">Open a .pgn file&hellip;<input type="file" id="pgn-file" accept=".pgn,.txt,application/x-chess-pgn,text/plain" hidden /></label>
+          <span id="pgn-file-name" class="muted"></span>
+        </div>
+        <div id="pgn-pick-row" class="pgn-pick-row" hidden>
+          <label for="pgn-pick">Game:</label>
+          <select id="pgn-pick"></select>
+        </div>
+        <p id="pgn-status" class="pgn-status"></p>
+        <div class="dialog-buttons">
+          <button type="button" id="pgn-cancel">Cancel</button>
+          <button type="submit" id="pgn-review" class="accent" disabled>Review game</button>
+        </div>
+      </form>
+    </dialog>
 
     <!-- Pop-up messages -->
     <dialog id="dialog">
