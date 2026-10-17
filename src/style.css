@@ -1,0 +1,945 @@
+/* Chess Trainer - looks like the desktop app (Sun Valley light theme, wood board) */
+
+:root {
+  color-scheme: light;
+  --bg: #fafafa;
+  --card: #ffffff;
+  --text: #1c1c1c;
+  --muted: #666666;
+  --line: #e0e0e0;
+  --button: #fdfdfd;
+  --button-hover: #f3f3f3;
+  --accent: #005fb8;
+  --accent-hover: #1a6fc0;
+  --current-move: #dbe8f6;
+  --last-move: rgba(246, 226, 122, 0.55);
+  --selected: rgba(246, 226, 122, 0.75);
+  --dot: rgba(58, 58, 58, 0.28);
+  --coord-on-light: #8c5e3c;
+  --coord-on-dark: #e8d3b4;
+  --gutter: 16px;
+  font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  font-size: 15px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 600;
+  margin: 0;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* -- Buttons and boxes ------------------------------------------------------ */
+
+button,
+select {
+  font: inherit;
+  color: inherit;
+  background: var(--button);
+  border: 1px solid var(--line);
+  border-bottom-color: #cfcfcf;
+  border-radius: 5px;
+  padding: 7px 14px;
+  min-height: 36px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled),
+select:hover:not(:disabled) {
+  background: var(--button-hover);
+}
+
+button:disabled,
+select:disabled {
+  color: #a0a0a0;
+  cursor: default;
+}
+
+button.accent {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+button.accent:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+button:focus-visible,
+select:focus-visible,
+.mode:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* -- The start menu ----------------------------------------------------------- */
+
+.cover {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: var(--gutter);
+  background: var(--bg);
+  overflow-y: auto;
+}
+
+.card {
+  width: min(100%, 620px);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 26px 32px;
+}
+
+.card h1 {
+  text-align: center;
+  font-size: 2.1rem;
+}
+
+.subtitle {
+  text-align: center;
+  color: var(--muted);
+  margin: 4px 0 18px;
+  font-size: 1.05rem;
+}
+
+.modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.mode {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--button);
+  cursor: pointer;
+  font-size: 0.92rem;
+}
+
+.mode input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mode:has(input:checked) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.mode.disabled {
+  cursor: default;
+  color: #9a9a9a;
+}
+
+.soon {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.options {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 12px;
+  align-items: center;
+  margin: 20px 0 6px;
+}
+
+.options select {
+  width: 100%;
+}
+
+.engine-status {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.menu-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.menu-buttons .accent {
+  min-width: 160px;
+}
+
+/* -- The game screen ------------------------------------------------------------ */
+
+#game {
+  --board: min(calc(100dvh - 2 * var(--gutter)), calc(100vw - 600px));
+  display: grid;
+  grid-template-columns: var(--board) minmax(190px, 240px) minmax(260px, 1fr);
+  grid-template-areas: "board moves panel";
+  gap: 20px 28px;
+  padding: var(--gutter);
+  max-width: 1500px;
+  height: 100dvh;
+}
+
+.board-area {
+  grid-area: board;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.board-row {
+  display: flex;
+  gap: 6px;
+}
+
+/* The step buttons under the board are for phones; desktops have them above the move list */
+.board-area .board-nav {
+  display: none;
+}
+
+/* Practice: the eval bar beside the board takes a little width */
+body.practice #game {
+  --board: min(calc(100dvh - 2 * var(--gutter)), calc(100vw - 740px));
+  grid-template-columns: calc(var(--board) + 28px) minmax(210px, 250px) minmax(330px, 1fr);
+  gap: 20px 22px;
+}
+
+/* -- Evaluation bar ---------------------------------------------------------------- */
+
+#eval-bar {
+  --white: 50%;
+  position: relative;
+  flex: none;
+  width: 22px;
+  height: var(--board);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #2b2622; /* Black's share */
+  border: 1px solid #bdbdbd;
+}
+
+.eval-white {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--white);
+  background: #f3e6c8; /* the cream of White's pieces */
+  transition: height 0.3s ease;
+}
+
+#eval-bar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 1px solid #9a9a9a;
+}
+
+#eval-bar.flipped .eval-white {
+  bottom: auto;
+  top: 0;
+}
+
+.eval-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 4px;
+  z-index: 1;
+  text-align: center;
+  font-size: 9px;
+  font-weight: 600;
+  color: #f3e6c8;
+}
+
+.eval-label.on-white {
+  top: auto;
+  bottom: 4px;
+  color: #2b2622;
+}
+
+#eval-bar.flipped .eval-label {
+  top: auto;
+  bottom: 4px;
+}
+
+#eval-bar.flipped .eval-label.on-white {
+  top: 4px;
+  bottom: auto;
+}
+
+/* -- Board extras: analysis frame, the threat arrow dashed ------------------------- */
+
+/* In analysis the board is dulled and framed in blue (as the desktop) */
+#board.analysis cg-board::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 5px solid #2c6bb3;
+  background: rgba(74, 74, 74, 0.32);
+  pointer-events: none;
+  z-index: 2;
+}
+
+cg-container svg.cg-shapes line[stroke="#E67E22" i] {
+  stroke-dasharray: 0.18 0.11;
+}
+
+#board {
+  width: var(--board);
+  height: var(--board);
+  min-width: 280px;
+  min-height: 280px;
+}
+
+.moves-area {
+  grid-area: moves;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.moves-area h2,
+.panel h2 {
+  font-size: 1.35rem;
+}
+
+.moves-area h2 {
+  font-size: 1.15rem;
+  margin-bottom: 6px;
+}
+
+.nav {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+}
+
+.nav button {
+  padding: 4px 0;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+#view-label {
+  margin: 6px 0;
+  font-size: 0.9rem;
+}
+
+#move-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+#move-list li {
+  display: grid;
+  grid-template-columns: 2.4em 1fr 1fr;
+  align-items: center;
+}
+
+.number {
+  color: #888;
+  font-size: 0.92rem;
+}
+
+button.move {
+  border: none;
+  background: none;
+  text-align: left;
+  padding: 3px 6px;
+  min-height: 28px;
+  border-radius: 4px;
+}
+
+button.move.current {
+  background: var(--current-move);
+}
+
+/* -- Practice panels -------------------------------------------------------------- */
+
+/* In Practice the move list is short, so the move review below gets the space */
+body.practice #move-list {
+  flex: 0 1 auto;
+  max-height: 9.5em;
+}
+
+.repertoire-label {
+  font-size: 0.82rem;
+  color: var(--muted);
+  white-space: pre-line;
+  margin: 0 0 6px;
+}
+
+.review-header,
+.coach-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.reply-button {
+  margin-top: 6px;
+  width: 100%;
+}
+
+#coach {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  margin-top: 12px;
+}
+
+#coach h3 {
+  font-size: 1.15rem;
+}
+
+.coach-tools {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 6px 0 8px;
+}
+
+.coach-text {
+  flex: 1;
+  min-height: 120px;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid #dcdcdc;
+  border-radius: 5px;
+  padding: 8px 10px;
+  font-size: 0.93rem;
+  line-height: 1.4;
+}
+
+.coach-section + .coach-section {
+  margin-top: 14px;
+}
+
+.coach-section p {
+  margin: 0;
+}
+
+.coach-heading {
+  font-weight: 600;
+  margin-bottom: 2px !important;
+}
+
+.coach-body {
+  white-space: pre-line;
+}
+
+.coach-subheading {
+  font-weight: 600;
+  margin-top: 10px !important;
+}
+
+.coach-body + .coach-body:not(.coach-subheading) {
+  margin-top: 10px;
+}
+
+.coach-note {
+  color: var(--muted);
+}
+
+.coach-right {
+  color: #1b7f3b;
+  font-weight: 600;
+}
+
+.coach-wrong {
+  color: #c62828;
+  font-weight: 600;
+}
+
+.line-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 0.9rem;
+}
+
+.line-row button {
+  min-width: 36px;
+}
+
+.coach-status {
+  margin: 4px 0 0;
+  min-height: 1.2em;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: #555;
+}
+
+body.practice .bottom-buttons {
+  grid-template-columns: repeat(3, 1fr) auto;
+  align-items: center;
+}
+
+body.practice .bottom-buttons button {
+  padding-inline: 6px;
+}
+
+.fen-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+  font-size: 0.9rem;
+}
+
+.fen-row input {
+  font: inherit;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--card);
+  color: inherit;
+}
+
+.about-link {
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+.about-link a {
+  color: var(--muted);
+}
+
+.options label.disabled {
+  color: #a0a0a0;
+}
+
+/* -- Move review --------------------------------------------------------------- */
+
+#review-area {
+  flex: 1.4;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin-top: 12px;
+}
+
+#review-area h2 {
+  margin-bottom: 4px;
+}
+
+#review-progress {
+  margin: 0 0 6px;
+  font-size: 0.85rem;
+}
+
+#review {
+  overflow-y: auto;
+  min-height: 0;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+#review p {
+  margin: 0;
+}
+
+.review-heading {
+  font-weight: 600;
+  margin-bottom: 2px !important;
+}
+
+.review-body {
+  white-space: pre-line;
+}
+
+/* Opening names and notes, in the desktop app's book brown */
+.opening-label,
+.review-opening {
+  color: #8b5a2b;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin: 0 0 6px;
+}
+
+.review-opening {
+  margin: 0 !important;
+}
+
+.review-notes {
+  white-space: pre-line;
+  margin-bottom: 10px !important;
+}
+
+.review-notes:empty {
+  display: none;
+}
+
+/* Rating colours (the desktop app's move-list colours) */
+.r-brilliant { color: #159c82; }
+.r-great { color: #4f7aa3; }
+.r-best,
+.r-excellent { color: #5e9431; }
+.r-good { color: #5c7347; }
+.r-book { color: #a0703f; }
+.r-forced { color: #6e8c62; }
+.r-inaccuracy { color: #b88f00; }
+.r-mistake { color: #e07a1f; }
+.r-miss { color: #e05a4c; }
+.r-missed-win { color: #a6800a; }
+.r-blunder { color: #e0301e; }
+
+button.move[class*="r-"] {
+  font-weight: 600;
+}
+
+.panel {
+  grid-area: panel;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.turn {
+  font-size: 1.1rem;
+  margin: 4px 0 10px;
+}
+
+.game-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 36px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+body.practice .spacer {
+  display: none; /* the coach takes the spare height */
+}
+
+body.practice .bottom-buttons {
+  margin-top: 8px;
+}
+
+.bottom-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+/* -- Tablets and phones: everything in one column, board on top ----------------- */
+
+@media (max-width: 900px) {
+  :root {
+    --gutter: 10px;
+  }
+
+  #game,
+  body.practice #game {
+    --board: min(calc(100vw - 2 * var(--gutter)), 70dvh);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "board" "panel" "moves";
+    justify-items: center;
+    gap: 10px;
+    height: auto;
+  }
+
+  /* A slimmer eval bar beside the board */
+  body.practice #game {
+    --board: min(calc(100vw - 2 * var(--gutter) - 20px), 70dvh);
+  }
+
+  body.practice .board-area {
+    width: auto;
+  }
+
+  /* Step buttons right under the board, big enough for a thumb */
+  .board-area .board-nav {
+    display: grid;
+  }
+
+  .board-nav button {
+    min-height: 44px;
+    font-size: 1.3rem;
+  }
+
+  .moves-area .list-nav {
+    display: none;
+  }
+
+  #eval-bar {
+    width: 14px;
+  }
+
+  .eval-label {
+    font-size: 7px;
+  }
+
+  .coach-text {
+    max-height: none;
+    overflow: visible;
+  }
+
+  body.practice #move-list {
+    max-height: 9.5em;
+  }
+
+  .board-area,
+  .moves-area,
+  .panel {
+    width: min(100%, var(--board));
+  }
+
+  #board {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .panel h2 {
+    display: none; /* "Play" is clear enough on a small screen */
+  }
+
+  .turn {
+    margin: 0 0 4px;
+  }
+
+  .spacer {
+    display: none;
+  }
+
+  .bottom-buttons {
+    margin-top: 8px;
+  }
+
+  /* Moves flow along like a sentence and scroll if the game gets long */
+  #move-list {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    flex: none;
+    max-height: 9.5em;
+    margin-bottom: 8px;
+  }
+
+  #move-list li {
+    display: flex;
+  }
+
+  .number {
+    margin-left: 6px;
+  }
+
+  #review-area {
+    margin-top: 4px;
+  }
+
+  #review {
+    overflow: visible;
+  }
+
+  .modes {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 20px 18px;
+  }
+
+  .options {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .options label {
+    margin-top: 6px;
+  }
+}
+
+/* -- Pop-up messages ---------------------------------------------------------- */
+
+dialog {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 22px 24px 18px;
+  width: min(calc(100vw - 32px), 400px);
+  color: var(--text);
+  background: var(--card);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+dialog h3 {
+  font-size: 1.15rem;
+}
+
+#dialog-text {
+  white-space: pre-line;
+  margin: 10px 0 18px;
+}
+
+.dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dialog-buttons button {
+  min-width: 90px;
+}
+
+/* -- The board ------------------------------------------------------------------- */
+
+/* Board themes (the desktop app's theme.py THEMES) */
+cg-board {
+  border-radius: 3px;
+}
+
+.wood cg-board {
+  background-image: url("/boards/wood.png");
+  background-size: cover;
+}
+
+#board.grey {
+  --last-move: rgba(246, 226, 122, 0.6);
+  --selected: rgba(246, 226, 122, 0.8);
+  --coord-on-light: #7d8287;
+  --coord-on-dark: #f4f4f4;
+}
+
+/* Flat squares: light a8 at the top-left, dark a1 at the bottom-left */
+.grey cg-board {
+  background: repeating-conic-gradient(#9ea3a8 0 25%, #eeeeee 0 50%) 0 0 / 25% 25%;
+}
+
+cg-board square.last-move {
+  background-color: var(--last-move);
+}
+
+cg-board square.selected {
+  background-color: var(--selected);
+}
+
+/* Grey move dots, or rings where a piece can be captured */
+cg-board square.move-dest {
+  background: radial-gradient(circle closest-side, var(--dot) 31%, transparent 33%);
+}
+
+cg-board square.oc.move-dest {
+  background: radial-gradient(circle closest-side, transparent 77%, var(--dot) 79%, var(--dot) 93%, transparent 95%);
+}
+
+cg-board square.move-dest:hover {
+  background: var(--selected);
+}
+
+/* A soft red glow under a king in check */
+cg-board square.check {
+  background: radial-gradient(
+    circle closest-side,
+    rgba(255, 42, 26, 0.95) 0%,
+    rgba(232, 21, 11, 0.75) 45%,
+    rgba(176, 0, 0, 0) 100%
+  );
+}
+
+.look-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 0.9rem;
+}
+
+.look-row select {
+  padding-block: 4px;
+  min-height: 32px;
+}
+
+/* Coordinates in the corners, in the colour that shows on each square */
+.cg-wrap coords {
+  font-size: clamp(9px, 1.6vmin, 13px);
+  font-weight: 600;
+}
+
+/* Letters at the bottom-right of each square, kept inside the board
+   (chessground's default shifts them right, past the board's edge) */
+.cg-wrap coords.files {
+  left: 0;
+}
+
+.cg-wrap coords.files coord {
+  text-align: right;
+  padding-right: 4px;
+}
+
+.cg-wrap coords.ranks coord,
+.cg-wrap coords.files coord {
+  color: var(--coord-on-dark);
+}
+
+/* The bottom-left square is dark from either side (a1 or h8), and both
+   rows of coordinates start there, so every second one is on a light square */
+.cg-wrap coords.ranks coord:nth-child(even),
+.cg-wrap coords.files coord:nth-child(even) {
+  color: var(--coord-on-light);
+}

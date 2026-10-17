@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>About Chess Trainer</title>
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+        color: #1c1c1c;
+        background: #fafafa;
+      }
+      body {
+        margin: 0;
+        background: #fafafa;
+      }
+      main {
+        max-width: 680px;
+        margin: 0 auto;
+        padding: 24px 16px 48px;
+        line-height: 1.5;
+      }
+      h1 {
+        font-size: 1.8rem;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 1.15rem;
+        margin: 28px 0 8px;
+      }
+      a {
+        color: #005fb8;
+      }
+      ul {
+        padding-left: 1.2em;
+      }
+      li {
+        margin-bottom: 10px;
+      }
+      .muted {
+        color: #666;
+      }
+      .back {
+        display: inline-block;
+        margin-bottom: 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a class="back" href="./">&lsaquo; Back to Chess Trainer</a>
+      <h1>About Chess Trainer</h1>
+      <p class="muted">Play and practise chess against Stockfish: move reviews, openings and a strategy coach.
+        Everything runs on your own device; nothing is sent anywhere.</p>
+
+      <h2>Source code and licence</h2>
+      <p>
+        Chess Trainer is free software under the
+        <a href="https://www.gnu.org/licenses/gpl-3.0.html">GNU General Public License, version 3</a>
+        (or any later version). You may use, share and change it under those terms. It comes with no warranty.
+      </p>
+      <p>
+        The complete source code is at
+        <a href="https://github.com/el-g33/chess-trainer">github.com/el-g33/chess-trainer</a>.
+      </p>
+
+      <h2>Built with</h2>
+      <ul>
+        <li>
+          <strong>Stockfish 19</strong> (the chess engine), in the browser version
+          <a href="https://github.com/nmrugg/stockfish.js">stockfish.js</a> -
+          GPL-3.0. Source: <a href="https://github.com/official-stockfish/Stockfish">github.com/official-stockfish/Stockfish</a>.
+          Licence text: <a href="./stockfish/Copying.txt">Copying.txt</a>
+        </li>
+        <li>
+          <strong>chessground</strong> (the board) and <strong>chessops</strong> (the chess rules) from lichess -
+          GPL-3.0 or later.
+          Source: <a href="https://github.com/lichess-org/chessground">chessground</a>,
+          <a href="https://github.com/niklasf/chessops">chessops</a>
+        </li>
+        <li>
+          <strong>Merida chess pieces</strong> by Armando Hernandez Marroquin, as published by lichess -
+          GPL-2.0 or later (used here under GPL-3.0).
+          Source: <a href="https://github.com/lichess-org/lila">github.com/lichess-org/lila</a> (public/piece/merida).
+          Details: <a href="./pieces/CREDITS.txt">CREDITS.txt</a>
+        </li>
+        <li>
+          <strong>Opening names</strong> from the lichess
+          <a href="https://github.com/lichess-org/chess-openings">chess-openings</a> database - CC0 (public domain).
+        </li>
+        <li>
+          <strong>Permanent Marker</strong> font by Font Diner - Apache License 2.0,
+          via <a href="https://fontsource.org/fonts/permanent-marker">Fontsource</a>.
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>

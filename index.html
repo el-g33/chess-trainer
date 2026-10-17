@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#fafafa" />
+    <meta name="description" content="Play and practise chess against Stockfish." />
+    <!-- Unlisted: search engines are asked not to list the site. Remove this
+         line (and register the site with Google Search Console) to make it findable. -->
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Chess Trainer</title>
+    <!-- Installable: add to the home screen, opens full-screen, works offline -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/icons/icon-192.png" type="image/png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Chess Trainer" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  </head>
+  <body>
+    <!-- The start menu: covers the game while open -->
+    <div id="menu" class="cover">
+      <form id="menu-card" class="card">
+        <h1>Chess Trainer</h1>
+        <p class="subtitle">How would you like to play?</p>
+
+        <div class="modes" role="radiogroup" aria-label="Mode">
+          <label class="mode">
+            <input type="radio" name="mode" value="play" checked />
+            <span class="mode-title">Play against Stockfish</span>
+            <span class="mode-blurb">Just chess. No eval bar, no hints, no move ratings - a real game.</span>
+          </label>
+          <label class="mode">
+            <input type="radio" name="mode" value="practice" />
+            <span class="mode-title">Practice mode</span>
+            <span class="mode-blurb">Strategy coach, eval bar, move ratings and opening training.</span>
+          </label>
+        </div>
+
+        <div class="options">
+          <label for="opponent">Opponent:</label>
+          <select id="opponent">
+            <option>Stockfish</option>
+            <option>Nobody - I move both sides</option>
+          </select>
+          <label for="level">Stockfish's level:</label>
+          <select id="level"></select>
+          <label for="colour">You play:</label>
+          <select id="colour">
+            <option>White</option>
+            <option>Black</option>
+            <option>Random</option>
+          </select>
+          <label for="sf-opening">Stockfish's opening:</label>
+          <select id="sf-opening"></select>
+          <label for="my-opening">Your opening to practise:</label>
+          <select id="my-opening"></select>
+        </div>
+
+        <p id="engine-status" class="engine-status">Loading Stockfish...</p>
+
+        <div class="menu-buttons">
+          <button type="button" id="back-to-game">Back to current game</button>
+          <button type="submit" id="start" class="accent">Start game</button>
+        </div>
+        <p class="about-link"><a href="./about.html">About &amp; licences</a></p>
+      </form>
+    </div>
+
+    <!-- The game screen -->
+    <main id="game">
+      <section class="board-area">
+        <div class="board-row">
+          <div id="eval-bar" hidden aria-label="Evaluation">
+            <div class="eval-white"></div>
+            <span class="eval-label"></span>
+          </div>
+          <div id="board" class="wood"></div>
+        </div>
+        <!-- On phones the step buttons sit right under the board -->
+        <div class="nav board-nav" aria-label="Step through the game">
+          <button type="button" data-nav="first" title="First position">&laquo;</button>
+          <button type="button" data-nav="back" title="Back one move">&lsaquo;</button>
+          <button type="button" data-nav="forward" title="Forward one move">&rsaquo;</button>
+          <button type="button" data-nav="last" title="Current position">&raquo;</button>
+        </div>
+      </section>
+
+      <section class="moves-area">
+        <h2>Moves</h2>
+        <div class="nav list-nav" aria-label="Step through the game">
+          <button type="button" data-nav="first" title="First position">&laquo;</button>
+          <button type="button" data-nav="back" title="Back one move">&lsaquo;</button>
+          <button type="button" data-nav="forward" title="Forward one move">&rsaquo;</button>
+          <button type="button" data-nav="last" title="Current position">&raquo;</button>
+        </div>
+        <p id="view-label" class="muted">No moves yet</p>
+        <p id="opening-label" class="opening-label" hidden></p>
+        <p id="repertoire-label" class="repertoire-label" hidden></p>
+        <ol id="move-list"></ol>
+
+        <div id="review-area" hidden>
+          <div class="review-header">
+            <h2>Move review</h2>
+            <label class="check"><input type="checkbox" id="rate-moves" checked /> Rate moves</label>
+          </div>
+          <p id="review-progress" class="muted"></p>
+          <div id="review" aria-live="polite"></div>
+          <button type="button" id="reply-button" class="reply-button" disabled>See Stockfish's reply &rsaquo;</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2 id="mode-title">Play</h2>
+        <p id="turn" class="turn"></p>
+        <div class="game-bar">
+          <span id="game-info"></span>
+          <button type="button" id="resign">Resign</button>
+          <button type="button" id="review-game" class="accent" hidden>Review this game</button>
+          <button type="button" id="exit-analysis" class="accent" hidden>&lsaquo; Back to game review</button>
+        </div>
+
+        <!-- The strategy coach (Practice mode) -->
+        <div id="coach" hidden>
+          <div class="coach-header">
+            <h3>Strategy coach</h3>
+            <span id="quiz-score" class="muted"></span>
+          </div>
+          <div class="coach-tools">
+            <button type="button" id="threat-button">What's the threat?</button>
+            <button type="button" id="plan-button">Plan ahead</button>
+            <button type="button" id="quiz-button">Spot their idea (quiz)</button>
+            <button type="button" id="ideas-button">Explain the ideas</button>
+          </div>
+          <div id="coach-text" class="coach-text" aria-live="polite"></div>
+          <div class="line-row">
+            <span>Stockfish's line:</span>
+            <button type="button" id="line-back" title="Back one move in the line">&lsaquo;</button>
+            <button type="button" id="line-forward" title="Forward one move in the line">&rsaquo;</button>
+            <button type="button" id="line-exit">Back to position</button>
+          </div>
+          <p id="coach-status" class="coach-status"></p>
+        </div>
+
+        <div class="spacer"></div>
+        <div class="bottom-buttons">
+          <button type="button" id="undo" hidden>Undo move</button>
+          <button type="button" id="flip">Flip board</button>
+          <button type="button" id="new-game">New game</button>
+          <label class="check" id="eval-check-label" hidden><input type="checkbox" id="eval-check" checked /> Eval bar</label>
+        </div>
+        <div class="look-row">
+          <label for="board-theme">Board:</label>
+          <select id="board-theme">
+            <option value="wood">Wood</option>
+            <option value="grey">Grey &amp; white</option>
+          </select>
+        </div>
+        <form id="fen-row" class="fen-row" hidden>
+          <label for="fen">FEN:</label>
+          <input id="fen" type="text" autocomplete="off" spellcheck="false" placeholder="Paste a position" />
+          <button type="submit" id="load-fen">Load position</button>
+        </form>
+        <p class="about-link"><a href="./about.html">About &amp; licences</a></p>
+      </section>
+    </main>
+
+    <!-- Pop-up messages -->
+    <dialog id="dialog">
+      <form method="dialog">
+        <h3 id="dialog-title"></h3>
+        <p id="dialog-text"></p>
+        <div class="dialog-buttons">
+          <button value="cancel" id="dialog-cancel">Cancel</button>
+          <button value="ok" id="dialog-ok" class="accent">OK</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

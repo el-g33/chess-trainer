@@ -1,0 +1,28 @@
+{
+  "name": "chess-trainer-web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Chess Trainer - play and practise against Stockfish in the browser",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:phone": "vite --host",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "preview:phone": "vite preview --host",
+    "check": "tsc --noEmit",
+    "copy-engine": "node scripts/copy-engine.mjs",
+    "postinstall": "node scripts/copy-engine.mjs"
+  },
+  "dependencies": {
+    "@fontsource/permanent-marker": "5.3.0",
+    "@lichess-org/chessground": "10.4.2",
+    "chessops": "0.15.1",
+    "stockfish": "19.0.1"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vite": "8.3.4"
+  }
+}

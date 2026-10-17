@@ -1,0 +1,14 @@
+Chess piece artwork
+===================
+
+The piece images in this folder are the "Merida" set by Armando Hernandez
+Marroquin, as published in the lichess project
+(https://github.com/lichess-org/lila, public/piece/merida).
+
+License: GNU General Public License, version 2 or (at your option) any later
+version (GPLv2+). See https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+
+Changes: the Chess Trainer recolours the pieces when it loads them (cream for
+White, near-black for Black), resizes them, and rotates the king for the
+checkmate animation. The files in this folder are unchanged originals. If you
+share this app, keep this notice and the original files with it.
