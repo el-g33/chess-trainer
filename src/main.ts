@@ -41,6 +41,7 @@ import {
   type OpeningEngine,
   type OpeningInfo,
 } from "./openings";
+import { openingPlanAhead, reviewOpeningChoice, type OpeningPlan, type PlanMode } from "./openingPlan";
 import { FALL_ANGLES, fallenKing, loadPieces } from "./pieces";
 import { addMisses, fenOf, formatScore, isDrawnPosition, reviewMove, type Review } from "./review";
 import { gradeGuess, planAhead, threatCheck, type CoachEngine, type Plan, type Threat } from "./strategy";
@@ -55,6 +56,8 @@ const YOUR_ARROW = "#2E7D32"; // your moves in Stockfish's line
 const OPPONENT_ARROW = "#C62828"; // your opponent's moves in the line
 const THREAT_ARROW = "#E67E22"; // your opponent's threat (dashed)
 const GUESS_ARROW = "#1565C0"; // your quiz guess
+const DEVIATE_ARROW = "#C9A227"; // leaving your opening plan
+const BEST_ARROW = "#5E6B73"; // Stockfish's own choice where your opening plan differs (dashed)
 const ARROWS_AT_ONCE = 4; // how many moves of Stockfish's line are drawn at a time
 
 const HINT_TEXT =
@@ -118,6 +121,8 @@ const fenRow = $<HTMLFormElement>("fen-row");
 const fenInput = $<HTMLInputElement>("fen");
 const loadButton = $<HTMLButtonElement>("load-fen");
 const themeBox = $<HTMLSelectElement>("board-theme");
+const planModeBox = $<HTMLSelectElement>("plan-mode");
+const planModeRow = $("plan-mode-row");
 // « ‹ › » - above the move list, and (on phones) right under the board
 const navButtons = [...document.querySelectorAll<HTMLButtonElement>("button[data-nav]")];
 
@@ -236,6 +241,11 @@ const coachAnalysis: CoachEngine = {
       return { score: lineScore(position, line), pv };
     });
   },
+  async moveScore(position, move, seconds) {
+    coachEngine ??= new Engine();
+    const [line] = await coachEngine.analyse(fenOf(position), seconds * 1000, 1, [standardUci(position, move)]);
+    return lineScore(position, line);
+  },
 };
 
 const ground: Api = Chessground($("board"), {
@@ -254,6 +264,8 @@ Object.assign(ground.state.drawable.brushes, {
   them: { key: "them", color: OPPONENT_ARROW, opacity: 0.85, lineWidth: 10 },
   threat: { key: "threat", color: THREAT_ARROW, opacity: 0.9, lineWidth: 10 },
   guess: { key: "guess", color: GUESS_ARROW, opacity: 0.85, lineWidth: 10 },
+  deviate: { key: "deviate", color: DEVIATE_ARROW, opacity: 0.9, lineWidth: 10 },
+  best: { key: "best", color: BEST_ARROW, opacity: 0.55, lineWidth: 7 },
 });
 
 // ---------------------------------------------------------------------------
@@ -316,6 +328,7 @@ interface Settings {
   rateMoves?: boolean;
   evalBar?: boolean;
   boardTheme?: string;
+  planMode?: string;
 }
 
 function loadSettings(): Settings {
@@ -337,6 +350,7 @@ function saveSettings() {
     rateMoves: rateMovesBox.checked,
     evalBar: evalCheck.checked,
     boardTheme: themeBox.value,
+    planMode: planModeBox.value,
   };
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -373,6 +387,8 @@ function buildMenu() {
   if (saved.rateMoves !== undefined) rateMovesBox.checked = saved.rateMoves;
   if (saved.evalBar !== undefined) evalCheck.checked = saved.evalBar;
   if (saved.boardTheme) themeBox.value = saved.boardTheme;
+  if (saved.planMode) planModeBox.value = saved.planMode;
+  if (planModeBox.selectedIndex < 0) planModeBox.selectedIndex = 0;
   if (themeBox.selectedIndex < 0) themeBox.selectedIndex = 0;
   applyTheme();
 
@@ -747,7 +763,10 @@ async function startTask(kind: Task) {
   const fen = fenOf(position);
   const insight = insights.get(fen) ?? {};
   const needThreat = kind !== "plan" && !insight.threat;
-  const needPlan = (kind === "plan" || kind === "ideas") && !insight.plan;
+  const planMode = currentPlanMode(position);
+  // A plan made in the other mode is made again (Explain the ideas uses whichever is there)
+  const needPlan = (kind === "plan" && (!insight.plan || planModeOf(insight.plan) !== planMode)) ||
+    (kind === "ideas" && !insight.plan);
   const needIdeas = kind === "ideas" && !insight.ideas;
 
   if (kind === "quiz") {
@@ -778,8 +797,14 @@ async function startTask(kind: Task) {
       refresh();
     }
     if (needPlan) {
-      statusMessage = "Stockfish is working out the next few moves...";
-      found.plan = await planAhead(coachAnalysis, position);
+      if (planMode === "best") {
+        statusMessage = "Stockfish is working out the next few moves...";
+        found.plan = await planAhead(coachAnalysis, position);
+      } else {
+        statusMessage = "Stockfish is checking your opening's moves...";
+        const first = firstMoveOf(game.positionAt(0), gameMoves());
+        found.plan = await openingPlanAhead(coachAnalysis, position, match!.myOpening!, book!, first, planMode);
+      }
       saveInsight(fen, found);
       refresh();
     }
@@ -795,6 +820,16 @@ async function startTask(kind: Task) {
     refresh();
   }
 }
+
+/** Which Plan ahead to make here: following your opening (if you're
+ *  practising one, it's your move and the switch is on), or Stockfish's best. */
+function currentPlanMode(position: Chess): PlanMode {
+  const chosen = planModeBox.value as PlanMode;
+  if (chosen === "best" || !match?.myOpening || !book || position.turn !== match.user) return "best";
+  return chosen;
+}
+
+const planModeOf = (plan: Plan): PlanMode => ("mode" in plan ? (plan as OpeningPlan).mode : "best");
 
 function saveInsight(fen: string, found: Insight) {
   insights.set(fen, { ...(insights.get(fen) ?? {}), ...found });
@@ -950,6 +985,7 @@ function applyMode() {
   document.body.classList.toggle("practice", practice);
   modeTitle.textContent = practice ? "Practice" : "Play";
   for (const element of [coachPanel, reviewArea, fenRow, undoButton]) element.hidden = !practice;
+  planModeRow.hidden = !(practice && match?.myOpening);
   $("eval-check-label").hidden = !practice;
   evalBar.hidden = !evalOn();
 }
@@ -969,14 +1005,23 @@ function arrowShapes(): DrawShape[] {
     // The next few moves of the line from where you are in it
     const first = preview?.step ?? 0;
     const you = base().turn;
+    const choices = planModeOf(insight.plan) === "best" ? [] : (insight.plan as OpeningPlan).choices;
     insight.plan.steps.slice(first, first + ARROWS_AT_ONCE).forEach((step, i) => {
       const before = insight.plan!.positions[first + i];
+      const choice = choices[first + i];
+      const deviating = step.side === you && choice?.kind === "deviate";
+      const brush = step.side !== you ? "them" : deviating ? "deviate" : "you";
+      const fill = step.side !== you ? OPPONENT_ARROW : deviating ? DEVIATE_ARROW : YOUR_ARROW;
       shapes.push({
         orig: makeSquare(step.move.from) as Key,
         dest: arrowEnd(before, step.move),
-        brush: step.side === you ? "you" : "them",
-        label: { text: String(step.number), fill: step.side === you ? YOUR_ARROW : OPPONENT_ARROW },
+        brush,
+        label: { text: String(step.number), fill },
       });
+      // Your next move: where the opening plan differs from Stockfish's own choice, show that too
+      if (i === 0 && step.side === you && choice && makeUci(choice.best) !== makeUci(step.move)) {
+        shapes.push({ orig: makeSquare(choice.best.from) as Key, dest: arrowEnd(before, choice.best), brush: "best" });
+      }
     });
   }
   const threat = insight.threat;
@@ -1184,6 +1229,16 @@ function drawMoveList(reviews: (Review | undefined)[], info: OpeningInfo[]) {
   repertoireLabel.hidden = !lines.length;
 }
 
+/** For your moves while practising an opening: whether sticking to it (or
+ *  leaving it) was right, judged with Stockfish's ratings. */
+function openingChoiceNote(ply: number, review: Review | undefined): string | undefined {
+  if (!review || !book || !match?.myOpening || game.moverOf(ply) !== match.user) return undefined;
+  const before = game.positionAt(ply - 1);
+  const best = analyser.evals.get(fenOf(before))?.best;
+  const first = firstMoveOf(game.positionAt(0), gameMoves().slice(0, Math.max(0, ply - 1)));
+  return reviewOpeningChoice(before, game.moves[ply - 1].move, review.loss, best, match.myOpening, book, first);
+}
+
 /** "Missed Win" -> "r-missed-win", for the rating's colour */
 const ratingClass = (rating: string) => "r-" + rating.toLowerCase().replace(" ", "-");
 
@@ -1215,6 +1270,8 @@ function drawReview(reviews: (Review | undefined)[], info: OpeningInfo[]) {
     if (ply > 0) {
       const moveInfo = info[ply - 1] ?? { book: false, opening: null, notes: [] };
       const notes = [...moveInfo.notes, ...(plyNotes.get(ply) ?? [])];
+      const choiceNote = openingChoiceNote(ply, reviews[ply - 1]);
+      if (choiceNote) notes.push(choiceNote);
       if (moveInfo.book || notes.length) {
         const name = moveInfo.opening ? moveInfo.opening[1] : "known theory";
         paragraph(moveInfo.book ? `Book move (${name})` : "Opening", "review-opening");
@@ -1488,6 +1545,10 @@ function wireButtons() {
     refresh();
   });
   fenRow.addEventListener("submit", (event) => void onLoadFen(event));
+  planModeBox.addEventListener("change", () => {
+    saveSettings();
+    refresh();
+  });
   themeBox.addEventListener("change", () => {
     applyTheme();
     saveSettings();

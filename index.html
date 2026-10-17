@@ -134,6 +134,15 @@
             <button type="button" id="quiz-button">Spot their idea (quiz)</button>
             <button type="button" id="ideas-button">Explain the ideas</button>
           </div>
+          <!-- Only while practising an opening: what Plan ahead follows -->
+          <div id="plan-mode-row" class="plan-mode-row" hidden>
+            <label for="plan-mode">Plan ahead:</label>
+            <select id="plan-mode">
+              <option value="best">Stockfish's best moves</option>
+              <option value="stick">My opening - stick to it</option>
+              <option value="chances">My opening - take chances</option>
+            </select>
+          </div>
           <div id="coach-text" class="coach-text" aria-live="polite"></div>
           <div class="line-row">
             <span>Stockfish's line:</span>

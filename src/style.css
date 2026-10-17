@@ -453,6 +453,26 @@ body.practice #move-list {
   margin: 6px 0 8px;
 }
 
+.plan-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+}
+
+.plan-mode-row select {
+  flex: 1;
+  min-width: 0;
+  min-height: 32px;
+  padding-block: 4px;
+}
+
+/* Stockfish's own choice for your next move, where the opening plan differs */
+cg-container svg.cg-shapes line[stroke="#5E6B73" i] {
+  stroke-dasharray: 0.14 0.1;
+}
+
 .coach-text {
   flex: 1;
   min-height: 120px;

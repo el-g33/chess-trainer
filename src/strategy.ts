@@ -40,6 +40,8 @@ const QUIZ_CLOSE_ENOUGH = 5;
  *  point of view, and each line's moves (already chessops moves). */
 export interface CoachEngine {
   analyse(position: Chess, seconds: number, lines?: number): Promise<{ score: Score; pv: NormalMove[] }[]>;
+  /** The score of one particular move (for the opening-aware plan). */
+  moveScore?(position: Chess, move: NormalMove, seconds: number): Promise<Score>;
 }
 
 const bullets = (ideas: string[]) => ideas.map((idea) => `• ${idea}`);

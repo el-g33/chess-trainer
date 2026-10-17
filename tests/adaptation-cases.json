@@ -1,0 +1,48 @@
+{
+  "_about": "Positions where a repertoire opening should adapt to the opponent. 'line' is from the lichess opening list (source) unless noted; 'expect' are the adaptation moves the plan should offer. Checked by verify_adaptations.py (full Stockfish) and tests/adaptations.html (the web triggers).",
+  "cases": [
+    { "opening": "Italian Game", "line": "1. e4 g6", "expect": ["d4"], "source": "Modern Defense 2.d4 (centre conceded)" },
+    { "opening": "Italian Game", "line": "1. e4 b6", "expect": ["d4"], "source": "Owen Defense 2.d4 (centre conceded)" },
+    { "opening": "Italian Game", "line": "1. e4 e5 2. Nf3 d6", "expect": ["d4"], "source": "Philidor Defense 3.d4" },
+    { "opening": "Italian Game", "line": "1. e4 e5 2. Nf3 f5", "expect": ["Nxe5", "exf5"], "source": "Latvian Gambit Accepted 3.Nxe5 / 3.exf5" },
+    { "opening": "Italian Game", "line": "1. e4 e5 2. Nf3 Nf6", "expect": ["Nxe5"], "source": "Petrov's Defense 3.Nxe5" },
+
+    { "opening": "London System", "line": "1. d4 e5", "expect": ["dxe5"], "source": "Englund Gambit 2.dxe5" },
+    { "opening": "London System", "line": "1. d4 Nf6 2. Nf3 d5 3. Bf4 c5 4. e3 Qb6", "expect": ["Nc3", "Qc1"], "source": "London System: Poisoned Pawn Variation 5.Nc3" },
+    { "opening": "London System", "line": "1. d4 g6", "expect": ["e4"], "source": "Modern Defense (centre conceded)" },
+    { "opening": "London System", "line": "1. d4 b6", "expect": ["e4"], "source": "English Defense / Owen (centre conceded)" },
+
+    { "opening": "Rapport-Jobava System", "line": "1. d4 e5", "expect": ["dxe5"], "source": "Englund Gambit 2.dxe5" },
+    { "opening": "Rapport-Jobava System", "line": "1. d4 g6 2. Nc3 Bg7 3. Bf4 d6", "expect": ["e4"], "source": "centre conceded: Jobava with e4 (Pirc/Modern structure)" },
+    { "opening": "Rapport-Jobava System", "line": "1. d4 d5 2. Nc3 Nf6 3. Bf4 e6", "expect": ["Nb5"], "source": "Rapport-Jobava System with e6: Nb5 hitting c7 (plan idea)" },
+
+    { "opening": "Queen's Gambit", "line": "1. d4 d5 2. c4 e5", "expect": ["dxe5"], "source": "Albin Countergambit 3.dxe5" },
+    { "opening": "Queen's Gambit", "line": "1. d4 d5 2. c4 dxc4", "expect": ["e4", "e3", "Nf3"], "source": "Queen's Gambit Accepted: Central Variation 3.e4" },
+    { "opening": "Queen's Gambit", "line": "1. d4 b6", "expect": ["e4"], "source": "centre conceded" },
+
+    { "opening": "Ruy Lopez", "line": "1. e4 e5 2. Nf3 d6", "expect": ["d4"], "source": "Philidor Defense 3.d4" },
+    { "opening": "Ruy Lopez", "line": "1. e4 e5 2. Nf3 Nf6", "expect": ["Nxe5"], "source": "Petrov's Defense 3.Nxe5" },
+    { "opening": "Ruy Lopez", "line": "1. e4 g6", "expect": ["d4"], "source": "Modern Defense 2.d4 (centre conceded)" },
+
+    { "opening": "Classical centre (...e5 / ...d5)", "line": "1. e4 e5 2. Nf3 Nc6 3. d4", "expect": ["exd4"], "source": "Scotch Game 3...exd4" },
+    { "opening": "Classical centre (...e5 / ...d5)", "line": "1. e4 e5 2. Qh5 Nc6 3. Bc4", "expect": ["g6", "Qe7"], "source": "Wayward Queen Attack: ...g6 (lichess Mellon line)" },
+    { "opening": "Classical centre (...e5 / ...d5)", "line": "1. d4 d5 2. e4", "expect": ["dxe4"], "source": "Blackmar-Diemer Gambit 2...dxe4" },
+    { "opening": "Classical centre (...e5 / ...d5)", "line": "1. d4 d5 2. Bf4", "expect": ["c5"], "source": "Accelerated London: Steinitz Countergambit 2...c5" },
+    { "opening": "Classical centre (...e5 / ...d5)", "line": "1. e4 e5 2. f4", "expect": ["exf4", "d5"], "source": "King's Gambit Accepted / Falkbeer" },
+
+    { "opening": "Caro-Kann / Slav (...c6 and ...d5)", "line": "1. e4 c6 2. d4 d5 3. exd5", "expect": ["cxd5"], "source": "Caro-Kann Exchange 3...cxd5" },
+    { "opening": "Caro-Kann / Slav (...c6 and ...d5)", "line": "1. e4 c6 2. d4 d5 3. e5 Bf5 4. Nf3 e6 5. Be2", "expect": ["c5"], "source": "Caro-Kann Advance: the ...c5 break (cf. Botvinnik-Carls 3...c5)" },
+    { "opening": "Caro-Kann / Slav (...c6 and ...d5)", "line": "1. d4 d5 2. c4 c6 3. cxd5", "expect": ["cxd5"], "source": "Slav Exchange 3...cxd5" },
+    { "opening": "Caro-Kann / Slav (...c6 and ...d5)", "line": "1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. e3 Bf5 5. Qb3", "expect": ["Qb6"], "source": "Slav with ...Bf5: meet Qb3 with ...Qb6" },
+
+    { "opening": "King's Indian / Pirc setup", "line": "1. e4 d6 2. d4 Nf6 3. Nc3 g6 4. f4 Bg7 5. Nf3", "expect": ["c5", "O-O"], "source": "Pirc Austrian Attack: Dragon Formation 5...c5" },
+    { "opening": "King's Indian / Pirc setup", "line": "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. f4 O-O 6. Nf3", "expect": ["c5"], "source": "King's Indian Four Pawns Attack: ...c5" },
+    { "opening": "King's Indian / Pirc setup", "line": "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. f3 O-O 6. Be3", "expect": ["e5", "c5"], "source": "King's Indian Sämisch: ...e5 / ...c5" },
+    { "opening": "King's Indian / Pirc setup", "line": "1. d4 Nf6 2. Nf3 g6 3. Bf4 Bg7 4. e3 d6 5. h3 O-O 6. Be2", "expect": ["c5"], "source": "London System with Be2: ...c5" },
+
+    { "opening": "Sicilian Defence", "line": "1. e4 c5 2. Nf3 d6 3. d4", "expect": ["cxd4"], "source": "Open Sicilian 3...cxd4" },
+    { "opening": "Sicilian Defence", "line": "1. e4 c5 2. c3", "expect": ["Nf6", "d5"], "source": "Sicilian Alapin 2...Nf6 / 2...d5" },
+    { "opening": "Sicilian Defence", "line": "1. e4 c5 2. Nf3 d6 3. Bb5+", "expect": ["Bd7", "Nd7"], "source": "Sicilian Moscow Variation 3...Bd7" },
+    { "opening": "Sicilian Defence", "line": "1. e4 c5 2. Nc3 Nc6 3. f4", "expect": ["g6", "e6"], "source": "Sicilian Grand Prix Attack: ...g6 / ...e6" }
+  ]
+}

@@ -111,6 +111,20 @@ any difference. The tests folder isn't part of the built site.
 | `tests/make_review_cases.py` | http://localhost:5173/tests/ | move ratings and texts (`move_review.py`) | 761 / 761 identical |
 | `tests/make_opening_cases.py` | http://localhost:5173/tests/openings.html | book moves, opening names, Stockfish's opening choices, opening coaching (`openings.py`) | 1845 / 1845 identical |
 | `tests/make_coach_cases.py` | http://localhost:5173/tests/coach.html | threat check, plan ahead, explain the ideas, quiz marking (`strategy.py`, `ideas.py`) | 1143 / 1143 identical |
+| `tests/verify_adaptations.py` | http://localhost:5173/tests/adaptations.html | the opening adaptations (web only, no desktop version): full-strength Stockfish confirms each answer; the page checks the web version spots each situation | 35 / 35 confirmed, 35 / 35 spotted |
+
+## Plan ahead with your opening (web only)
+
+While practising an opening, Plan ahead can follow it ("Plan ahead:" in the
+coach panel): **stick to it** keeps to the opening unless that costs more than
+8 points of winning chance or gives back material; **take chances** leaves the
+opening whenever Stockfish's best gains 3 points or more, and says what the
+opening move would have been and why it isn't best. Your moves come from the
+opening's book moves, its setup (in whatever order works best) and the
+adaptations in `src/openings.ts` (standard answers to the opponent's
+deviations, each from a lichess line - e.g. 1. d4 e5 2. dxe5 against the
+Englund Gambit). The Move review then notes good adaptations and missed
+chances. Code: `src/openingPlan.ts`. The desktop app doesn't have this.
 
 The opening and coach tests record every Stockfish answer the desktop asked
 for, so the web version is replayed with exactly the same engine results.

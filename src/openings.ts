@@ -297,6 +297,278 @@ export const REPERTOIRE: Opening[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Adaptations: standard ways each opening adjusts to what the opponent does
+// ---------------------------------------------------------------------------
+// The setups above describe the opening when the opponent plays "normally".
+// These are the well-known answers when they don't - e.g. taking the Englund
+// Gambit pawn with dxe5 instead of carrying on with the London setup. Each
+// comes from a named lichess line (source), and every one is checked against
+// full-strength Stockfish by tests/verify_adaptations.py. They are only
+// candidates: the plan still checks each with Stockfish before suggesting it.
+
+export interface Adaptation {
+  name: string; // what the opponent did, e.g. "Englund Gambit"
+  moves: string[]; // the answers, in notation (only legal ones count)
+  when: (position: Chess, me: Color) => boolean; // the situation
+  why: string; // the idea, in plain words
+  source: string; // where the answer comes from
+}
+
+const at = (position: Chess, square: string) => position.board.get(parseSquare(square)!);
+/** Is there a piece (letter P N B R Q K) of `colour` on every one of these squares? */
+const has = (position: Chess, colour: Color, letter: string, ...squares: string[]) =>
+  squares.every((s) => {
+    const piece = at(position, s);
+    return piece?.color === colour && piece.role === PIECE_ROLES_BY_LETTER[letter];
+  });
+const PIECE_ROLES_BY_LETTER: Record<string, Role> = { P: "pawn", N: "knight", B: "bishop", R: "rook", Q: "queen", K: "king" };
+const early = (position: Chess, moves = 4) => position.fullmoves <= moves;
+
+/** No enemy pawn in the centre (c4-f4, c5-f5) and no knight eyeing e4/d4:
+ *  the opponent has left the centre to you. */
+function centreConceded(position: Chess, me: Color, knightSquare: string): boolean {
+  const them: Color = me === "white" ? "black" : "white";
+  const centre = ["c4", "d4", "e4", "f4", "c5", "d5", "e5", "f5"];
+  return !centre.some((s) => has(position, them, "P", s)) && !has(position, them, "N", knightSquare);
+}
+
+const ENGLUND: Adaptation = {
+  name: "Englund Gambit (1...e5)",
+  moves: ["dxe5"],
+  when: (p, me) => early(p, 3) && has(p, me, "P", "d4") && has(p, opp(me), "P", "e5"),
+  why: "They've offered the e5 pawn. Take it with dxe5: Black's quick tricks (...Qe7, ...Nc6, ...Qxe5) are known not to work, and your setup can follow afterwards.",
+  source: "lichess: Englund Gambit 1. d4 e5 2. dxe5",
+};
+
+const CENTRE_E4: Adaptation = {
+  name: "they've given up the centre",
+  moves: ["e4"],
+  when: (p, me) => early(p, 4) && has(p, me, "P", "d4") && centreConceded(p, me, "f6"),
+  why: "There's no black pawn on d5 or e5 and nothing stopping e4, so take the whole centre with e4. Two pawns side by side in the centre give your pieces more room; the slower setup moves can come after.",
+  source: "lichess: Modern Defense / Owen Defense lines with e4",
+};
+
+const CENTRE_D4: Adaptation = {
+  name: "they've given up the centre",
+  moves: ["d4"],
+  when: (p, me) => early(p, 3) && has(p, me, "P", "e4") && centreConceded(p, me, "c6"),
+  why: "Black hasn't put a pawn in the centre, so take it with d4: with pawns on e4 and d4 you control the key squares and your pieces come out easily.",
+  source: "lichess: Modern Defense 1. e4 g6 2. d4, Owen Defense 1. e4 b6 2. d4",
+};
+
+const PHILIDOR: Adaptation = {
+  name: "Philidor Defence (...d6 instead of ...Nc6)",
+  moves: ["d4"],
+  when: (p, me) => early(p, 3) && has(p, me, "N", "f3") && has(p, opp(me), "P", "e5", "d6") && !has(p, opp(me), "N", "c6"),
+  why: "Black defends e5 with the pawn on d6, which shuts in their own bishop. Strike at once with d4: it gains space and Black's position stays cramped.",
+  source: "lichess: Philidor Defense 1. e4 e5 2. Nf3 d6 3. d4",
+};
+
+const LATVIAN: Adaptation = {
+  name: "Latvian Gambit (...f5)",
+  moves: ["Nxe5", "exf5"],
+  when: (p, me) => early(p, 3) && has(p, me, "N", "f3") && has(p, opp(me), "P", "e5", "f5"),
+  why: "...f5 is a risky gambit that weakens Black's king. Take the e5 pawn with Nxe5 (main line), or take on f5.",
+  source: "lichess: Latvian Gambit Accepted 3. Nxe5 / 3. exf5",
+};
+
+const PETROV: Adaptation = {
+  name: "Petrov's Defence (...Nf6 instead of ...Nc6)",
+  moves: ["Nxe5"],
+  when: (p, me) => early(p, 3) && has(p, me, "N", "f3") && has(p, opp(me), "N", "f6") && has(p, opp(me), "P", "e5") && !has(p, opp(me), "N", "c6"),
+  why: "Black attacks your e4 pawn instead of defending e5. Take first with Nxe5; after ...d6 the knight goes back (Nf3) and you're ready for Black's ...Nxe4.",
+  source: "lichess: Petrov's Defense 1. e4 e5 2. Nf3 Nf6 3. Nxe5",
+};
+
+const ALBIN: Adaptation = {
+  name: "Albin Countergambit (2...e5)",
+  moves: ["dxe5"],
+  when: (p, me) => early(p, 3) && has(p, me, "P", "d4", "c4") && has(p, opp(me), "P", "e5", "d5"),
+  why: "They offer a pawn to open the centre. Take it with dxe5, then develop calmly (Nf3, g3 or a3); don't grab more pawns.",
+  source: "lichess: Queen's Gambit Declined: Albin Countergambit 3. dxe5",
+};
+
+const QGA: Adaptation = {
+  name: "Queen's Gambit Accepted (...dxc4)",
+  moves: ["e4", "e3", "Nf3"],
+  when: (p, me) => early(p, 5) && has(p, me, "P", "d4") && has(p, opp(me), "P", "c4"),
+  why: "They've taken your c-pawn. Don't chase it with b3: take the centre with e4 (or play e3) and win the pawn back with Bxc4.",
+  source: "lichess: Queen's Gambit Accepted: Central Variation 3. e4",
+};
+
+const LONDON_QB6: Adaptation = {
+  name: "...Qb6, attacking b2",
+  moves: ["Nc3", "Qc1"],
+  when: (p, me) => early(p, 8) && has(p, opp(me), "Q", "b6") && has(p, me, "P", "b2") && has(p, me, "B", "f4"),
+  why: "With your bishop on f4 the b2 pawn is unguarded and their queen attacks it. Nc3 sets a trap (after ...Qxb2, Nb5 threatens Nc7+), or simply guard it with Qc1.",
+  source: "lichess: London System: Poisoned Pawn Variation 5. Nc3",
+};
+
+const JOBAVA_NB5: Adaptation = {
+  name: "c7 is weak",
+  moves: ["Nb5"],
+  when: (p, me) => early(p, 6) && has(p, me, "N", "c3") && has(p, me, "B", "f4") && has(p, opp(me), "P", "c7") && !has(p, opp(me), "B", "d6") && !has(p, opp(me), "N", "a6"),
+  why: "Your bishop on f4 already aims at c7; Nb5 attacks it a second time, so Black has to spend a move (...Na6 or ...Bd6) defending - the typical Jobava idea.",
+  source: "lichess: Rapport-Jobava System with e6 (Nb5 idea)",
+};
+
+// -- Black openings --
+
+const SCOTCH: Adaptation = {
+  name: "Scotch Game (d4)",
+  moves: ["exd4"],
+  when: (p, me) => early(p, 4) && has(p, me, "P", "e5") && has(p, opp(me), "P", "d4"),
+  why: "White opens the centre with d4. Take it with ...exd4 and develop quickly; holding e5 with ...d6 is passive.",
+  source: "lichess: Scotch Game 3...exd4",
+};
+
+const WAYWARD_QUEEN: Adaptation = {
+  name: "early queen attack on f7",
+  moves: ["g6", "Qe7"],
+  when: (p, me) => early(p, 4) && has(p, opp(me), "Q", "h5") && has(p, opp(me), "B", "c4") && has(p, me, "P", "f7"),
+  why: "Their queen and bishop both aim at f7, threatening Qxf7 mate. Block with ...g6 (it also attacks the queen), or defend with ...Qe7.",
+  source: "lichess: King's Pawn Game: Wayward Queen Attack (...g6)",
+};
+
+const BLACKMAR_DIEMER: Adaptation = {
+  name: "Blackmar-Diemer Gambit (2.e4)",
+  moves: ["dxe4"],
+  when: (p, me) => early(p, 3) && has(p, me, "P", "d5") && has(p, opp(me), "P", "e4", "d4"),
+  why: "White offers the e4 pawn for fast development. Take it with ...dxe4, then develop with ...Nf6 and don't hang on to everything.",
+  source: "lichess: Blackmar-Diemer Gambit 2...dxe4",
+};
+
+const VS_EARLY_BF4: Adaptation = {
+  name: "Early Bf4 (London)",
+  moves: ["c5"],
+  when: (p, me) => early(p, 4) && has(p, opp(me), "B", "f4") && has(p, opp(me), "P", "b2", "d4") && has(p, me, "P", "d5", "c7"),
+  why: "White's bishop has left c1, so b2 is loose. Hit back at the centre with ...c5; ...Qb6 next attacks b2.",
+  source: "lichess: Accelerated London System: Steinitz Countergambit 2...c5",
+};
+
+const KINGS_GAMBIT: Adaptation = {
+  name: "King's Gambit (f4)",
+  moves: ["exf4", "d5"],
+  when: (p, me) => early(p, 3) && has(p, me, "P", "e5") && has(p, opp(me), "P", "f4", "e4"),
+  why: "White offers the f-pawn. Take it with ...exf4, or strike back in the centre with ...d5 (Falkbeer).",
+  source: "lichess: King's Gambit Accepted / Falkbeer Countergambit",
+};
+
+const EXCHANGE_RECAPTURE: Adaptation = {
+  name: "exchange on d5",
+  moves: ["cxd5"],
+  when: (p, me) => early(p, 5) && has(p, me, "P", "c6") && has(p, opp(me), "P", "d5"),
+  why: "They've exchanged on d5: recapture with the c-pawn (...cxd5) to keep a pawn in the centre - that's what ...c6 prepared.",
+  source: "lichess: Caro-Kann Exchange 3...cxd5, Slav Exchange 3...cxd5",
+};
+
+const ADVANCE_C5: Adaptation = {
+  name: "Advance Variation (e5)",
+  moves: ["c5"],
+  when: (p, me) => early(p, 8) && has(p, opp(me), "P", "e5", "d4") && has(p, me, "P", "d5", "e6", "c6"),
+  why: "White's pawn chain d4-e5 is strong at the front, so attack its base: ...c5 hits d4.",
+  source: "lichess: Caro-Kann Advance (cf. Botvinnik-Carls Defense 3...c5)",
+};
+
+const SLAV_QB3: Adaptation = {
+  name: "Qb3 attacking b7",
+  moves: ["Qb6"],
+  when: (p, me) => early(p, 8) && has(p, opp(me), "Q", "b3") && has(p, me, "P", "b7") && has(p, me, "B", "f5") && has(p, me, "Q", "d8"),
+  why: "With your bishop out on f5, b7 is unguarded and their queen hits it. ...Qb6 defends b7 and offers a queen trade.",
+  source: "lichess: Slav Defense with ...Bf5, Qb3 Qb6",
+};
+
+const BIG_CENTRE_C5: Adaptation = {
+  name: "big pawn centre with f4",
+  moves: ["c5"],
+  when: (p, me) => early(p, 8) && has(p, opp(me), "P", "e4", "d4", "f4") && has(p, me, "P", "c7"),
+  why: "White has three pawns in the centre (Austrian / Four Pawns Attack). Hit them at once with ...c5 before they roll forward.",
+  source: "lichess: Pirc Austrian Attack: Dragon Formation 5...c5; King's Indian Four Pawns Attack",
+};
+
+const SAEMISCH: Adaptation = {
+  name: "Sämisch (f3)",
+  moves: ["e5", "c5"],
+  when: (p, me) => early(p, 9) && has(p, opp(me), "P", "f3", "e4", "d4", "c4") && has(p, me, "B", "g7"),
+  why: "Against the Sämisch, the standard counter-punches are ...e5 or ...c5, opening lines for your g7 bishop.",
+  source: "lichess: King's Indian Defense: Sämisch Variation",
+};
+
+const KID_VS_LONDON: Adaptation = {
+  name: "London setup against your King's Indian",
+  moves: ["c5"],
+  when: (p, me) => early(p, 9) && has(p, opp(me), "B", "f4") && has(p, opp(me), "P", "d4") && !has(p, opp(me), "P", "e4") && has(p, me, "B", "g7") && has(p, me, "P", "c7"),
+  why: "White's calm London setup doesn't fear ...e5, so attack d4 with ...c5 instead - it also opens the long diagonal for your g7 bishop.",
+  source: "lichess: London System, with Be2 (...c5)",
+};
+
+const OPEN_SICILIAN: Adaptation = {
+  name: "Open Sicilian (d4)",
+  moves: ["cxd4"],
+  when: (p, me) => early(p, 4) && has(p, me, "P", "c5") && has(p, opp(me), "P", "d4"),
+  why: "Take with ...cxd4: swapping your c-pawn for White's d-pawn is the whole point of the Sicilian - you keep more centre pawns.",
+  source: "lichess: Open Sicilian 3...cxd4",
+};
+
+const ALAPIN: Adaptation = {
+  name: "Alapin (c3)",
+  moves: ["Nf6", "d5"],
+  when: (p, me) => early(p, 3) && has(p, opp(me), "P", "c3", "e4") && has(p, me, "P", "c5") && !has(p, opp(me), "P", "d4"),
+  why: "c3 prepares d4 for a full pawn centre. Hit e4 at once with ...Nf6 or ...d5 so it never gets built.",
+  source: "lichess: Sicilian Defense: Alapin Variation 2...Nf6 / 2...d5",
+};
+
+const MOSCOW: Adaptation = {
+  name: "check from b5",
+  moves: ["Bd7", "Nd7"],
+  when: (p, me) => early(p, 4) && has(p, opp(me), "B", "b5") && p.isCheck(),
+  why: "Block the check with ...Bd7 (the main line), offering to trade White's active bishop.",
+  source: "lichess: Sicilian Defense: Moscow Variation 3...Bd7",
+};
+
+const GRAND_PRIX: Adaptation = {
+  name: "Grand Prix Attack (f4)",
+  moves: ["g6", "e6"],
+  when: (p, me) => early(p, 4) && has(p, opp(me), "P", "f4", "e4") && has(p, me, "P", "c5") && !has(p, opp(me), "P", "d4"),
+  why: "White aims for a kingside attack. Set up solidly: ...g6 with ...Bg7, or ...e6 followed by ...d5.",
+  source: "lichess: Sicilian Defense: Grand Prix Attack",
+};
+
+function opp(colour: Color): Color {
+  return colour === "white" ? "black" : "white";
+}
+
+/** The adaptations for each opening system, by its label. */
+const ADAPTATIONS: Record<string, Adaptation[]> = {
+  "Italian Game": [CENTRE_D4, PHILIDOR, LATVIAN, PETROV],
+  "London System": [ENGLUND, LONDON_QB6, CENTRE_E4],
+  "Queen's Gambit": [ALBIN, QGA, CENTRE_E4],
+  "Rapport-Jobava System": [ENGLUND, CENTRE_E4, JOBAVA_NB5],
+  "Ruy Lopez": [CENTRE_D4, PHILIDOR, PETROV, LATVIAN],
+  "Open Game (...e5)": [SCOTCH, WAYWARD_QUEEN, KINGS_GAMBIT],
+  "Queen's Gambit Declined (...d5)": [BLACKMAR_DIEMER, VS_EARLY_BF4],
+  "Caro-Kann Defence": [EXCHANGE_RECAPTURE, ADVANCE_C5],
+  "Slav Defence": [EXCHANGE_RECAPTURE, SLAV_QB3],
+  "Pirc Defence": [BIG_CENTRE_C5, KID_VS_LONDON],
+  "King's Indian Defence": [BIG_CENTRE_C5, SAEMISCH, KID_VS_LONDON],
+  "Sicilian Defence": [OPEN_SICILIAN, ALAPIN, MOSCOW, GRAND_PRIX],
+};
+
+/** The adaptation moves that fit this position for the side to move. */
+export function adaptationMoves(position: Chess, system: OpeningSystem): { move: NormalMove; adaptation: Adaptation }[] {
+  const me = position.turn;
+  const found: { move: NormalMove; adaptation: Adaptation }[] = [];
+  for (const adaptation of ADAPTATIONS[system.label] ?? []) {
+    if (!adaptation.when(position, me)) continue;
+    for (const san of adaptation.moves) {
+      const move = parseSan(position, san) as NormalMove | undefined;
+      if (move && !found.some((f) => makeUci(f.move) === makeUci(move))) found.push({ move, adaptation });
+    }
+  }
+  return found;
+}
+
 const PIECE_WORDS: Record<string, string> = { P: "pawn", N: "knight", B: "bishop", R: "rook", Q: "queen", K: "king" };
 const PIECE_ROLES: Record<string, Role> = { P: "pawn", N: "knight", B: "bishop", R: "rook", Q: "queen", K: "king" };
 
