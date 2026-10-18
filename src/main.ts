@@ -17,6 +17,7 @@ import { makeSquare, makeUci, opposite, parseSquare, parseUci } from "chessops/u
 import "@fontsource/permanent-marker/latin-400.css";
 import "@lichess-org/chessground/assets/chessground.base.css";
 import "./style.css";
+import "./themes.css";
 import { Analyser, lineMove, lineScore } from "./analyser";
 import { badgeSvg } from "./badge";
 import { afterMove as positionAfter, colourName, isCastling, standardUci, variationSan } from "./coach";
@@ -148,6 +149,7 @@ const themeBox = $<HTMLSelectElement>("board-theme");
 const soundOn = $<HTMLInputElement>("sound-on");
 const soundVolume = $<HTMLInputElement>("sound-volume");
 const playerNameBox = $<HTMLInputElement>("player-name");
+const uiThemeBox = $<HTMLSelectElement>("ui-theme");
 const planModeBox = $<HTMLSelectElement>("plan-mode");
 const planModeRow = $("plan-mode-row");
 // « ‹ › » - above the move list, and (on phones) right under the board
@@ -393,6 +395,7 @@ interface Settings {
   soundOn?: boolean;
   soundVolume?: number;
   playerName?: string;
+  uiTheme?: string;
   timeControl?: string;
   tcMinutes?: number;
   tcIncrement?: number;
@@ -422,6 +425,7 @@ function saveSettings() {
     soundOn: soundOn.checked,
     soundVolume: Number(soundVolume.value),
     playerName: playerNameBox.value.trim(),
+    uiTheme: uiThemeBox.value,
     timeControl: timeControlBox.value,
     tcMinutes: Number(tcMinutes.value),
     tcIncrement: Number(tcIncrement.value),
@@ -475,6 +479,9 @@ function buildMenu() {
   if (saved.clockTick !== undefined) clockTickBox.checked = saved.clockTick;
   applySound();
   if (themeBox.selectedIndex < 0) themeBox.selectedIndex = 0;
+  if (saved.uiTheme) uiThemeBox.value = saved.uiTheme;
+  if (uiThemeBox.selectedIndex < 0) uiThemeBox.selectedIndex = 0;
+  applyUiTheme();
   applyTheme();
 
   menuCard.addEventListener("change", updateMenu);
@@ -494,6 +501,17 @@ function applySound() {
 }
 
 /** The board theme: "wood" or "grey" (a class on the board). */
+// Each look comes with a board that suits it (the Board box can still change it)
+const THEME_BOARDS: Record<string, string> = { classic: "wood", ember: "slate", stone: "walnut", violet: "lavender" };
+const THEME_BARS: Record<string, string> = { classic: "#fafafa", ember: "#16181e", stone: "#9a908a", violet: "#33365e" };
+
+/** The colours of the whole page: Classic, Midnight ember, Warm stone or Violet glass. */
+function applyUiTheme() {
+  const theme = uiThemeBox.value;
+  document.documentElement.dataset.ui = theme;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", THEME_BARS[theme] ?? "#fafafa");
+}
+
 function applyTheme() {
   const board = $("board");
   for (const option of themeBox.options) board.classList.toggle(option.value, option.value === themeBox.value);
@@ -1035,7 +1053,8 @@ function startDemo(chosen: Demo, line = 0) {
   mode = "practice";
   canReview = false;
   reviewing = false;
-  orientation = "white";
+  // Black openings are shown from Black's side
+  orientation = REPERTOIRE.find((o) => o.name === chosen.opening)?.colour ?? "white";
   demo = { demo: chosen, line: 0, steps: [], playing: true, interrupted: false };
   demoPick.replaceChildren(...chosen.lines.map((l, i) => new Option(`${i + 1}. ${l.title}`, String(i))));
   if (menuOpen) hideMenu();
@@ -1141,7 +1160,8 @@ function openDemoDialog() {
     ...DEMOS.map((d) => {
       const button = document.createElement("button");
       button.type = "button";
-      button.textContent = `${d.opening} (White) - ${d.lines.length} lines`;
+      const colour = REPERTOIRE.find((o) => o.name === d.opening)?.colour === "black" ? "Black" : "White";
+      button.textContent = `${d.opening} (${colour}) - ${d.lines.length} lines`;
       button.addEventListener("click", () => {
         demoDialog.close();
         startDemo(d);
@@ -2372,6 +2392,13 @@ function wireButtons() {
     last: () => goTo(game.length),
   };
   for (const button of navButtons) button.addEventListener("click", () => steps[button.dataset.nav!]());
+  uiThemeBox.addEventListener("change", () => {
+    applyUiTheme();
+    themeBox.value = THEME_BOARDS[uiThemeBox.value] ?? themeBox.value;
+    applyTheme();
+    saveSettings();
+    refresh();
+  });
   $("flip").addEventListener("click", () => {
     orientation = opposite(orientation);
     refresh();

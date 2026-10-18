@@ -1,0 +1,213 @@
+/* The page themes (Theme box): Classic is style.css itself; these change its
+   colour variables, corners and cards. Each has a matching board below
+   (Board box), picked automatically when the theme is chosen. */
+
+/* -- Midnight ember: near-black slate with one ember-orange accent ---------- */
+
+:root[data-ui="ember"] {
+  color-scheme: dark;
+  --bg: #16181e;
+  --card: #1f2229;
+  --text: #e8e9ed;
+  --muted: #9097a6;
+  --line: #30343f;
+  --line-strong: #3a3f4b;
+  --button: #262a33;
+  --button-hover: #2f3440;
+  --accent: #ff5a36;
+  --accent-hover: #ff7352;
+  --on-accent: #16181e;
+  --current-move: rgba(255, 90, 54, 0.24);
+  --disabled: #5d6370;
+  --input: #262a33;
+  --soft: #23262f;
+  --danger: #ff6b5b;
+  --danger-soft: #3a1f1c;
+  --good: #4cd18a;
+  --note: #a5abb8;
+  --book: #e0a46a;
+  --special: #c79bff;
+  --clock: #262a33;
+  --clock-text: #9097a6;
+  --clock-run: #ff5a36;
+  --card-radius: 10px;
+}
+
+/* -- Warm stone: taupe, cream and espresso cards, soft orange --------------- */
+
+:root[data-ui="stone"] {
+  --bg: #9a908a;
+  --card: #f2eeea;
+  --text: #2f2b29;
+  --muted: #6f655e;
+  --line: #ddd4cb;
+  --line-strong: #cfc4b9;
+  --button: #f7f3ef;
+  --button-hover: #ebe4dc;
+  --accent: #e8743b;
+  --accent-hover: #f0854f;
+  --on-accent: #2f2b29;
+  --current-move: #f6d9c6;
+  --input: #fffdfb;
+  --soft: #ebe4dc;
+  --book: #9a5b2c;
+  --clock: #e4ddd6;
+  --clock-text: #6f655e;
+  --clock-run: #2f2b29;
+  --radius: 14px;
+  --card-radius: 24px;
+}
+
+/* -- Violet glass: dusky indigo, translucent cards, cyan highlights --------- */
+
+:root[data-ui="violet"] {
+  color-scheme: dark;
+  --bg: #33365e;
+  --card: rgba(255, 255, 255, 0.08);
+  --text: #eeedfe;
+  --muted: #b3b1e0;
+  --line: rgba(255, 255, 255, 0.14);
+  --line-strong: rgba(255, 255, 255, 0.22);
+  --button: rgba(255, 255, 255, 0.1);
+  --button-hover: rgba(255, 255, 255, 0.17);
+  --accent: #5de0e6;
+  --accent-hover: #7ce9ee;
+  --on-accent: #1e1b45;
+  --current-move: rgba(93, 224, 230, 0.26);
+  --disabled: #7c7aa8;
+  --input: rgba(0, 0, 0, 0.18);
+  --soft: rgba(255, 255, 255, 0.07);
+  --danger: #ff8a9a;
+  --danger-soft: rgba(255, 138, 154, 0.16);
+  --good: #6ee7a8;
+  --note: #c9c7f0;
+  --book: #f5c27a;
+  --special: #f0a6ff;
+  --clock: rgba(255, 255, 255, 0.1);
+  --clock-text: #b3b1e0;
+  --clock-run: #5de0e6;
+  --radius: 12px;
+  --card-radius: 20px;
+}
+
+:root[data-ui="violet"] body,
+:root[data-ui="violet"] .cover {
+  background: linear-gradient(160deg, #2c2f55 0%, #3b3e6b 55%, #474a85 100%) fixed;
+}
+
+/* Cards: in Warm stone and Violet glass the page sits on cards */
+:root[data-ui="stone"] .moves-area,
+:root[data-ui="stone"] .panel,
+:root[data-ui="violet"] .moves-area,
+:root[data-ui="violet"] .panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--card-radius);
+  padding: 14px 16px;
+}
+
+:root[data-ui="violet"] .card,
+:root[data-ui="violet"] dialog,
+:root[data-ui="violet"] .tour-bubble {
+  background: #3f4277;
+}
+
+:root[data-ui="violet"] .moves-area,
+:root[data-ui="violet"] .panel {
+  backdrop-filter: blur(8px);
+}
+
+/* The running clock in a solid accent colour */
+:root[data-ui="ember"] .pb-clock.running,
+:root[data-ui="violet"] .pb-clock.running {
+  color: var(--on-accent);
+  box-shadow: none;
+}
+
+:root[data-ui="stone"] .pb-clock.running {
+  color: var(--card);
+  box-shadow: none;
+}
+
+:root[data-ui="stone"] .pb-clock,
+:root[data-ui="violet"] .pb-clock {
+  border-radius: 999px;
+}
+
+:root[data-ui] .pb-clock.low.running {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* Warm stone: big friendly numbers on the player bars */
+:root[data-ui="stone"] .player-bar {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 0 8px;
+  margin: 4px 0;
+}
+
+:root[data-ui="stone"] .pb-clock {
+  font-size: 1.3rem;
+}
+
+/* Move ratings, brighter so they read on the dark themes */
+:root[data-ui="ember"] .r-best, :root[data-ui="violet"] .r-best { color: #7fd6a0; }
+:root[data-ui="ember"] .r-brilliant, :root[data-ui="violet"] .r-brilliant { color: #3fd9bb; }
+:root[data-ui="ember"] .r-great, :root[data-ui="violet"] .r-great { color: #8db8e8; }
+:root[data-ui="ember"] .r-excellent, :root[data-ui="violet"] .r-excellent { color: #8fd05a; }
+:root[data-ui="ember"] .r-good, :root[data-ui="violet"] .r-good { color: #a8c48c; }
+:root[data-ui="ember"] .r-book, :root[data-ui="violet"] .r-book { color: #e0a46a; }
+:root[data-ui="ember"] .r-forced, :root[data-ui="violet"] .r-forced { color: #a5c79a; }
+:root[data-ui="ember"] .r-inaccuracy, :root[data-ui="violet"] .r-inaccuracy { color: #f2c94c; }
+:root[data-ui="ember"] .r-mistake, :root[data-ui="violet"] .r-mistake { color: #ff9f4a; }
+:root[data-ui="ember"] .r-miss, :root[data-ui="violet"] .r-miss { color: #ff7f72; }
+:root[data-ui="ember"] .r-missed-win, :root[data-ui="violet"] .r-missed-win { color: #e8c14a; }
+:root[data-ui="ember"] .r-blunder, :root[data-ui="violet"] .r-blunder { color: #ff5a4a; }
+
+/* -- The matching boards (flat squares, light a8 at the top-left) ----------- */
+
+#board.slate {
+  --last-move: rgba(255, 90, 54, 0.45);
+  --selected: rgba(255, 90, 54, 0.6);
+  --coord-on-light: #3b4150;
+  --coord-on-dark: #d8dce6;
+}
+
+.slate cg-board {
+  background: repeating-conic-gradient(#5f687b 0 25%, #9aa3b5 0 50%) 0 0 / 25% 25%;
+}
+
+#board.walnut {
+  --last-move: rgba(232, 116, 59, 0.4);
+  --selected: rgba(232, 116, 59, 0.55);
+  --coord-on-light: #a9805e;
+  --coord-on-dark: #f2e9dc;
+}
+
+.walnut cg-board {
+  background: repeating-conic-gradient(#a9805e 0 25%, #ede3d3 0 50%) 0 0 / 25% 25%;
+}
+
+#board.lavender {
+  --last-move: rgba(93, 224, 230, 0.5);
+  --selected: rgba(93, 224, 230, 0.65);
+  --coord-on-light: #6f69b8;
+  --coord-on-dark: #ecebfb;
+}
+
+.lavender cg-board {
+  background: repeating-conic-gradient(#8f89cf 0 25%, #cfcbf0 0 50%) 0 0 / 25% 25%;
+}
+
+/* Rounder boards for the softer themes */
+:root[data-ui="stone"] cg-board,
+:root[data-ui="violet"] cg-board {
+  border-radius: 10px;
+}
+
+/* Links in Warm stone: a deeper orange so they read on the cream cards */
+:root[data-ui="stone"] .link-button,
+:root[data-ui="stone"] .about-link a {
+  color: #a94a1a;
+}

@@ -17,6 +17,22 @@
   --dot: rgba(58, 58, 58, 0.28);
   --coord-on-light: #8c5e3c;
   --coord-on-dark: #e8d3b4;
+  --on-accent: #ffffff; /* text on accent-coloured buttons */
+  --disabled: #a0a0a0;
+  --line-strong: #cfcfcf;
+  --input: #ffffff;
+  --soft: #f3f6fb; /* quiet panels: notes, the demo */
+  --danger: #c62828;
+  --danger-soft: #fdecea;
+  --good: #1b7f3b;
+  --note: #555555;
+  --book: #8b5a2b;
+  --special: #6a1b9a;
+  --clock: #e8e8e8;
+  --clock-text: #555555;
+  --clock-run: #ffffff;
+  --radius: 5px;
+  --card-radius: 8px;
   --gutter: 16px;
   font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
   font-size: 15px;
@@ -58,8 +74,8 @@ select {
   color: inherit;
   background: var(--button);
   border: 1px solid var(--line);
-  border-bottom-color: #cfcfcf;
-  border-radius: 5px;
+  border-bottom-color: var(--line-strong);
+  border-radius: var(--radius);
   padding: 7px 14px;
   min-height: 36px;
   cursor: pointer;
@@ -72,14 +88,14 @@ select:hover:not(:disabled) {
 
 button:disabled,
 select:disabled {
-  color: #a0a0a0;
+  color: var(--disabled);
   cursor: default;
 }
 
 button.accent {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 button.accent:hover:not(:disabled) {
@@ -110,7 +126,7 @@ select:focus-visible,
   width: min(100%, 620px);
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--card-radius);
   padding: 26px 32px;
 }
 
@@ -139,7 +155,7 @@ select:focus-visible,
   gap: 10px;
   padding: 18px 20px;
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: var(--radius);
   background: var(--button);
   cursor: pointer;
   font-size: 0.92rem;
@@ -154,7 +170,7 @@ select:focus-visible,
 .mode:has(input:checked) {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .mode.disabled {
@@ -182,13 +198,15 @@ select:focus-visible,
 }
 
 .tc-custom input {
+  color: inherit;
+  background: var(--input);
   width: 4.5em;
   box-sizing: border-box;
   font: inherit;
   min-height: 32px;
   padding: 4px 6px;
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: var(--radius);
 }
 
 .options .tick-check {
@@ -197,16 +215,18 @@ select:focus-visible,
 }
 
 .options .check.disabled {
-  color: #a0a0a0;
+  color: var(--disabled);
 }
 
 .options input[type="text"] {
   box-sizing: border-box;
+  color: inherit;
+  background: var(--input);
   font: inherit;
   min-height: 36px;
   padding: 6px 12px;
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: var(--radius);
 }
 
 .engine-status {
@@ -305,16 +325,16 @@ body.practice .player-bar {
   margin-left: auto;
   min-width: 78px;
   padding: 3px 10px;
-  border-radius: 5px;
-  background: #e8e8e8;
-  color: #555;
+  border-radius: var(--radius);
+  background: var(--clock);
+  color: var(--clock-text);
   font: 600 1.15rem/1.2 "Segoe UI", system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
 
 .pb-clock.running {
-  background: #fff;
+  background: var(--clock-run);
   color: var(--text);
   box-shadow: 0 0 0 2px var(--accent) inset;
 }
@@ -324,11 +344,11 @@ body.practice .player-bar {
 }
 
 .pb-clock.low {
-  color: #c62828;
+  color: var(--danger);
 }
 
 .pb-clock.low.running {
-  background: #fdecea;
+  background: var(--danger-soft);
 }
 
 /* The step buttons under the board are for phones; desktops have them above the move list */
@@ -483,7 +503,7 @@ cg-container svg.cg-shapes line[stroke="#E67E22" i] {
 }
 
 .number {
-  color: #888;
+  color: var(--muted);
   font-size: 0.92rem;
 }
 
@@ -601,8 +621,8 @@ cg-container svg.cg-shapes line[stroke="#5E6B73" i] {
   min-height: 120px;
   overflow-y: auto;
   background: var(--card);
-  border: 1px solid #dcdcdc;
-  border-radius: 5px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   padding: 8px 10px;
   font-size: 0.93rem;
   line-height: 1.4;
@@ -639,12 +659,12 @@ cg-container svg.cg-shapes line[stroke="#5E6B73" i] {
 }
 
 .coach-right {
-  color: #1b7f3b;
+  color: var(--good);
   font-weight: 600;
 }
 
 .coach-wrong {
-  color: #c62828;
+  color: var(--danger);
   font-weight: 600;
 }
 
@@ -665,7 +685,7 @@ cg-container svg.cg-shapes line[stroke="#5E6B73" i] {
   min-height: 1.2em;
   font-size: 0.85rem;
   font-style: italic;
-  color: #555;
+  color: var(--note);
 }
 
 body.practice .bottom-buttons {
@@ -691,7 +711,7 @@ body.practice .bottom-buttons button {
   min-width: 0;
   padding: 7px 8px;
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: var(--radius);
   background: var(--card);
   color: inherit;
 }
@@ -707,7 +727,7 @@ body.practice .bottom-buttons button {
 }
 
 .options label.disabled {
-  color: #a0a0a0;
+  color: var(--disabled);
 }
 
 /* -- Move review --------------------------------------------------------------- */
@@ -752,7 +772,7 @@ body.practice .bottom-buttons button {
 /* Opening names and notes, in the desktop app's book brown */
 .opening-label,
 .review-opening {
-  color: #8b5a2b;
+  color: var(--book);
   font-weight: 600;
   font-size: 0.9rem;
   margin: 0 0 6px;
@@ -1141,11 +1161,11 @@ cg-board square.check {
   font: 0.85rem/1.4 Consolas, "Courier New", monospace;
   padding: 8px;
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: var(--radius);
   resize: vertical;
   margin: 8px 0;
   color: inherit;
-  background: var(--card);
+  background: var(--input);
 }
 
 .pgn-file-row,
@@ -1166,8 +1186,8 @@ cg-board square.check {
   display: inline-block;
   padding: 7px 14px;
   border: 1px solid var(--line);
-  border-bottom-color: #cfcfcf;
-  border-radius: 5px;
+  border-bottom-color: var(--line-strong);
+  border-radius: var(--radius);
   background: var(--button);
   cursor: pointer;
 }
@@ -1183,7 +1203,7 @@ cg-board square.check {
 }
 
 .pgn-status.problem {
-  color: #c62828;
+  color: var(--danger);
 }
 
 .look-row .sound-check {
@@ -1245,7 +1265,7 @@ cg-board square.check {
   min-height: 5.5em;
   padding: 10px 12px;
   border-left: 4px solid var(--accent);
-  background: var(--panel-soft, #f3f6fb);
+  background: var(--soft);
   border-radius: 4px;
   line-height: 1.45;
 }
@@ -1259,7 +1279,7 @@ cg-board square.check {
 .demo-note .demo-transposition {
   display: block;
   margin-top: 6px;
-  color: #6a1b9a;
+  color: var(--special);
   font-weight: 600;
 }
 
@@ -1341,7 +1361,7 @@ cg-board square.check {
   z-index: 902;
   box-sizing: border-box;
   padding: 14px 16px 12px;
-  background: #fff;
+  background: var(--card);
   color: var(--text);
   border-radius: 10px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
