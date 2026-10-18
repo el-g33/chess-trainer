@@ -231,9 +231,13 @@
   color: #e8e9ed;
 }
 
-:root[data-ui="stone"] option {
-  background-color: #fffdfb;
-  color: #2f2b29;
+:root[data-ui="stone"] select {
+  color-scheme: light;
+}
+
+:root[data-ui="ember"] select,
+:root[data-ui="violet"] select {
+  color-scheme: dark;
 }
 
 :root[data-ui="violet"] select:hover:not(:disabled) {

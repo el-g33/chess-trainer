@@ -147,3 +147,81 @@ export function verdict(review: Review, before: Chess, after: Chess,
   const line = pick(generic[review.rating] ?? ["Interesting choice."], seed);
   return mine ? line : line.replace("I'm afraid", "for them");
 }
+
+// ---------------------------------------------------------------------------
+// Why a move is good, and what it controls (for "Tell me more")
+// ---------------------------------------------------------------------------
+
+const CENTRE = ["d4", "e4", "d5", "e5"].map((name) => ["a", "b", "c", "d", "e", "f", "g", "h"].indexOf(name[0]) + 8 * (Number(name[1]) - 1));
+
+/** The squares worth pointing at that the piece on `square` controls: the
+ *  centre, and enemy pieces it attacks. */
+export function controlledSquares(position: Chess, square: number): number[] {
+  const piece = position.board.get(square);
+  if (!piece || piece.role === "king") return [];
+  const reach = attacks(piece, square, position.board.occupied);
+  const centre = CENTRE.filter((s) => reach.has(s) && s !== square);
+  return [...new Set([...centre, ...targetsOf(position, square)])];
+}
+
+/** Why a move is good, in a short clause: "it develops your knight and controls the centre". */
+export function whyMove(before: Chess, move: NormalMove, listener: Color | null): string {
+  const piece = before.board.get(move.from);
+  if (!piece) return "";
+  const after = before.clone();
+  after.play(move);
+  const victim = before.board.get(move.to);
+  const name = NAMES[piece.role];
+  const yours = owner(piece.color, listener);
+  const theirs = owner(opposite(piece.color), listener);
+  if (after.isCheckmate()) return "it's checkmate";
+  const castles = piece.role === "king" && (Math.abs((move.to & 7) - (move.from & 7)) > 1 || victim?.color === piece.color);
+  if (castles) return "it gets the king safe and brings the rook into play";
+  const parts: string[] = [];
+  if (victim && victim.color !== piece.color) parts.push(`it wins ${theirs} ${NAMES[victim.role]}`);
+  else if (after.isCheck()) parts.push("it gives check");
+  else if (piece.role !== "pawn" && (piece.color === "white" ? move.from >> 3 === 0 : move.from >> 3 === 7)) parts.push(`it develops ${yours} ${name}`);
+  else if (piece.role === "pawn" && CENTRE.includes(move.to)) parts.push("it takes space in the centre");
+  const centre = CENTRE.filter((s) => attacks(piece, move.to, after.board.occupied).has(s));
+  const hits = targets(after, move.to);
+  if (hits.length && !victim) parts.push(`attacks ${theirs} ${NAMES[hits[0]]}`);
+  else if (centre.length && !(piece.role === "pawn" && CENTRE.includes(move.to))) parts.push("controls the centre");
+  if (!parts.length) return "it puts the piece on its most useful square";
+  if (parts.length === 1 && !parts[0].startsWith("it ")) return `it ${parts[0]}`;
+  return parts.join(" and ");
+}
+
+/** How dangerous a move was, judged by what Stockfish's reply can win:
+ *  red = the queen (or mate), orange = a piece, amber = a pawn, yellow = the centre. */
+export type Danger = { level: "red" | "orange" | "amber" | "yellow"; text: string };
+
+export function dangerAfter(review: Review, before: Chess, after: Chess, beforeEval: Evaluation | undefined,
+  afterEval: Evaluation | undefined, inBook: boolean): Danger | null {
+  if (!["Inaccuracy", "Mistake", "Miss", "Missed Win", "Blunder"].includes(review.rating)) return null;
+  const mover = before.turn;
+  const pawns = (e: Evaluation | undefined) => {
+    if (!e) return undefined;
+    const score = e.score;
+    const cp = score.mate !== undefined ? (score.mate > 0 ? 2000 : -2000) : score.cp;
+    return (mover === "white" ? cp : -cp) / 100;
+  };
+  const was = pawns(beforeEval);
+  const now = pawns(afterEval);
+  const loss = was !== undefined && now !== undefined ? Math.max(0, was - now) : 0;
+  const reply = afterEval?.best;
+  const victim = reply ? after.board.get(reply.to) : undefined;
+  const lost = victim && victim.color === mover ? victim.role : undefined;
+  const mate = afterEval?.score.mate !== undefined && (mover === "white" ? afterEval.score.mate < 0 : afterEval.score.mate > 0);
+  if (mate) return { level: "red", text: "There's a checkmate coming." };
+  // What their best reply takes decides the colour first...
+  if (lost === "queen") return { level: "red", text: "They can win your queen." };
+  if (lost && PIECE_VALUES[lost] >= 3) return { level: "orange", text: `Your ${NAMES[lost]} can be taken.` };
+  if (lost === "pawn") return { level: "amber", text: "You can lose a pawn here." };
+  // ...otherwise how much the score dropped (the loss comes a little later)
+  if (loss >= 6) return { level: "red", text: "This is about to cost you a lot." };
+  if (loss >= 2.5) return { level: "orange", text: "You can lose a piece here." };
+  if (loss >= 0.8) return { level: "amber", text: "You can lose a pawn here." };
+  // A small slip: only worth a warning if they take over the centre
+  if (!inBook && reply && CENTRE.includes(reply.to)) return { level: "yellow", text: "They can take over the centre." };
+  return null;
+}

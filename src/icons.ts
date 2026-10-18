@@ -5,6 +5,12 @@ const PATHS: Record<string, string> = {
   gear:
     '<circle cx="12" cy="12" r="8.2" stroke-width="3.4" stroke-dasharray="3.2 3.24" stroke-linecap="butt"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2.4"/>',
   back: '<path d="M15 5l-7 7 7 7"/>',
+  home: '<path d="M4 11l8-7 8 7"/><path d="M6.5 9.5V20h11V9.5M10 20v-5.5h4V20"/>',
+  play: '<path d="M8 5.5v13l11-6.5z" fill="currentColor" fill-opacity=".9"/>',
+  pause: '<path d="M8.5 5.5v13M15.5 5.5v13" stroke-width="3"/>',
+  replay: '<path d="M5 12a7 7 0 1 0 2.2-5.1M5 4.5v4h4"/>',
+  skipPrev: '<path d="M6 5v14M18 5l-9 7 9 7z"/>',
+  skipNext: '<path d="M18 5v14M6 5l9 7-9 7z"/>',
   next: '<path d="M9 5l7 7-7 7"/>',
   first: '<path d="M18 5l-7 7 7 7M11 5l-7 7 7 7"/>',
   last: '<path d="M6 5l7 7-7 7M13 5l7 7-7 7"/>',

@@ -10,7 +10,7 @@ import type { Key } from "@lichess-org/chessground/types";
 import { Chess, normalizeMove } from "chessops/chess";
 import { chessgroundDests } from "chessops/compat";
 import { parseFen } from "chessops/fen";
-import { makeSan } from "chessops/san";
+import { makeSan, parseSan } from "chessops/san";
 import type { Color, NormalMove, Role } from "chessops/types";
 import { makeSquare, makeUci, opposite, parseSquare, parseUci } from "chessops/util";
 
@@ -27,7 +27,7 @@ import { afterMove as positionAfter, colourName, isCastling, standardUci, variat
 import { Engine } from "./engine";
 import { Game, type Outcome } from "./game";
 import { explainIdeas } from "./ideas";
-import { narrateMove, targetsOf, verdict } from "./narrate";
+import { controlledSquares, dangerAfter, narrateMove, targetsOf, verdict, whyMove, type Danger } from "./narrate";
 import { middlegameNotes } from "./middlegame";
 import { DEFAULT_LEVEL, LEVELS, OPPONENT_MIN_DELAY, shortName } from "./levels";
 import {
@@ -321,6 +321,7 @@ Object.assign(ground.state.drawable.brushes, {
   deviate: { key: "deviate", color: DEVIATE_ARROW, opacity: 0.9, lineWidth: 10 },
   best: { key: "best", color: BEST_ARROW, opacity: 0.55, lineWidth: 7 },
   brilliant: { key: "brilliant", color: BRILLIANT_ARROW, opacity: 0.9, lineWidth: 10 },
+  control: { key: "control", color: YOUR_ARROW, opacity: 0.4, lineWidth: 6 },
 });
 
 // ---------------------------------------------------------------------------
@@ -567,6 +568,8 @@ let greeting = "";
 let practiceTab: "learn" | "match" = "learn";
 let learnColour: Color = "white";
 let learnOpening: string | null = null;
+// Where the game on screen came from, so New game goes back to that setup
+let gameOrigin: HomeChoice | "learn" | null = null;
 
 /** Five ways to say hello, so it doesn't feel the same every time. */
 function pickGreeting(): string {
@@ -744,6 +747,7 @@ function setupHome() {
   $("empty-board").addEventListener("click", () => {
     mode = "practice";
     resetBoard(new Game());
+    gameOrigin = "analysis";
     orientation = "white";
     canReview = false;
     reviewing = false;
@@ -763,6 +767,7 @@ function startFromHome(kind: "play" | "practice") {
     if (chosen) startDemo(chosen);
     return;
   }
+  gameOrigin = kind;
   setMode(kind);
   opponentBox.selectedIndex = 0;
   if (kind === "practice") {
@@ -1046,7 +1051,15 @@ function onReviewGame() {
   mode = "practice";
   canReview = false;
   reviewing = true;
+  currentView = "stats"; // the statistics first, then the review from move 1
   refresh();
+}
+
+/** Start going through the game, from the first move. */
+function startReview() {
+  currentView = "board";
+  stepper = null;
+  goTo(0);
 }
 
 async function onResign() {
@@ -1279,6 +1292,7 @@ function startDemo(chosen: Demo, line = 0) {
   // Black openings are shown from Black's side
   orientation = REPERTOIRE.find((o) => o.name === chosen.opening)?.colour ?? "white";
   demo = { demo: chosen, line: 0, steps: [], playing: true, interrupted: false };
+  gameOrigin = "learn";
   demoPick.replaceChildren(...chosen.lines.map((l, i) => new Option(`${i + 1}. ${l.title}`, String(i))));
   if (menuOpen) hideMenu();
   loadDemoLine(line);
@@ -1338,43 +1352,29 @@ function onDemoPlay() {
   scheduleDemo(demo.playing ? 400 : DEMO_MOVE_DELAY);
 }
 
+/** The demo's controls: play / pause / replay between the move buttons, the
+ *  variation buttons, and the line's name as the heading. */
 function drawDemo() {
+  document.body.classList.toggle("demo-on", demo !== null);
+  $("moves-heading").textContent = demo ? demoTitle() : "Moves";
   if (!demo) return;
-  const ply = currentPly();
-  const line = demo.demo.lines[demo.line];
-  $("demo-line").textContent = `Line ${demo.line + 1} of ${demo.demo.lines.length}: ${line.title}`;
-  const note = $("demo-note");
-  note.replaceChildren();
-  if (ply === 0) {
-    note.append(demo.line === 0 ? demo.demo.intro : `Watch how this line goes: ${line.title}.`);
-  } else {
-    const step = demo.steps[ply - 1];
-    const label = document.createElement("span");
-    label.className = "demo-move";
-    label.textContent = step.label;
-    note.append(label);
-    const [said, transposition] = (step.note ?? "").split(/(?=Transposition: )/);
-    if (said) note.append(said.trim());
-    if (transposition) {
-      const extra = document.createElement("span");
-      extra.className = "demo-transposition";
-      extra.textContent = transposition;
-      note.append(extra);
-    }
-    if (!step.note) note.append(demo.playing ? "" : "(no note for this move)");
+  const atEnd = currentPly() >= game.length;
+  const [glyph, label] = atEnd ? ["replay", "Watch again"] : demo.playing ? ["pause", "Pause"] : ["play", "Play"];
+  for (const button of document.querySelectorAll<HTMLButtonElement>(".nav-play")) {
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    button.querySelector(".play-icon")!.innerHTML = icon(glyph, 20);
   }
-  const atEnd = ply >= game.length;
-  if (atEnd) {
-    const last = document.createElement("span");
-    last.className = "demo-transposition";
-    last.textContent = demo.line + 1 < demo.demo.lines.length ? "End of this line. Next variation, or try it yourself." : "That's the last line. Now try it yourself!";
-    note.append(last);
-  }
-  demoPlay.textContent = atEnd ? "↻ Watch again" : demo.playing ? "⏸ Pause" : demo.interrupted ? "▶ Resume autoplay" : ply === 0 ? "▶ Play" : "▶ Continue";
-  $<HTMLButtonElement>("demo-back").disabled = ply === 0;
-  $<HTMLButtonElement>("demo-next").disabled = atEnd;
-  $<HTMLButtonElement>("demo-next-line").disabled = demo.line + 1 >= demo.demo.lines.length;
-  demoPick.value = String(demo.line);
+  for (const button of document.querySelectorAll<HTMLButtonElement>(".var-prev")) button.disabled = demo.line === 0;
+  for (const button of document.querySelectorAll<HTMLButtonElement>(".var-next")) button.disabled = demo.line + 1 >= demo.demo.lines.length;
+}
+
+/** "London: Main line" */
+function demoTitle(): string {
+  if (!demo) return "";
+  const name = demo.demo.opening.replace(/ \(.*\)$/, "").replace(/ (System|Opening|Game|Defence|setup)$/, "");
+  const title = demo.demo.lines[demo.line].title;
+  return `${name}: ${title.startsWith("Main line") ? "Main line" : title.replace(/ \(.*\)$/, "")}`;
 }
 
 /** "Show me this opening" while practising it: leave the game for the demo. */
@@ -1959,7 +1959,7 @@ function drawPlayerBars() {
   ];
   for (const [bar, colour] of bars) {
     const name = bar.querySelector<HTMLElement>(".pb-name")!;
-    name.textContent = barName(colour);
+    name.textContent = demo && bar.id === "bar-top" ? demoTitle() : barName(colour);
     name.title = `${name.textContent} - ${colour === "white" ? "White" : "Black"}`;
     // The pieces this side has taken (the other side's missing pieces)
     const taken = opposite(colour);
@@ -2282,7 +2282,7 @@ interface CoachButton {
   ico: string;
   label: string;
   run: () => void;
-  kind?: "accent" | "soft" | "hazard";
+  kind?: "accent" | "soft" | "hazard" | `hazard ${string}`;
 }
 
 interface CoachSay {
@@ -2441,17 +2441,37 @@ function openMore() {
   const ply = reviewPly();
   const review = ratingsOn() && ply > 0 ? reviews()[ply - 1] : undefined;
   if (!review) return;
-  const [heading, ...rest] = review.text.split("\n");
-  const parts: Node[] = [para(heading, "overlay-heading")];
-  for (const chunk of rest.join("\n").split(/\n\s*\n/)) if (chunk.trim()) parts.push(para(chunk.trim()));
-  const missed = missedBrilliant(game.positionAt(ply - 1), game.moves[ply - 1].move, analyser.evals);
-  if (missed) parts.push(para(missed));
-  const buttons: CoachButton[] = [];
-  if (!game.positionAt(ply).isEnd()) {
-    buttons.push({ ico: "hazard", label: "What can they do now?", kind: "hazard", run: () => void openThreatLine(ply) });
-  }
-  buttons.push(CLOSE);
-  showOverlay(moodForRating(review.rating), parts, buttons);
+  explainMove(ply, review);
+}
+
+// Ratings where the coach shows the better move
+const WORTH_SHOWING = new Set(["Inaccuracy", "Mistake", "Miss", "Missed Win", "Blunder"]);
+
+/** Tell me more about a move: one sentence, and the board shows it - the
+ *  better move if there was one (with what that piece controls), or the
+ *  move itself. A hazard button appears only when the move let something go,
+ *  coloured by how much. */
+function explainMove(ply: number, review: Review) {
+  const before = game.positionAt(ply - 1);
+  const after = game.positionAt(ply);
+  const played = game.moves[ply - 1].move;
+  const you = listener();
+  const mine = !you || game.moverOf(ply) === you;
+  const better = WORTH_SHOWING.has(review.rating) && review.bestSan ? parseSan(before, review.bestSan) as NormalMove | undefined : undefined;
+  const move = better ?? played;
+  const why = whyMove(before, move, mine ? game.moverOf(ply) : you);
+  const san = makeSan(before, move);
+  const text = better
+    ? `${mine ? "Better was" : "Stronger was"} ${san}: ${why}.`
+    : `${review.rating === "Book" ? "A known move" : "Good choice"}: ${why}.`;
+  const info = openingInfo();
+  const danger = dangerAfter(review, before, after, analyser.evals.get(fenOf(before)), analyser.evals.get(fenOf(after)), !!info[ply - 1]?.book);
+  const extra = danger && !after.isEnd() ? hazardButton(ply, danger) : undefined;
+  startStepper([before, positionAfter(before, move)], [move], [text], moodForRating(review.rating), extra, true);
+}
+
+function hazardButton(ply: number, danger: Danger): CoachButton {
+  return { ico: "hazard", label: `What can they do now? ${danger.text}`, kind: `hazard ${danger.level}` as CoachButton["kind"], run: () => void openThreatLine(ply, danger) };
 }
 
 /** The reviews of the game's moves (the same ones the move list shows). */
@@ -2468,14 +2488,15 @@ interface Stepper {
   step: number; // 1 = after the first move
   mood: Mood;
   extra?: CoachButton;
+  illustration?: boolean; // one move, with what the piece controls
 }
 
 let stepper: Stepper | null = null;
 
-function startStepper(positions: Chess[], moves: NormalMove[], texts: string[], mood: Mood, extra?: CoachButton) {
+function startStepper(positions: Chess[], moves: NormalMove[], texts: string[], mood: Mood, extra?: CoachButton, illustration = false) {
   if (!moves.length) return;
   closeOverlay(false);
-  stepper = { positions, moves, texts, step: 1, mood, extra };
+  stepper = { positions, moves, texts, step: 1, mood, extra, illustration };
   void play(soundForMove(makeSan(positions[0], moves[0])));
   refresh();
 }
@@ -2499,7 +2520,8 @@ function drawStepper() {
   area.classList.toggle("stepping", stepper !== null);
   box.hidden = !stepper;
   if (!stepper) return;
-  $("step-count").textContent = `${stepper.step}/${stepper.moves.length}`;
+  $("step-count").textContent = stepper.moves.length > 1 ? `${stepper.step}/${stepper.moves.length}` : "";
+  for (const id of ["step-back", "step-next"]) $(id).hidden = stepper.moves.length < 2;
   $("step-text").textContent = stepper.texts[stepper.step - 1] ?? "";
   setFace($("step-face"), stepper.mood, 34);
   $<HTMLButtonElement>("step-back").disabled = stepper.step <= 1;
@@ -2517,14 +2539,19 @@ function stepperShapes(): DrawShape[] {
   const yours = mover === (listener() ?? orientation);
   const shapes: DrawShape[] = [{ orig: makeSquare(move.from) as Key, dest: arrowEnd(before, move), brush: yours ? "you" : "them" }];
   const landing = isCastling(before, move) ? undefined : move.to;
-  if (landing !== undefined) {
+  if (landing !== undefined && stepper.illustration) {
+    // What the piece controls from its new square
+    for (const square of controlledSquares(after, landing)) {
+      shapes.push({ orig: makeSquare(landing) as Key, dest: makeSquare(square) as Key, brush: "control" });
+    }
+  } else if (landing !== undefined) {
     for (const square of targetsOf(after, landing)) shapes.push({ orig: makeSquare(square) as Key, brush: "threat" });
   }
   return shapes;
 }
 
 /** What can they do now? Stockfish's best line for the opponent after the move. */
-async function openThreatLine(ply: number) {
+async function openThreatLine(ply: number, danger?: Danger) {
   closeOverlay(false);
   const position = game.positionAt(ply);
   setBusy(true, "Let me see what they can do...");
@@ -2533,6 +2560,7 @@ async function openThreatLine(ply: number) {
     const moves = plan.steps.slice(0, 4).map((step) => step.move);
     const positions = plan.positions.slice(0, moves.length + 1);
     const texts = moves.map((move, i) => narrateMove(positions[i], move, game.moverOf(ply)));
+    if (danger && texts.length) texts[0] = `${danger.text} ${texts[0]}`;
     setBusy(false);
     startStepper(positions, moves, texts, "worried");
   } catch (error) {
@@ -2741,6 +2769,14 @@ function drawStats() {
     }
   }
   card.append(table);
+  if (reviewing) {
+    const start = element("div", "stats-start");
+    const button = iconButton({ ico: "play", label: "Start the review", run: startReview, kind: "accent" }, 18);
+    button.classList.add("labelled");
+    button.append(element("span", "", "Start the review"));
+    start.append(button);
+    box.append(start);
+  }
   if (done < total) card.append(element("p", "stats-note", `Stockfish is still checking the game (${done} of ${total}); the numbers will settle.`));
 
   // The rating, in its own table
@@ -2915,13 +2951,35 @@ function openSavedGame(saved: SavedGame) {
   reviewing = true;
   reviewTitle = "";
   orientation = saved.user;
+  gameOrigin = saved.mode === "play" ? "play" : "practice";
   viewPly = loaded.length ? 0 : null;
   currentView = "board";
   refresh();
 }
 
+const inProgress = () => match !== null && game.length > 0 && !game.outcome();
+
+/** New game: the setup screen of the mode you're in. */
 async function onNewGame() {
-  if (match && game.length && !game.outcome() && !(await message("New game?", "Are you sure? This game will end.", true))) return;
+  if (inProgress() && !(await message("New game?", "Are you sure? This game will end.", true))) return;
+  const learning = demo ? demo.demo.opening : null;
+  const screen: HomeChoice | null = gameOrigin === "learn" ? "practice" : gameOrigin;
+  showMenu();
+  if (!screen) return;
+  homeChoice = screen;
+  if (screen === "practice") {
+    practiceTab = learning ? "learn" : "match";
+    if (learning) {
+      learnOpening = learning;
+      learnColour = REPERTOIRE.find((o) => o.name === learning)?.colour ?? "white";
+    }
+  }
+  showScreen(screen);
+}
+
+/** Home: the coach's welcome. */
+async function onHome() {
+  if (inProgress() && !(await message("Leave this game?", "Are you sure? This game will end.", true))) return;
   showMenu();
 }
 
@@ -3187,6 +3245,7 @@ async function reviewPgnGame(event: Event) {
   canReview = false;
   reviewing = true;
   reviewTitle = `Reviewing: ${chosen.title}`;
+  gameOrigin = "analysis";
   viewPly = loaded.length ? 0 : null; // start from the first position and step through
   orientation = "white";
   if (menuOpen) hideMenu();
@@ -3333,6 +3392,10 @@ function wireButtons() {
   demoPick.addEventListener("change", () => loadDemoLine(Number(demoPick.value)));
   $("demo-try").addEventListener("click", onDemoTry);
   $("strip-face").addEventListener("click", () => openMore());
+  for (const button of document.querySelectorAll(".nav-play")) button.addEventListener("click", onDemoPlay);
+  for (const button of document.querySelectorAll(".var-prev")) button.addEventListener("click", () => demo && demo.line > 0 && loadDemoLine(demo.line - 1));
+  for (const button of document.querySelectorAll(".var-next")) button.addEventListener("click", () => demo && demo.line + 1 < demo.demo.lines.length && loadDemoLine(demo.line + 1));
+  $("home-button").addEventListener("click", () => void onHome());
   for (const tab of document.querySelectorAll<HTMLButtonElement>(".view-tabs button")) {
     tab.addEventListener("click", () => {
       currentView = tab.dataset.view as typeof currentView;

@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#9a908a" />
     <meta name="description" content="Play and practise chess against Stockfish." />
     <!-- Unlisted: search engines are asked not to list the site. Remove this
@@ -71,7 +71,7 @@
         <!-- 2a. Play against the computer -->
         <section class="screen" data-screen="play" hidden>
           <div class="setup-head">
-            <button type="button" class="home-link setup-back">‹ Back</button>
+            <button type="button" class="home-link setup-back"><span data-ico="home" data-ico-size="18"></span> Home</button>
             <h2>Play</h2>
             <button type="button" class="setup-start accent" data-start="play">Start</button>
           </div>
@@ -100,7 +100,7 @@
         <!-- 2b. Practice: learn an opening, or a practice match -->
         <section class="screen" data-screen="practice" hidden>
           <div class="setup-head">
-            <button type="button" class="home-link setup-back">‹ Back</button>
+            <button type="button" class="home-link setup-back"><span data-ico="home" data-ico-size="18"></span> Home</button>
             <h2>Practice</h2>
             <button type="button" class="setup-start accent" data-start="practice" disabled>Start</button>
           </div>
@@ -129,7 +129,7 @@
         <!-- 2c. Game analysis: a game from a PGN -->
         <section class="screen" data-screen="analysis" hidden>
           <div class="setup-head">
-            <button type="button" class="home-link setup-back">‹ Back</button>
+            <button type="button" class="home-link setup-back"><span data-ico="home" data-ico-size="18"></span> Home</button>
             <h2>Game analysis</h2>
             <button type="button" class="setup-start accent" data-start="analysis" disabled>Start</button>
           </div>
@@ -152,6 +152,7 @@
     <!-- The game screen -->
     <main id="game">
       <header class="game-top">
+        <button type="button" id="home-button" class="icon-button home-button" aria-label="Home" title="Home"><span data-ico="home"></span></button>
         <button type="button" id="new-game" class="new-game accent"><span data-ico="plus" data-ico-size="18"></span>New game</button>
         <nav class="view-tabs" aria-label="Views">
           <button type="button" data-view="board" class="on" aria-label="Board" title="Board"><span data-ico="board"></span></button>
@@ -203,8 +204,11 @@
         <div class="board-controls nav board-nav" aria-label="Step through the game">
           <button type="button" data-nav="first" title="First position"><span data-ico="first"></span></button>
           <button type="button" data-nav="back" title="Back one move"><span data-ico="back"></span></button>
+          <button type="button" class="nav-play" title="Play"><span class="play-icon"></span></button>
           <button type="button" data-nav="forward" title="Forward one move"><span data-ico="next"></span></button>
           <button type="button" data-nav="last" title="Current position"><span data-ico="last"></span></button>
+          <button type="button" class="var-prev demo-only" title="Previous variation"><span data-ico="skipPrev"></span></button>
+          <button type="button" class="var-next demo-only" title="Next variation"><span data-ico="skipNext"></span></button>
           <button type="button" id="undo" title="Take back" hidden><span data-ico="undo"></span></button>
           <button type="button" id="flip" title="Flip board"><span data-ico="flip"></span></button>
           <button type="button" id="resign" title="Resign"><span data-ico="flag"></span></button>
@@ -232,10 +236,11 @@
 
       <!-- Desktops: the move list beside the board -->
       <section class="moves-area" data-view-panel="board">
-        <h2>Moves</h2>
+        <h2 id="moves-heading">Moves</h2>
         <div class="nav list-nav" aria-label="Step through the game">
           <button type="button" data-nav="first" title="First position"><span data-ico="first"></span></button>
           <button type="button" data-nav="back" title="Back one move"><span data-ico="back"></span></button>
+          <button type="button" class="nav-play" title="Play"><span class="play-icon"></span></button>
           <button type="button" data-nav="forward" title="Forward one move"><span data-ico="next"></span></button>
           <button type="button" data-nav="last" title="Current position"><span data-ico="last"></span></button>
         </div>
@@ -243,6 +248,10 @@
         <p id="opening-label" class="opening-label" hidden></p>
         <p id="repertoire-label" class="repertoire-label" hidden></p>
         <ol id="move-list"></ol>
+        <div class="demo-vars demo-only">
+          <button type="button" class="var-prev"><span data-ico="skipPrev" data-ico-size="16"></span> Previous variation</button>
+          <button type="button" class="var-next">Next variation <span data-ico="skipNext" data-ico-size="16"></span></button>
+        </div>
       </section>
 
       <section class="view stats-view" data-view-panel="stats" hidden>

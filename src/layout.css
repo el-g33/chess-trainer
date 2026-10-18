@@ -1007,3 +1007,130 @@ html body .board-area .board-controls {
 .demo-panel {
   margin-top: 8px;
 }
+
+/* -- Round 2: no tap flash, demo controls, fixed practice menu ------------------- */
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  touch-action: manipulation; /* no double-tap zoom */
+}
+
+.home-button {
+  background: transparent;
+  border: 0;
+}
+
+/* The play / pause / replay button and the variation buttons: demos only */
+.nav-play,
+.demo-only {
+  display: none !important;
+}
+
+body.demo-on .nav-play,
+body.demo-on .board-controls .demo-only {
+  display: inline-flex !important;
+}
+
+body.demo-on .demo-vars.demo-only {
+  display: grid !important;
+}
+
+.demo-vars {
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.demo-vars button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+
+.nav-play {
+  align-items: center;
+  justify-content: center;
+}
+
+body.demo-on .list-nav {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+body.demo-on #undo,
+body.demo-on #flip,
+body.demo-on #resign,
+body.demo-on #bar-bottom,
+body.demo-on .board-controls [data-nav="first"],
+body.demo-on .board-controls [data-nav="last"] {
+  display: none !important;
+}
+
+#demo-panel {
+  display: none !important;
+}
+
+/* Desktops step through the moves with the buttons beside the move list */
+@media (min-width: 901px) {
+  .board-controls [data-nav] {
+    display: none !important;
+  }
+
+  body.demo-on .board-controls {
+    visibility: hidden;
+  }
+}
+
+/* The opening tiles keep the same space whether White or Black is chosen */
+.tiles {
+  grid-auto-rows: 58px;
+  min-height: calc(4 * 58px + 3 * 8px);
+  align-content: start;
+}
+
+/* both tabs keep the same height */
+.tab-panel {
+  min-height: calc(4 * 58px + 3 * 8px + 70px);
+}
+
+/* Danger levels for "What can they do now?" */
+button.round.hazard.yellow { background: #f2d24b; color: #3a2a00; }
+button.round.hazard.amber { background: #f0a020; color: #3a2000; }
+button.round.hazard.orange { background: #ff7a5a; color: #3a0d00; }
+button.round.hazard.red { background: #d93025; color: #fff; }
+
+.stats-start {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+/* The move strip scrolls inside its own box; it mustn't widen the page */
+.board-area,
+.moves-area {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.move-strip {
+  max-width: 100%;
+}
+
+.new-game {
+  white-space: nowrap;
+}
+
+@media (max-width: 400px) {
+  .game-top {
+    gap: 6px;
+  }
+
+  .view-tabs button {
+    width: 38px;
+  }
+}
