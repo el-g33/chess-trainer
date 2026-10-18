@@ -22,6 +22,7 @@ import "./layout.css";
 import { Analyser, lineMove, lineScore } from "./analyser";
 import { avatarSvg, moodForRating, type Mood } from "./avatar";
 import { drawIcons, icon } from "./icons";
+import { enhanceSelects, syncDropdowns } from "./dropdown";
 import { badgeSvg } from "./badge";
 import { afterMove as positionAfter, colourName, isCastling, standardUci, variationSan } from "./coach";
 import { Engine } from "./engine";
@@ -516,6 +517,7 @@ function buildMenu() {
   backButton.addEventListener("click", hideMenu);
   setupHome();
   updateMenu();
+  enhanceSelects();
 }
 
 /** Sound effects on or off, and how loud. */
@@ -606,7 +608,11 @@ function showScreen(screen: HomeScreen) {
   for (const section of menu.querySelectorAll<HTMLElement>(".screen")) section.hidden = section.dataset.screen !== screen;
   // The level box is shared by the Play and Practice screens
   const slot = menu.querySelector<HTMLElement>(`.screen[data-screen="${screen}"] .slot-level`);
-  if (slot && levelBox.parentElement !== slot) slot.append(levelBox);
+  if (slot && levelBox.parentElement !== slot) {
+    const button = document.getElementById("level-button");
+    slot.append(levelBox);
+    if (button) slot.append(button); // its themed dropdown goes with it
+  }
   drawHome();
 }
 
@@ -629,6 +635,7 @@ function drawHome() {
     button.setAttribute("aria-checked", String(on));
   }
   $<HTMLButtonElement>("home-next").disabled = !homeChoice;
+  syncDropdowns();
 
   // Play
   for (const button of menu.querySelectorAll<HTMLButtonElement>("#colour-seg button")) {
@@ -1232,6 +1239,36 @@ const PRACTICE_TOUR: TourStep[] = [
     text: "Play, practise or analyse a game. The feature tour is in the settings if you'd like to see it again." },
 ];
 
+const DEMO_TOUR: TourStep[] = [
+  { target: "#bar-top", title: "The line",
+    text: "The opening and the line you're watching, for example the main line or a variation." },
+  { target: "#coach-strip", title: "Your coach",
+    text: "I explain each idea as the moves are played. Tap the dots to read the full note." },
+  { target: "#board", title: "The board", text: "The moves play out here, one at a time." },
+  { target: ".board-controls", title: "Play, pause and step",
+    text: "Step back and forward, play or pause in the middle, and jump to the previous or next variation." },
+  { target: ".list-nav", title: "Play, pause and step",
+    text: "Step back and forward, with play and pause in the middle." },
+  { target: ".demo-vars", title: "Variations", text: "Jump to the previous or next variation of this opening." },
+  { target: "#new-game", title: "New game", text: "Choose another opening, or practise this one in a match." },
+];
+
+const STATS_TOUR: TourStep[] = [
+  { target: ".stats-card", title: "Accuracy",
+    text: "How accurately each player played: over the whole game, then the opening, middlegame and endgame. Tap More for a count of every grade." },
+  { target: ".rating-card", title: "Rating",
+    text: "Roughly how strongly each side played in this game, judged by how much they gave away move by move." },
+  { target: ".stats-start", title: "The review", text: "Go through the game move by move, from the start." },
+  { target: ".view-tabs", title: "Tabs", text: "Back to the board, or on to your game history." },
+];
+
+const HISTORY_TOUR: TourStep[] = [
+  { target: ".history-colours", title: "Your colour", text: "Show all your games, or only those as White or Black." },
+  { target: ".history-record", title: "Your record",
+    text: "Wins, draws and losses. Tap them to show only those games; they combine with the colour." },
+  { target: ".history-list", title: "Your games", text: "Tap a game to replay it with me." },
+];
+
 const PLAY_TOUR: TourStep[] = [
   ...BOARD_STEPS,
   { target: ".board-controls", title: "Moving through the game",
@@ -1255,11 +1292,15 @@ function tourSeen(): Record<string, string> {
 /** The tour for the mode on screen: automatically only the first time
  *  (unless "No thanks" was pressed without the tick), or when asked for. */
 async function showTour(asked: boolean) {
-  if (menuOpen || tourOpen() || demo) return;
+  if (menuOpen || tourOpen() || (demo && !asked)) return;
   const which = mode;
   const seen = tourSeen();
   if (!asked && seen[which]) return;
-  const end = await runTour(which === "practice" ? PRACTICE_TOUR : PLAY_TOUR, which === "practice" ? "Practice mode tour" : "Play mode tour");
+  const [steps, title] = currentView === "stats" ? [STATS_TOUR, "Statistics"]
+    : currentView === "history" ? [HISTORY_TOUR, "Game history"]
+    : demo ? [DEMO_TOUR, "Learn an opening"]
+    : which === "practice" ? [PRACTICE_TOUR, "Practice mode tour"] : [PLAY_TOUR, "Play mode tour"];
+  const end = await runTour(steps, title);
   if (end.finished || end.neverAgain || asked) {
     try {
       localStorage.setItem(TOUR_KEY, JSON.stringify({ ...seen, [which]: end.neverAgain ? "never" : "seen" }));
@@ -1270,12 +1311,33 @@ async function showTour(asked: boolean) {
   refresh();
 }
 
-/** "Show the feature tour" in the menu: back to the game (or start one), then the tour. */
-function onMenuTour() {
-  if (game.length === 0 && match === null) onStartGame();
-  else hideMenu();
-  setTimeout(() => void showTour(true), 500);
+/** The ? button: About, and (in a game) a tour of the screen you're on. */
+function toggleHelp(anchor: HTMLElement) {
+  const box = $("help-menu");
+  if (!box.hidden) {
+    box.hidden = true;
+    return;
+  }
+  box.replaceChildren();
+  const item = (text: string, run: () => void) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.setAttribute("role", "menuitem");
+    button.textContent = text;
+    button.addEventListener("click", () => {
+      box.hidden = true;
+      run();
+    });
+    box.append(button);
+  };
+  if (!menuOpen) item("Show me around this screen", () => void showTour(true));
+  item("About and licences", () => window.open("./about.html", "_blank"));
+  const rect = anchor.getBoundingClientRect();
+  box.hidden = false;
+  box.style.top = `${rect.bottom + 6}px`;
+  box.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`;
 }
+
 
 // ---------------------------------------------------------------------------
 // Opening demos
@@ -1708,6 +1770,7 @@ function refresh() {
   drawReview(reviews, info);
   drawCoachFace(reviews);
   drawMoveStrip(reviews);
+  syncDropdowns();
   applyView();
   drawTurn();
   drawButtons();
@@ -2715,6 +2778,18 @@ function drawStats() {
   const phases = phaseAccuracy(start, positions, scores);
   const ratings = estimateRating(start, scores);
   const { done, total } = analyser.progress();
+  // Until Stockfish has checked every move, show ?? rather than numbers that keep changing
+  const pending = done < total || scores.some((score) => !score) || list.some((review) => !review);
+  if (pending) {
+    const bar = element("div", "stats-progress");
+    const fill = element("div", "stats-progress-fill");
+    const fraction = total ? done / total : 0;
+    fill.style.width = `${Math.round(fraction * 100)}%`;
+    const track = element("div", "stats-progress-track");
+    track.append(fill);
+    bar.append(element("span", "", "Stockfish is checking the game..."), track);
+    box.append(bar);
+  }
 
   // Both players side by side (you first when it's your game)
   const first: Color = listener() ?? "white";
@@ -2731,7 +2806,8 @@ function drawStats() {
   };
   const percent = (value: number | undefined, big = false) => {
     const cell = element("span", `stats-cell ${big ? "big" : ""}`);
-    if (value === undefined || Number.isNaN(value)) cell.textContent = "-";
+    if (pending) cell.textContent = "??";
+    else if (value === undefined || Number.isNaN(value)) cell.textContent = "-";
     else {
       cell.textContent = `${Math.round(value)}%`;
       cell.classList.add(ratingClass(accuracyRating(value)));
@@ -2763,7 +2839,7 @@ function drawStats() {
       label.append(element("span", `grade-dot ${ratingClass(grade)}`), element("span", "", grade));
       row(label, sides.map((c) => {
         const cell = element("span", "stats-cell");
-        cell.append(element("span", `count-chip ${ratingClass(grade)}`, String(counts[c][grade] ?? 0)));
+        cell.append(element("span", `count-chip ${ratingClass(grade)}`, pending ? "??" : String(counts[c][grade] ?? 0)));
         return cell;
       }));
     }
@@ -2777,7 +2853,6 @@ function drawStats() {
     start.append(button);
     box.append(start);
   }
-  if (done < total) card.append(element("p", "stats-note", `Stockfish is still checking the game (${done} of ${total}); the numbers will settle.`));
 
   // The rating, in its own table
   const rating = element("div", "stats-card rating-card");
@@ -2785,7 +2860,7 @@ function drawStats() {
   line.append(element("span", "stats-label", "Rating"));
   for (const colour of sides) {
     const cell = element("span", "stats-cell");
-    cell.append(element("span", "rating-block", ratings[colour] ? String(ratings[colour]) : "-"));
+    cell.append(element("span", "rating-block", pending ? "??" : ratings[colour] ? String(ratings[colour]) : "-"));
     line.append(cell);
   }
   rating.append(line);
@@ -3253,8 +3328,56 @@ async function reviewPgnGame(event: Event) {
   if (problem) await message("PGN", problem);
 }
 
-/** The game as a .pgn file, for keeping, sharing or opening elsewhere. */
+/** Download PGNs: choose from the game on screen and your saved games. */
 function downloadPgn() {
+  settingsDialog.close();
+  const list = $("pgn-download-list");
+  list.replaceChildren();
+  const add = (title: string, meta: string, save: () => void) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "history-game";
+    const text = document.createElement("span");
+    text.className = "history-text";
+    const t = document.createElement("span");
+    t.className = "history-title";
+    t.textContent = title;
+    const m = document.createElement("span");
+    m.className = "history-meta";
+    m.textContent = meta;
+    text.append(t, m);
+    const glyph = document.createElement("span");
+    glyph.innerHTML = icon("download", 20);
+    item.append(text, glyph);
+    item.addEventListener("click", save);
+    list.append(item);
+  };
+  if (game.length && !currentGameId) add("The game on screen", `${game.length} moves`, downloadCurrentPgn);
+  for (const saved of loadHistory()) {
+    const result = saved.result === "win" ? "Won" : saved.result === "loss" ? "Lost" : "Drawn";
+    add(`vs Stockfish · ${shortName(LEVELS[saved.level] ?? LEVELS[0])} · ${result}`,
+      [saved.opening || "Game", saved.user === "white" ? "White" : "Black", shortDate(saved.date)].join(" · "),
+      () => saveFile(`chess-trainer-${saved.date.slice(0, 10)}-${saved.id}.pgn`, saved.pgn));
+  }
+  if (!list.children.length) {
+    const empty = document.createElement("p");
+    empty.className = "stats-note";
+    empty.textContent = "No games yet: play against Stockfish and they'll be listed here.";
+    list.append(empty);
+  }
+  $<HTMLButtonElement>("pgn-download-all").disabled = !loadHistory().length;
+  $<HTMLDialogElement>("pgn-download-dialog").showModal();
+}
+
+/** Every saved game, in one .pgn file. */
+function downloadAllPgns() {
+  const games = loadHistory();
+  if (!games.length) return;
+  saveFile(`chess-trainer-games-${today().replace(/\./g, "-")}.pgn`, games.map((g) => g.pgn.trim()).join("\n\n") + "\n");
+}
+
+/** The game on screen as a .pgn file. */
+function downloadCurrentPgn() {
   if (!game.length) {
     void message("Download PGN", "There are no moves to save yet.");
     return;
@@ -3379,11 +3502,17 @@ function wireButtons() {
     saveSettings();
     refresh();
   });
-  $("settings-tour").addEventListener("click", () => {
-    settingsDialog.close();
-    if (menuOpen) onMenuTour();
-    else void showTour(true);
+  for (const help of document.querySelectorAll<HTMLElement>(".help-button")) {
+    help.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleHelp(help);
+    });
+  }
+  document.addEventListener("pointerdown", (event) => {
+    const menuBox = $("help-menu");
+    if (!menuBox.hidden && !menuBox.contains(event.target as Node) && !(event.target as Element).closest?.(".help-button")) menuBox.hidden = true;
   });
+  $("pgn-download-all").addEventListener("click", downloadAllPgns);
   showDemoButton.addEventListener("click", () => void onShowDemo());
   demoPlay.addEventListener("click", onDemoPlay);
   $("demo-back").addEventListener("click", () => goTo(currentPly() - 1));

@@ -54,6 +54,7 @@
           <div class="home-top">
             <button type="button" id="back-to-game" class="home-link"><span data-ico="back" data-ico-size="16"></span> Back to game</button>
             <span class="home-gap"></span>
+            <button type="button" class="icon-button help-button" aria-label="Help" title="Help"><span data-ico="quiz"></span></button>
             <button type="button" class="icon-button gear-button" aria-label="Settings" title="Settings"><span data-ico="gear"></span></button>
           </div>
           <div id="home-face" class="home-face" aria-hidden="true"></div>
@@ -65,7 +66,6 @@
           </div>
           <button type="button" id="home-next" class="home-next accent" disabled>Next</button>
           <p id="engine-status" class="engine-status">Loading Stockfish...</p>
-          <p class="about-link"><a href="./about.html">About &amp; licences</a></p>
         </section>
 
         <!-- 2a. Play against the computer -->
@@ -159,6 +159,7 @@
           <button type="button" data-view="stats" aria-label="Statistics" title="Statistics"><span data-ico="chart"></span></button>
           <button type="button" data-view="history" aria-label="Game history" title="Game history"><span data-ico="history"></span></button>
         </nav>
+        <button type="button" class="icon-button help-button" aria-label="Help" title="Help"><span data-ico="quiz"></span></button>
         <button type="button" class="icon-button gear-button" aria-label="Settings" title="Settings"><span data-ico="gear"></span></button>
       </header>
 
@@ -350,15 +351,31 @@
           </select>
         </div>
         <div class="settings-buttons">
-          <button type="button" id="download-pgn"><span data-ico="download" data-ico-size="16"></span> Download this game (PGN)</button>
-          <button type="button" id="settings-tour">Show the feature tour</button>
+          <button type="button" id="download-pgn"><span data-ico="download" data-ico-size="16"></span> Download PGNs</button>
         </div>
         <div id="fen-row" class="fen-row">
           <label for="fen">Position (FEN)</label>
           <input id="fen" type="text" autocomplete="off" spellcheck="false" placeholder="Paste a position" />
           <button type="button" id="load-fen">Load</button>
         </div>
-        <p class="about-link"><a href="./about.html">About &amp; licences</a></p>
+      </form>
+    </dialog>
+
+    <!-- Help: About, and a tour of the screen you're on -->
+    <div id="help-menu" class="help-menu" role="menu" hidden></div>
+
+    <!-- Download PGNs: choose from your games -->
+    <dialog id="pgn-download-dialog" class="settings-dialog">
+      <form method="dialog">
+        <div class="settings-head">
+          <h3>Download PGNs</h3>
+          <button value="close" class="round soft" aria-label="Close"><span data-ico="close"></span></button>
+        </div>
+        <p class="setup-note">Tap a game to save it as a .pgn file, or save them all in one file.</p>
+        <div id="pgn-download-list" class="history-list pgn-download-list"></div>
+        <div class="settings-buttons">
+          <button type="button" id="pgn-download-all" class="accent"><span data-ico="download" data-ico-size="16"></span> Download all</button>
+        </div>
       </form>
     </dialog>
 

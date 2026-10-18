@@ -1134,3 +1134,155 @@ button.round.hazard.red { background: #d93025; color: #fff; }
     width: 38px;
   }
 }
+
+/* Statistics while Stockfish checks the game */
+.stats-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: var(--card-radius);
+  background: var(--card);
+  border: 1px solid var(--line);
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.stats-progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.stats-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+/* -- Themed dropdowns (src/dropdown.ts) -------------------------------------- */
+
+select.dd-native {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.dd-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px 6px 14px;
+  text-align: left;
+  background: var(--button);
+  color: var(--text);
+}
+
+.dd-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dd-arrow {
+  flex: none;
+  opacity: 0.7;
+}
+
+.dd-list {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+}
+
+:root[data-ui="violet"] .dd-list {
+  background: #3f4277;
+}
+
+.dd-option {
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.dd-option:hover:not(:disabled),
+.dd-option:focus-visible {
+  background: var(--button-hover);
+  outline: none;
+}
+
+.dd-option.on {
+  background: var(--round-bg);
+  color: var(--round-fg);
+}
+
+.dd-group {
+  padding: 8px 12px 4px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* Help menu */
+.help-menu {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 4px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+}
+
+:root[data-ui="violet"] .help-menu {
+  background: #3f4277;
+}
+
+.help-menu[hidden] {
+  display: none;
+}
+
+.help-menu button {
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 8px 12px;
+  color: var(--text);
+}
+
+.help-menu button:hover:not(:disabled) {
+  background: var(--button-hover);
+}
+
+.pgn-download-list {
+  max-height: 50dvh;
+  overflow-y: auto;
+  margin: 10px 0;
+}
+
+.game-top .help-button {
+  margin-left: 0;
+}
