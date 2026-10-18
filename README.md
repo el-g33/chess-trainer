@@ -127,6 +127,32 @@ any difference. The tests folder isn't part of the built site.
 - **Middlegame notes** (`src/middlegame.ts`) in Explain the ideas: outposts,
   weak squares, bad bishops, rooks on the 7th, the isolated queen's pawn, the
   minority attack.
+- **Accuracy** (`src/accuracy.ts`): the Game report in the Move review shows each
+  side's accuracy for the opening, middlegame, endgame and the whole game
+  (lichess's formulas and phase divider), coloured like the move ratings.
+  Doubtful ratings get a deeper second look (2 s) so a shallow eval doesn't
+  call a winning move a mistake.
+- **Quiz explanations** (`src/quizExplain.ts`): after a wrong guess, Stockfish
+  explains why it isn't a threat (or how it would be punished), with arrows and
+  the line to step through.
+- **Player bars**: names (your name from the menu, Stockfish's level, or the PGN
+  names and ratings), captured pieces and the material lead, above and below
+  the board.
+- **Time control** (`src/clock.ts`): presets from 1 minute to 30 minutes plus
+  custom, with increment. Stockfish takes human-like time (quick book moves,
+  longer thinks in tricky positions, faster when short of time). Running out of
+  time loses, or draws if the other side can't mate. Practice mode pauses the
+  clock while the coach works, while looking back or analysing; Undo restores
+  the clocks. PGN downloads include TimeControl and [%clk].
+- **Opening demos** (`src/demos.ts`): "Learn an opening" in the menu, or "Show
+  me this opening" while practising it. Stockfish plays the main line and the
+  variations, pausing at each note; Back/Next, Resume autoplay, Next
+  variation, Try it yourself. Transpositions are found automatically. London
+  System and Rapport-Jobava so far; every line was checked with full-strength
+  Stockfish.
+- **Feature tour** (`src/tour.ts`): callouts shown the first time each mode is
+  used, with Back / Next / No thanks and "Don't show this again"; can be watched
+  again from the menu or the panel.
 
 ## Plan ahead with your opening (web only)
 
