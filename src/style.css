@@ -249,7 +249,9 @@ select:focus-visible,
 /* -- The game screen ------------------------------------------------------------ */
 
 #game {
-  --board: min(calc(100dvh - 2 * var(--gutter)), calc(100vw - 600px));
+  /* the board fills the height, less the player bars above and below it */
+  --bars: 70px;
+  --board: min(calc(100dvh - 2 * var(--gutter) - var(--bars)), calc(100vw - 600px));
   display: grid;
   grid-template-columns: var(--board) minmax(190px, 240px) minmax(260px, 1fr);
   grid-template-areas: "board moves panel";
@@ -358,7 +360,7 @@ body.practice .player-bar {
 
 /* Practice: the eval bar beside the board takes a little width */
 body.practice #game {
-  --board: min(calc(100dvh - 2 * var(--gutter)), calc(100vw - 740px));
+  --board: min(calc(100dvh - 2 * var(--gutter) - var(--bars)), calc(100vw - 740px));
   grid-template-columns: calc(var(--board) + 28px) minmax(210px, 250px) minmax(330px, 1fr);
   gap: 20px 22px;
 }
@@ -1123,15 +1125,20 @@ cg-board square.check {
   );
 }
 
+/* Theme, Board, Pieces and Sounds: two columns of label + box, so the row
+   never runs off the edge however many choices there are */
 .look-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: 6px 8px;
   margin-top: 6px;
   font-size: 0.9rem;
 }
 
 .look-row select {
+  width: 100%;
+  min-width: 0;
   padding-block: 4px;
   min-height: 32px;
 }
@@ -1207,11 +1214,12 @@ cg-board square.check {
 }
 
 .look-row .sound-check {
-  margin-left: auto;
+  grid-column: 3;
 }
 
 .look-row input[type="range"] {
-  width: 90px;
+  width: 100%;
+  min-width: 0;
   accent-color: var(--accent);
 }
 

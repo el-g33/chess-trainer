@@ -482,8 +482,11 @@ function buildMenu() {
   if (saved.clockTick !== undefined) clockTickBox.checked = saved.clockTick;
   applySound();
   if (themeBox.selectedIndex < 0) themeBox.selectedIndex = 0;
-  if (saved.uiTheme) uiThemeBox.value = saved.uiTheme;
-  if (uiThemeBox.selectedIndex < 0) uiThemeBox.selectedIndex = 0;
+  // Warm stone, with its walnut board and ivory-and-espresso pieces, for anyone
+  // who hasn't chosen a theme yet
+  uiThemeBox.value = saved.uiTheme ?? DEFAULT_THEME;
+  if (uiThemeBox.selectedIndex < 0) uiThemeBox.value = DEFAULT_THEME;
+  if (!saved.uiTheme) themeBox.value = THEME_BOARDS[DEFAULT_THEME];
   for (const [value, label] of Object.entries(PIECE_CHOICES)) piecesBox.add(new Option(label, value));
   piecesBox.value = saved.pieces && PIECE_CHOICES[saved.pieces] ? saved.pieces : uiThemeBox.value;
   if (piecesBox.selectedIndex < 0) piecesBox.selectedIndex = 0;
@@ -509,6 +512,7 @@ function applySound() {
 
 /** The board theme: "wood" or "grey" (a class on the board). */
 // Each look comes with a board that suits it (the Board box can still change it)
+const DEFAULT_THEME = "stone";
 const THEME_BOARDS: Record<string, string> = { classic: "wood", ember: "slate", stone: "walnut", violet: "lavender" };
 const THEME_BARS: Record<string, string> = { classic: "#fafafa", ember: "#16181e", stone: "#9a908a", violet: "#33365e" };
 

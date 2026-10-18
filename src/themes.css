@@ -151,6 +151,10 @@
   font-size: 1.3rem;
 }
 
+:root[data-ui="stone"] #game {
+  --bars: 86px; /* the bars' cards have a little margin */
+}
+
 /* Move ratings, brighter so they read on the dark themes */
 :root[data-ui="ember"] .r-best, :root[data-ui="violet"] .r-best { color: #7fd6a0; }
 :root[data-ui="ember"] .r-brilliant, :root[data-ui="violet"] .r-brilliant { color: #3fd9bb; }
@@ -210,4 +214,28 @@
 :root[data-ui="stone"] .link-button,
 :root[data-ui="stone"] .about-link a {
   color: #a94a1a;
+}
+
+/* Dropdown lists: the open list draws its own background, so give the dark
+   themes solid, readable options (the boxes themselves can be see-through) */
+:root[data-ui="violet"] select,
+:root[data-ui="violet"] option,
+:root[data-ui="violet"] optgroup {
+  background-color: #3f4277;
+  color: #eeedfe;
+}
+
+:root[data-ui="ember"] option,
+:root[data-ui="ember"] optgroup {
+  background-color: #262a33;
+  color: #e8e9ed;
+}
+
+:root[data-ui="stone"] option {
+  background-color: #fffdfb;
+  color: #2f2b29;
+}
+
+:root[data-ui="violet"] select:hover:not(:disabled) {
+  background-color: #4a4e88;
 }
