@@ -44,7 +44,7 @@ import {
   type OpeningInfo,
 } from "./openings";
 import { openingPlanAhead, reviewOpeningChoice, type OpeningPlan, type PlanMode } from "./openingPlan";
-import { FALL_ANGLES, fallenKing, loadPieces } from "./pieces";
+import { FALL_ANGLES, fallenKing, loadPieces, PALETTES, setPalette } from "./pieces";
 import { play, setSound, soundForMove, unlockSounds } from "./sounds";
 import { brilliantCandidates, findBrilliant, missedBrilliant, type Brilliant } from "./brilliant";
 import { accuracyRating, divide, gameAccuracy, phaseAccuracy, winPercent, type Phase } from "./accuracy";
@@ -150,6 +150,7 @@ const soundOn = $<HTMLInputElement>("sound-on");
 const soundVolume = $<HTMLInputElement>("sound-volume");
 const playerNameBox = $<HTMLInputElement>("player-name");
 const uiThemeBox = $<HTMLSelectElement>("ui-theme");
+const piecesBox = $<HTMLSelectElement>("pieces");
 const planModeBox = $<HTMLSelectElement>("plan-mode");
 const planModeRow = $("plan-mode-row");
 // « ‹ › » - above the move list, and (on phones) right under the board
@@ -396,6 +397,7 @@ interface Settings {
   soundVolume?: number;
   playerName?: string;
   uiTheme?: string;
+  pieces?: string;
   timeControl?: string;
   tcMinutes?: number;
   tcIncrement?: number;
@@ -426,6 +428,7 @@ function saveSettings() {
     soundVolume: Number(soundVolume.value),
     playerName: playerNameBox.value.trim(),
     uiTheme: uiThemeBox.value,
+    pieces: piecesBox.value,
     timeControl: timeControlBox.value,
     tcMinutes: Number(tcMinutes.value),
     tcIncrement: Number(tcIncrement.value),
@@ -481,6 +484,10 @@ function buildMenu() {
   if (themeBox.selectedIndex < 0) themeBox.selectedIndex = 0;
   if (saved.uiTheme) uiThemeBox.value = saved.uiTheme;
   if (uiThemeBox.selectedIndex < 0) uiThemeBox.selectedIndex = 0;
+  for (const [value, palette] of Object.entries(PALETTES)) piecesBox.add(new Option(palette.label, value));
+  piecesBox.value = saved.pieces && PALETTES[saved.pieces] ? saved.pieces : uiThemeBox.value;
+  if (piecesBox.selectedIndex < 0) piecesBox.selectedIndex = 0;
+  setPalette(piecesBox.value);
   applyUiTheme();
   applyTheme();
 
@@ -1678,7 +1685,7 @@ function showFallFrame() {
   if (!fall) return;
   const url = fallenKing(fall.colour, FALL_ANGLES[fall.step]);
   // (more specific than the normal piece pictures, so it wins)
-  fallStyle.textContent = url ? `.cg-wrap cg-board piece.king.${fall.colour} { background-image: url("${url}"); }` : "";
+  fallStyle.textContent = url ? `:root[data-pieces] .cg-wrap cg-board piece.king.${fall.colour} { background-image: url("${url}"); }` : "";
 }
 
 /** Stockfish's verdict on the position on screen, as White's share of the bar. */
@@ -2392,10 +2399,17 @@ function wireButtons() {
     last: () => goTo(game.length),
   };
   for (const button of navButtons) button.addEventListener("click", () => steps[button.dataset.nav!]());
+  piecesBox.addEventListener("change", () => {
+    setPalette(piecesBox.value);
+    saveSettings();
+    refresh();
+  });
   uiThemeBox.addEventListener("change", () => {
     applyUiTheme();
     themeBox.value = THEME_BOARDS[uiThemeBox.value] ?? themeBox.value;
     applyTheme();
+    piecesBox.value = uiThemeBox.value; // each theme has its own piece colours
+    setPalette(piecesBox.value);
     saveSettings();
     refresh();
   });
