@@ -77,6 +77,8 @@ export interface Threat {
   threatSan?: string;
   passed?: Chess; // the position with your move skipped
   goodGuesses: Set<string>; // quiz answers that count (UCI)
+  nowScore?: Score; // Stockfish's score now (White's view)
+  threatScore?: Score; // ...if you skipped your move and they played the threat
   text: string;
 }
 
@@ -156,6 +158,8 @@ export async function threatCheck(engine: CoachEngine, position: Chess): Promise
     threatMove: threat,
     threatSan: san,
     passed,
+    nowScore: now.score,
+    threatScore: best.score,
     text: lines.join("\n"),
   };
 }

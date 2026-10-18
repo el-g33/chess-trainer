@@ -48,6 +48,7 @@ import { play, setSound, soundForMove, unlockSounds } from "./sounds";
 import { brilliantCandidates, findBrilliant, missedBrilliant, type Brilliant } from "./brilliant";
 import { accuracyRating, divide, gameAccuracy, phaseAccuracy, winPercent, type Phase } from "./accuracy";
 import type { Score } from "./coach";
+import { explainGuess, type GuessExplanation } from "./quizExplain";
 import { readPgn, saveFile, today, writePgn, type Headers, type PgnGame } from "./pgn";
 import { addMisses, fenOf, formatScore, isDrawnPosition, reviewMove, type Review } from "./review";
 import { gradeGuess, planAhead, threatCheck, type CoachEngine, type Plan, type Threat } from "./strategy";
@@ -172,6 +173,9 @@ interface Quiz {
   answered: boolean;
   guess?: NormalMove;
   result?: [boolean, string];
+  explanation?: GuessExplanation; // for a wrong guess: what would really happen
+  explaining?: boolean;
+  lineStep?: number; // stepping through the guess played out (0 = not)
 }
 
 // Three separate copies of Stockfish, so they never get in each other's way:
@@ -299,8 +303,19 @@ function base(): Chess {
 
 /** What the board draws: a position of Stockfish's line during a preview. */
 function shown(): Chess {
+  const line = quizLinePositions();
+  if (line && quiz?.lineStep) return line[quiz.lineStep];
   const plan = previewPlan();
   return plan && preview ? plan.positions[preview.step] : base();
+}
+
+/** The positions along a wrong guess played out (your move skipped, their guess, your answer...). */
+function quizLinePositions(): Chess[] | undefined {
+  const explanation = quiz?.explanation;
+  if (!explanation) return undefined;
+  const positions = [explanation.start];
+  for (const move of explanation.line) positions.push(positionAfter(positions[positions.length - 1], move));
+  return positions;
 }
 
 function previewPlan(): Plan | undefined {
@@ -689,7 +704,7 @@ function clickPosition(): Chess {
 
 /** Can pieces be moved right now, and which side's? */
 function movableColour(): Color | undefined {
-  if (busy || thinking || preview || menuOpen) return undefined;
+  if (busy || thinking || preview || menuOpen || quiz?.lineStep) return undefined;
   if (quizWaiting()) return quiz!.threat!.them;
   if (analysing()) return base().turn;
   if (viewPly !== null) return undefined; // looking back in Play mode
@@ -926,9 +941,32 @@ function answerQuiz(guess: NormalMove) {
   quiz!.guess = guess;
   quiz!.result = [correct, text];
   refresh();
+  if (!correct) void explainWrongGuess(guess);
+}
+
+async function explainWrongGuess(guess: NormalMove) {
+  const asked = quiz;
+  if (!asked?.threat) return;
+  asked.explaining = true;
+  setBusy(true, "Stockfish is checking your guess...");
+  try {
+    asked.explanation = await explainGuess(coachAnalysis, asked.threat, guess);
+  } catch (error) {
+    errorText = `Something went wrong: ${error}`;
+  } finally {
+    asked.explaining = false;
+    setBusy(false);
+    refresh();
+  }
 }
 
 function stepPreview(direction: number) {
+  if (quiz?.explanation) {
+    const last = quiz.explanation.line.length;
+    quiz.lineStep = Math.max(0, Math.min((quiz.lineStep ?? 0) + direction, last));
+    refresh();
+    return;
+  }
   const plan = insights.get(fenOf(base()))?.plan;
   if (!plan || busy) return;
   const step = Math.max(0, Math.min((preview?.step ?? 0) + direction, plan.steps.length));
@@ -937,6 +975,7 @@ function stepPreview(direction: number) {
 }
 
 function exitPreview() {
+  if (quiz) quiz.lineStep = 0;
   preview = null;
   refresh();
 }
@@ -1134,6 +1173,11 @@ function arrowShapes(): DrawShape[] {
       brush: "guess",
       label: { text: "?", fill: GUESS_ARROW },
     });
+    const reply = quiz.explanation?.reply;
+    if (reply && !quiz.lineStep) {
+      const afterGuess = positionAfter(quiz.threat.passed, quiz.guess);
+      shapes.push({ orig: makeSquare(reply.from) as Key, dest: arrowEnd(afterGuess, reply), brush: "you" });
+    }
   }
   return shapes;
 }
@@ -1166,7 +1210,11 @@ function drawBoard(reviews: (Review | undefined)[], info: OpeningInfo[]) {
   const position = shown();
   let last: [Key, Key] | undefined;
   const plan = previewPlan();
-  if (plan && preview) {
+  const quizLine = quizLinePositions();
+  if (quizLine && quiz?.lineStep) {
+    const move = quiz.explanation!.line[quiz.lineStep - 1];
+    last = [makeSquare(move.from) as Key, arrowEnd(quizLine[quiz.lineStep - 1], move)];
+  } else if (plan && preview) {
     const step = plan.steps[preview.step - 1];
     last = [makeSquare(step.move.from) as Key, arrowEnd(plan.positions[preview.step - 1], step.move)];
   } else if (analysis && analysis.line.length) {
@@ -1515,6 +1563,14 @@ function turnText(): string {
     const side = colourName(base().turn);
     return line ? `Analysis (${side} to move): ${line}` : `Analysis: make any move for ${side} to see what would have happened`;
   }
+  const quizLine = quizLinePositions();
+  if (quizLine && quiz?.lineStep) {
+    const total = quiz.explanation!.line.length;
+    const move = quiz.explanation!.line[quiz.lineStep - 1];
+    const san = makeSan(quizLine[quiz.lineStep - 1], move);
+    const who = quiz.lineStep === 1 ? "their guessed move" : quiz.lineStep % 2 === 0 ? "you answer" : "they play";
+    return `Your guess played out (not the game): move ${quiz.lineStep} of ${total}, ${who} ${san}`;
+  }
   const plan = previewPlan();
   if (plan && preview) {
     const step = plan.steps[preview.step - 1];
@@ -1552,9 +1608,16 @@ function drawButtons() {
 
   const plan = insights.get(fenOf(position))?.plan;
   const step = preview?.step ?? 0;
-  lineBack.disabled = waiting || step === 0;
-  lineForward.disabled = waiting || !plan || quizOpen || step >= (plan?.steps.length ?? 0);
-  lineExit.disabled = preview === null;
+  if (quiz?.explanation) {
+    const quizStep = quiz.lineStep ?? 0;
+    lineBack.disabled = waiting || quizStep === 0;
+    lineForward.disabled = waiting || quizStep >= quiz.explanation.line.length;
+    lineExit.disabled = quizStep === 0;
+  } else {
+    lineBack.disabled = waiting || step === 0;
+    lineForward.disabled = waiting || !plan || quizOpen || step >= (plan?.steps.length ?? 0);
+    lineExit.disabled = preview === null;
+  }
 
   // No take-backs while looking back or previewing: Undo only works on the live game.
   undoButton.disabled = waiting || looking || quizOpen || !game.length;
@@ -1602,7 +1665,13 @@ function drawCoach() {
     );
   } else if (quiz?.answered) {
     const [correct, text] = quiz.result!;
-    section("Quiz result", textBlock(text, correct ? "coach-right" : "coach-wrong"));
+    const parts: HTMLElement[] = [textBlock(text, correct ? "coach-right" : "coach-wrong")];
+    if (quiz.explaining) parts.push(textBlock("Stockfish is checking what your guess would do...", "coach-note"));
+    if (quiz.explanation) {
+      parts.push(textBlock(quiz.explanation.text));
+      parts.push(textBlock("Blue arrow: your guess. Green arrow: your best answer. Use the ‹ › buttons below to play it out.", "coach-note"));
+    }
+    section("Quiz result", ...parts);
   }
 
   // No spoilers while a quiz question is open
@@ -1899,7 +1968,9 @@ function wireButtons() {
 
 // For testing in development only (not in the published site)
 if (import.meta.env.DEV) {
-  (window as unknown as { trainer: unknown }).trainer = { analyser, game: () => game, gameScores };
+  (window as unknown as { trainer: unknown }).trainer = {
+    analyser, game: () => game, gameScores, answerQuiz, startTask, quiz: () => quiz, parseUci, normalizeMove, base,
+  };
 }
 
 buildMenu();
