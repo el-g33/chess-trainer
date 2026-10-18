@@ -1303,3 +1303,77 @@ cg-board square.check {
   gap: 8px;
   justify-content: center;
 }
+
+/* -- Feature tour ---------------------------------------------------------------- */
+
+.link-button {
+  border: 0;
+  background: none;
+  padding: 0;
+  min-height: 0;
+  font: inherit;
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.link-button:hover:not(:disabled) {
+  background: none;
+}
+
+.tour-blocker {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+}
+
+.tour-spot {
+  position: fixed;
+  z-index: 901;
+  border-radius: 8px;
+  box-shadow: 0 0 0 3px var(--accent), 0 0 0 9999px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+
+.tour-bubble {
+  position: fixed;
+  z-index: 902;
+  box-sizing: border-box;
+  padding: 14px 16px 12px;
+  background: #fff;
+  color: var(--text);
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+}
+
+.tour-count {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.tour-title {
+  margin: 4px 0 6px;
+  font-size: 1.05rem;
+}
+
+.tour-text {
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+
+.tour-never {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.tour-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.tour-gap {
+  flex: 1;
+}

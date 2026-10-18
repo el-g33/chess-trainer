@@ -53,6 +53,7 @@ import {
   Clock, formatClock, parseTimeControl, PRESETS, thinkTime, timeControlTag, type TimeControl, type Times,
 } from "./clock";
 import { DEMOS, demoFor, demoSteps, type Demo, type DemoStep } from "./demos";
+import { runTour, tourOpen, type TourStep } from "./tour";
 import { readPgn, saveFile, today, writePgn, type Headers, type PgnGame } from "./pgn";
 import { addMisses, fenOf, formatScore, isDrawnPosition, reviewMove, type Review } from "./review";
 import { gradeGuess, planAhead, threatCheck, type CoachEngine, type Plan, type Threat } from "./strategy";
@@ -553,6 +554,7 @@ function onStartGame() {
   hideMenu();
   refresh();
   void maybeOpponentMove(); // if you're Black, Stockfish moves first
+  setTimeout(() => void showTour(false), 500); // the first time only
 }
 
 /** A fresh game from a position, with nothing else going on. */
@@ -929,6 +931,96 @@ async function onLoadFen(event: Event) {
   canReview = false;
   reviewing = false;
   refresh();
+}
+
+// ---------------------------------------------------------------------------
+// The feature tour
+// ---------------------------------------------------------------------------
+
+const TOUR_KEY = "chess-trainer-tour";
+
+const BOARD_STEPS: TourStep[] = [
+  { target: "#board", title: "The board",
+    text: "Drag a piece to move it, or tap it and then tap where it should go." },
+  { target: "#bar-top", title: "The players",
+    text: "Names, the pieces each side has captured, and who is ahead in material (+3 means three pawns' worth). With a time control, the clocks are here too." },
+];
+
+const STEP_THROUGH: TourStep[] = [
+  { target: ".board-nav", title: "Step through the game",
+    text: "Go back and forward through the moves. You can also click a move in the list, or use the arrow keys." },
+  { target: ".list-nav", title: "Step through the game",
+    text: "Go back and forward through the moves. You can also click a move in the list, or use the arrow keys." },
+];
+
+const PRACTICE_TOUR: TourStep[] = [
+  ...BOARD_STEPS,
+  { target: "#eval-bar", title: "Eval bar",
+    text: "Who is better according to Stockfish: the more white, the better for White. You can switch it off with the Eval bar tick box." },
+  { target: "#review-area", title: "Move review",
+    text: "Every move gets a rating (Best, Good, Mistake...) with what was better and why. The Game report adds accuracy for the opening, middlegame, endgame and the whole game." },
+  { target: "#threat-button", title: "What's the threat?",
+    text: "Shows what your opponent wants to do next." },
+  { target: "#plan-button", title: "Plan ahead",
+    text: "Stockfish's next few moves for both sides, as numbered arrows you can step through. While practising an opening it can follow your opening instead." },
+  { target: "#quiz-button", title: "Spot their idea (quiz)",
+    text: "Guess your opponent's threat by playing it on the board. A wrong guess is explained: why it isn't a threat, and how it would be punished." },
+  { target: "#ideas-button", title: "Explain the ideas",
+    text: "The plans in the position in plain words: weak squares, outposts, pawn structure and more." },
+  { target: "#brilliant-button", title: "Is there a brilliant move?",
+    text: "Checks for a hidden sacrifice or a winning trick in the position." },
+  { target: "#show-demo", title: "Opening demo",
+    text: "Watch Stockfish play the opening you're practising, with the ideas explained." },
+  ...STEP_THROUGH,
+  { target: "#undo", title: "Undo",
+    text: "Take back your move (and Stockfish's reply) to try something else." },
+  { target: ".pgn-row", title: "PGN files",
+    text: "Open a game from lichess, chess.com or a file to review it, or download this game." },
+  { target: "#new-game", title: "New game and the menu",
+    text: "Back to the menu: change the level, your colour, the time control, the opening to practise, or watch an opening demo. The feature tour can be found there and at the bottom of this panel." },
+];
+
+const PLAY_TOUR: TourStep[] = [
+  ...BOARD_STEPS,
+  ...STEP_THROUGH,
+  { target: "#resign", title: "Resign", text: "Give up the game." },
+  { target: ".pgn-row", title: "PGN files",
+    text: "Download this game, or open one to review it." },
+  { target: "#new-game", title: "New game and the menu",
+    text: "Back to the menu for a new game, Practice mode (coach, eval bar and move ratings) or an opening demo. After a game, \"Review this game\" shows how every move rated." },
+];
+
+function tourSeen(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(TOUR_KEY) ?? "{}");
+  } catch {
+    return {};
+  }
+}
+
+/** The tour for the mode on screen: automatically only the first time
+ *  (unless "No thanks" was pressed without the tick), or when asked for. */
+async function showTour(asked: boolean) {
+  if (menuOpen || tourOpen() || demo) return;
+  const which = mode;
+  const seen = tourSeen();
+  if (!asked && seen[which]) return;
+  const end = await runTour(which === "practice" ? PRACTICE_TOUR : PLAY_TOUR, which === "practice" ? "Practice mode tour" : "Play mode tour");
+  if (end.finished || end.neverAgain || asked) {
+    try {
+      localStorage.setItem(TOUR_KEY, JSON.stringify({ ...seen, [which]: end.neverAgain ? "never" : "seen" }));
+    } catch {
+      // storage blocked: it may be offered again next time
+    }
+  }
+  refresh();
+}
+
+/** "Show the feature tour" in the menu: back to the game (or start one), then the tour. */
+function onMenuTour() {
+  if (game.length === 0 && match === null) onStartGame();
+  else hideMenu();
+  setTimeout(() => void showTour(true), 500);
 }
 
 // ---------------------------------------------------------------------------
@@ -1661,7 +1753,7 @@ function legalMoveCount(position: Chess): number {
 /** Practice mode stops the clock while you use the coach, look back or
  *  analyse; both modes stop it while the menu is open. */
 function clockShouldPause(): boolean {
-  if (menuOpen) return true;
+  if (menuOpen || tourOpen()) return true;
   if (mode !== "practice") return false;
   return busy || viewPly !== null || analysis !== null || preview !== null || quiz !== null ||
     document.querySelector("dialog[open]") !== null;
@@ -2316,6 +2408,8 @@ function wireButtons() {
   $("open-pgn").addEventListener("click", openPgnDialog);
   $("menu-open-pgn").addEventListener("click", openPgnDialog);
   $("menu-demo").addEventListener("click", openDemoDialog);
+  $("menu-tour").addEventListener("click", onMenuTour);
+  $("panel-tour").addEventListener("click", () => void showTour(true));
   showDemoButton.addEventListener("click", () => void onShowDemo());
   demoPlay.addEventListener("click", onDemoPlay);
   $("demo-back").addEventListener("click", () => goTo(currentPly() - 1));
@@ -2353,7 +2447,7 @@ function wireButtons() {
   lineExit.addEventListener("click", exitPreview);
 
   document.addEventListener("keydown", (event) => {
-    if (menuOpen || dialog.open) return;
+    if (menuOpen || dialog.open || tourOpen()) return;
     if (event.target instanceof HTMLSelectElement || event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement || pgnDialog.open || demoDialog.open) return;
     if (event.key === " " && event.target instanceof HTMLButtonElement) return; // the button's own click
@@ -2384,7 +2478,7 @@ if (import.meta.env.DEV) {
   (window as unknown as { trainer: unknown }).trainer = {
     analyser, game: () => game, gameScores, answerQuiz, startTask, quiz: () => quiz, parseUci, normalizeMove, base,
     boardMove: onBoardMove, clock: () => clock, clockTimes: () => clockTimes, onUndo,
-    demo: () => demo, startDemo, DEMOS, demoSteps,
+    demo: () => demo, startDemo, DEMOS, demoSteps, showTour,
   };
 }
 
