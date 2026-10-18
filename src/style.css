@@ -1223,3 +1223,83 @@ cg-board square.check {
 .cg-wrap coords.files coord:nth-child(even) {
   color: var(--coord-on-light);
 }
+
+/* -- Opening demo -------------------------------------------------------------- */
+
+.demo-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.demo-panel[hidden] {
+  display: none;
+}
+
+.demo-line {
+  margin: 0;
+  font-weight: 600;
+}
+
+.demo-note {
+  min-height: 5.5em;
+  padding: 10px 12px;
+  border-left: 4px solid var(--accent);
+  background: var(--panel-soft, #f3f6fb);
+  border-radius: 4px;
+  line-height: 1.45;
+}
+
+.demo-note .demo-move {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 700;
+}
+
+.demo-note .demo-transposition {
+  display: block;
+  margin-top: 6px;
+  color: #6a1b9a;
+  font-weight: 600;
+}
+
+.demo-controls {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr 1fr;
+  gap: 6px;
+}
+
+.demo-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.demo-pick-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+.demo-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.demo-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.demo-choices button {
+  text-align: left;
+}
+
+.menu-pgn {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}

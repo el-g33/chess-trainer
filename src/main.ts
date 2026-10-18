@@ -52,6 +52,7 @@ import { explainGuess, type GuessExplanation } from "./quizExplain";
 import {
   Clock, formatClock, parseTimeControl, PRESETS, thinkTime, timeControlTag, type TimeControl, type Times,
 } from "./clock";
+import { DEMOS, demoFor, demoSteps, type Demo, type DemoStep } from "./demos";
 import { readPgn, saveFile, today, writePgn, type Headers, type PgnGame } from "./pgn";
 import { addMisses, fenOf, formatScore, isDrawnPosition, reviewMove, type Review } from "./review";
 import { gradeGuess, planAhead, threatCheck, type CoachEngine, type Plan, type Threat } from "./strategy";
@@ -118,6 +119,12 @@ const modeTitle = $("mode-title");
 const evalBar = $("eval-bar");
 const evalCheck = $<HTMLInputElement>("eval-check");
 const coachPanel = $("coach");
+const demoPanel = $("demo-panel");
+const gameBar = document.querySelector<HTMLElement>(".game-bar")!;
+const showDemoButton = $<HTMLButtonElement>("show-demo");
+const demoPlay = $<HTMLButtonElement>("demo-play");
+const demoPick = $<HTMLSelectElement>("demo-pick");
+const demoDialog = $<HTMLDialogElement>("demo-dialog");
 const coachText = $("coach-text");
 const coachStatus = $("coach-status");
 const quizScoreLabel = $("quiz-score");
@@ -207,6 +214,17 @@ let clock: Clock | null = null; // the chess clock, in a match with a time contr
 let clockTimes: number[] = []; // each move's time left afterwards (for the PGN)
 let clockHistory: Times[] = []; // the clocks after each move (for Undo)
 let lastTickSecond = -1;
+// An opening demo: Stockfish plays a line, pausing at the notes
+interface DemoState {
+  demo: Demo;
+  line: number;
+  steps: DemoStep[];
+  playing: boolean;
+  interrupted: boolean; // stopped by you (Back/Next), not by a note
+  timer?: number;
+}
+let demo: DemoState | null = null;
+let demoStepping = false; // the demo itself is moving on (not you)
 let canReview = false; // a finished Play game can be reviewed in Practice mode
 let reviewing = false; // reviewing a Play game in Practice mode
 let reviewTitle = ""; // for a game opened from PGN, e.g. "Reviewing: Carlsen - Nakamura (1-0)"
@@ -540,6 +558,8 @@ function onStartGame() {
 /** A fresh game from a position, with nothing else going on. */
 function resetBoard(newGame: Game, headers: Headers = { White: "?", Black: "?", Date: today() }) {
   gameHeaders = { ...headers };
+  if (demo) clearTimeout(demo.timer);
+  demo = null;
   clock = null;
   clockTimes = [];
   clockHistory = [];
@@ -799,7 +819,7 @@ function clickPosition(): Chess {
 
 /** Can pieces be moved right now, and which side's? */
 function movableColour(): Color | undefined {
-  if (busy || thinking || preview || menuOpen || quiz?.lineStep) return undefined;
+  if (busy || thinking || preview || menuOpen || quiz?.lineStep || demo) return undefined;
   if (quizWaiting()) return quiz!.threat!.them;
   if (analysing()) return base().turn;
   if (viewPly !== null) return undefined; // looking back in Play mode
@@ -864,6 +884,11 @@ function exitAnalysis() {
 // -- Stepping through the game ------------------------------------------------
 
 function goTo(ply: number) {
+  if (demo && !demoStepping) {
+    clearTimeout(demo.timer);
+    if (demo.playing) demo.interrupted = true;
+    demo.playing = false;
+  }
   ply = Math.max(0, Math.min(ply, game.length));
   if (ply === currentPly() + 1 && !analysis) void play(soundForMove(game.moves[ply - 1].san));
   analysis = null; // moving through the game leaves any analysis line
@@ -904,6 +929,165 @@ async function onLoadFen(event: Event) {
   canReview = false;
   reviewing = false;
   refresh();
+}
+
+// ---------------------------------------------------------------------------
+// Opening demos
+// ---------------------------------------------------------------------------
+
+const DEMO_MOVE_DELAY = 1100; // ms between moves while it plays on
+const DEMO_START_DELAY = 2500; // time to read the introduction
+
+function startDemo(chosen: Demo, line = 0) {
+  resetBoard(new Game(), { White: "White", Black: "Black", Event: `${chosen.opening} demo`, Date: today() });
+  mode = "practice";
+  canReview = false;
+  reviewing = false;
+  orientation = "white";
+  demo = { demo: chosen, line: 0, steps: [], playing: true, interrupted: false };
+  demoPick.replaceChildren(...chosen.lines.map((l, i) => new Option(`${i + 1}. ${l.title}`, String(i))));
+  if (menuOpen) hideMenu();
+  loadDemoLine(line);
+}
+
+/** Set up one line of the demo from its first move, and start playing it. */
+function loadDemoLine(index: number) {
+  if (!demo) return;
+  clearTimeout(demo.timer);
+  demo.line = index;
+  demo.steps = demoSteps(demo.demo, index);
+  game = new Game();
+  for (const step of demo.steps) game.play(step.move);
+  plyNotes = new Map();
+  analysis = null;
+  preview = null;
+  quiz = null;
+  viewPly = 0;
+  demo.playing = true;
+  demo.interrupted = false;
+  refresh();
+  scheduleDemo(DEMO_START_DELAY);
+}
+
+function scheduleDemo(delay = DEMO_MOVE_DELAY) {
+  if (!demo) return;
+  clearTimeout(demo.timer);
+  if (demo.playing) demo.timer = window.setTimeout(demoAdvance, delay);
+}
+
+/** Autoplay: the next move, then a pause if it has a note. */
+function demoAdvance() {
+  if (!demo || !demo.playing) return;
+  const ply = currentPly();
+  if (ply >= game.length) {
+    demo.playing = false;
+    refresh();
+    return;
+  }
+  demoStepping = true;
+  goTo(ply + 1);
+  demoStepping = false;
+  if (demo.steps[ply].note || ply + 1 >= game.length) demo.playing = false; // read the note, then Continue
+  refresh();
+  scheduleDemo();
+}
+
+function onDemoPlay() {
+  if (!demo) return;
+  if (currentPly() >= game.length) {
+    loadDemoLine(demo.line); // watch it again
+    return;
+  }
+  demo.playing = !demo.playing;
+  demo.interrupted = false;
+  refresh();
+  scheduleDemo(demo.playing ? 400 : DEMO_MOVE_DELAY);
+}
+
+function drawDemo() {
+  if (!demo) return;
+  const ply = currentPly();
+  const line = demo.demo.lines[demo.line];
+  $("demo-line").textContent = `Line ${demo.line + 1} of ${demo.demo.lines.length}: ${line.title}`;
+  const note = $("demo-note");
+  note.replaceChildren();
+  if (ply === 0) {
+    note.append(demo.line === 0 ? demo.demo.intro : `Watch how this line goes: ${line.title}.`);
+  } else {
+    const step = demo.steps[ply - 1];
+    const label = document.createElement("span");
+    label.className = "demo-move";
+    label.textContent = step.label;
+    note.append(label);
+    const [said, transposition] = (step.note ?? "").split(/(?=Transposition: )/);
+    if (said) note.append(said.trim());
+    if (transposition) {
+      const extra = document.createElement("span");
+      extra.className = "demo-transposition";
+      extra.textContent = transposition;
+      note.append(extra);
+    }
+    if (!step.note) note.append(demo.playing ? "" : "(no note for this move)");
+  }
+  const atEnd = ply >= game.length;
+  if (atEnd) {
+    const last = document.createElement("span");
+    last.className = "demo-transposition";
+    last.textContent = demo.line + 1 < demo.demo.lines.length ? "End of this line. Next variation, or try it yourself." : "That's the last line. Now try it yourself!";
+    note.append(last);
+  }
+  demoPlay.textContent = atEnd ? "↻ Watch again" : demo.playing ? "⏸ Pause" : demo.interrupted ? "▶ Resume autoplay" : ply === 0 ? "▶ Play" : "▶ Continue";
+  $<HTMLButtonElement>("demo-back").disabled = ply === 0;
+  $<HTMLButtonElement>("demo-next").disabled = atEnd;
+  $<HTMLButtonElement>("demo-next-line").disabled = demo.line + 1 >= demo.demo.lines.length;
+  demoPick.value = String(demo.line);
+}
+
+function openDemoDialog() {
+  const choices = $("demo-choices");
+  choices.replaceChildren(
+    ...DEMOS.map((d) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = `${d.opening} (White) - ${d.lines.length} lines`;
+      button.addEventListener("click", () => {
+        demoDialog.close();
+        startDemo(d);
+      });
+      return button;
+    }),
+  );
+  demoDialog.showModal();
+}
+
+/** "Show me this opening" while practising it: leave the game for the demo. */
+async function onShowDemo() {
+  const chosen = demoFor(match?.myOpening?.name);
+  if (!chosen) return;
+  if (game.length && !(await message("Opening demo", "Watch the demo of this opening? It ends your current game.", true))) return;
+  startDemo(chosen);
+}
+
+/** Try it yourself: back to the menu, set up to practise this opening. */
+function onDemoTry() {
+  if (!demo) return;
+  const opening = REPERTOIRE.find((o) => o.name === demo!.demo.opening);
+  resetBoard(new Game());
+  const practice = menuCard.querySelector<HTMLInputElement>('input[name="mode"][value="practice"]');
+  if (practice) practice.checked = true;
+  opponentBox.selectedIndex = 0;
+  if (opening) {
+    colourBox.value = opening.colour === "white" ? "White" : "Black";
+    myOpeningBox.value = menuName(opening);
+  }
+  refresh();
+  showMenu();
+}
+
+function onDemoExit() {
+  resetBoard(new Game());
+  refresh();
+  showMenu();
 }
 
 // ---------------------------------------------------------------------------
@@ -1205,6 +1389,7 @@ function refresh() {
   drawTurn();
   drawButtons();
   drawCoach();
+  drawDemo();
 }
 
 /** Show the parts of the page that belong to the current mode. */
@@ -1212,7 +1397,11 @@ function applyMode() {
   const practice = mode === "practice";
   document.body.classList.toggle("practice", practice);
   modeTitle.textContent = practice ? "Practice" : "Play";
-  for (const element of [coachPanel, reviewArea, fenRow, undoButton]) element.hidden = !practice;
+  for (const element of [coachPanel, reviewArea, fenRow, undoButton]) element.hidden = !practice || demo !== null;
+  demoPanel.hidden = demo === null;
+  gameBar.hidden = demo !== null;
+  if (demo) modeTitle.textContent = "Opening demo";
+  showDemoButton.hidden = !(practice && match?.myOpening && demoFor(match.myOpening.name));
   planModeRow.hidden = !(practice && match?.myOpening);
   $("eval-check-label").hidden = !practice;
   evalBar.hidden = !evalOn();
@@ -1754,6 +1943,10 @@ function drawReview(reviews: (Review | undefined)[], info: OpeningInfo[]) {
 }
 
 function drawTurn() {
+  if (demo) {
+    turnLabel.textContent = `${demo.demo.opening} - ${demo.demo.lines[demo.line].title}`;
+    return;
+  }
   turnLabel.textContent = turnText();
   if (analysis) gameInfo.textContent = "Exploring a different move";
   else if (match) {
@@ -2122,6 +2315,15 @@ function wireButtons() {
   document.addEventListener("keydown", unlockSounds, { once: true });
   $("open-pgn").addEventListener("click", openPgnDialog);
   $("menu-open-pgn").addEventListener("click", openPgnDialog);
+  $("menu-demo").addEventListener("click", openDemoDialog);
+  showDemoButton.addEventListener("click", () => void onShowDemo());
+  demoPlay.addEventListener("click", onDemoPlay);
+  $("demo-back").addEventListener("click", () => goTo(currentPly() - 1));
+  $("demo-next").addEventListener("click", () => goTo(currentPly() + 1));
+  $("demo-next-line").addEventListener("click", () => demo && loadDemoLine(demo.line + 1));
+  demoPick.addEventListener("change", () => loadDemoLine(Number(demoPick.value)));
+  $("demo-try").addEventListener("click", onDemoTry);
+  $("demo-exit").addEventListener("click", onDemoExit);
   $("download-pgn").addEventListener("click", downloadPgn);
   $("pgn-cancel").addEventListener("click", () => pgnDialog.close());
   $("pgn-form").addEventListener("submit", (event) => void reviewPgnGame(event));
@@ -2153,13 +2355,15 @@ function wireButtons() {
   document.addEventListener("keydown", (event) => {
     if (menuOpen || dialog.open) return;
     if (event.target instanceof HTMLSelectElement || event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement || pgnDialog.open) return;
+        event.target instanceof HTMLTextAreaElement || pgnDialog.open || demoDialog.open) return;
+    if (event.key === " " && event.target instanceof HTMLButtonElement) return; // the button's own click
     const keys: Record<string, () => void> = {
       ArrowLeft: () => (preview ? stepPreview(-1) : analysis ? analysisTakeBack() : goTo(currentPly() - 1)),
       ArrowRight: () => (preview ? stepPreview(1) : goTo(currentPly() + 1)),
       Home: () => goTo(0),
       End: () => goTo(game.length),
       Escape: exitAnalysis,
+      " ": () => demo && onDemoPlay(),
     };
     if (keys[event.key]) {
       event.preventDefault();
@@ -2180,6 +2384,7 @@ if (import.meta.env.DEV) {
   (window as unknown as { trainer: unknown }).trainer = {
     analyser, game: () => game, gameScores, answerQuiz, startTask, quiz: () => quiz, parseUci, normalizeMove, base,
     boardMove: onBoardMove, clock: () => clock, clockTimes: () => clockTimes, onUndo,
+    demo: () => demo, startDemo, DEMOS, demoSteps,
   };
 }
 

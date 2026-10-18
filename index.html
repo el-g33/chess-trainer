@@ -75,7 +75,10 @@
           <button type="button" id="back-to-game">Back to current game</button>
           <button type="submit" id="start" class="accent">Start game</button>
         </div>
-        <p class="menu-pgn"><button type="button" id="menu-open-pgn">Review a game from a PGN file&hellip;</button></p>
+        <p class="menu-pgn">
+          <button type="button" id="menu-demo">Learn an opening (demo)&hellip;</button>
+          <button type="button" id="menu-open-pgn">Review a game from a PGN file&hellip;</button>
+        </p>
         <p class="about-link"><a href="./about.html">About &amp; licences</a></p>
       </form>
     </div>
@@ -146,6 +149,26 @@
           <button type="button" id="exit-analysis" class="accent" hidden>&lsaquo; Back to game review</button>
         </div>
 
+        <!-- An opening demonstration: Stockfish plays the lines and explains -->
+        <div id="demo-panel" class="demo-panel" hidden>
+          <p id="demo-line" class="demo-line"></p>
+          <div id="demo-note" class="demo-note" aria-live="polite"></div>
+          <div class="demo-controls">
+            <button type="button" id="demo-back" title="Back one move">&lsaquo; Back</button>
+            <button type="button" id="demo-play" class="accent"></button>
+            <button type="button" id="demo-next" title="Forward one move">Next &rsaquo;</button>
+          </div>
+          <div class="demo-pick-row">
+            <label for="demo-pick">Line:</label>
+            <select id="demo-pick"></select>
+          </div>
+          <div class="demo-buttons">
+            <button type="button" id="demo-next-line">Next variation &rsaquo;</button>
+            <button type="button" id="demo-try" class="accent">Try it yourself</button>
+            <button type="button" id="demo-exit">Exit demo</button>
+          </div>
+        </div>
+
         <!-- The strategy coach (Practice mode) -->
         <div id="coach" hidden>
           <div class="coach-header">
@@ -158,6 +181,7 @@
             <button type="button" id="quiz-button">Spot their idea (quiz)</button>
             <button type="button" id="ideas-button">Explain the ideas</button>
             <button type="button" id="brilliant-button" class="wide">Is there a brilliant move?</button>
+            <button type="button" id="show-demo" class="wide" hidden>Show me this opening (demo)</button>
           </div>
           <!-- Only while practising an opening: what Plan ahead follows -->
           <div id="plan-mode-row" class="plan-mode-row" hidden>
@@ -225,6 +249,18 @@
         <div class="dialog-buttons">
           <button type="button" id="pgn-cancel">Cancel</button>
           <button type="submit" id="pgn-review" class="accent" disabled>Review game</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Choosing an opening demo -->
+    <dialog id="demo-dialog" class="demo-dialog">
+      <form method="dialog">
+        <h3>Learn an opening</h3>
+        <p class="muted">Stockfish plays the main line and the important variations, and pauses to explain the ideas.</p>
+        <div id="demo-choices" class="demo-choices"></div>
+        <div class="dialog-buttons">
+          <button value="cancel" id="demo-cancel">Cancel</button>
         </div>
       </form>
     </dialog>
