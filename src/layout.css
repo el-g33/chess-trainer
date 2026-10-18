@@ -1,0 +1,779 @@
+/* The streamlined screens: the coach's welcome and setup, and the game screen
+   with the coach above the board, tabs for statistics and history, and
+   overlays instead of panels. Loaded after style.css and themes.css; all
+   colours come from the theme variables. */
+
+:root {
+  --round-bg: var(--text);
+  --round-fg: var(--bg);
+  --hazard: #e0b000;
+  --hazard-fg: #3a2a00;
+}
+
+:root[data-ui="stone"] {
+  --round-bg: #2f2b29;
+  --round-fg: #f2eeea;
+}
+
+:root[data-ui="ember"],
+:root[data-ui="violet"] {
+  --round-bg: rgba(255, 255, 255, 0.14);
+  --round-fg: var(--text);
+}
+
+/* -- Round icon buttons -------------------------------------------------------- */
+
+button.round {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 34px;
+  height: 34px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--round-bg);
+  color: var(--round-fg);
+  flex: none;
+}
+
+button.round:hover:not(:disabled) {
+  background: var(--round-bg);
+  filter: brightness(1.15);
+}
+
+button.round.accent {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+button.round.soft {
+  background: var(--button);
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+
+button.round.hazard {
+  background: var(--hazard);
+  color: var(--hazard-fg);
+}
+
+button.round.labelled {
+  width: auto;
+  padding: 0 14px 0 10px;
+}
+
+button.round:disabled {
+  opacity: 0.35;
+}
+
+.ico-svg {
+  display: block;
+  flex: none;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 999px;
+}
+
+/* -- The start screens ---------------------------------------------------------- */
+
+.card.home {
+  width: min(100%, 460px);
+  padding: 18px 20px 16px;
+}
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.screen[hidden] {
+  display: none !important;
+}
+
+.home-top {
+  display: flex;
+  align-items: center;
+  min-height: 38px;
+}
+
+.home-gap {
+  flex: 1;
+}
+
+.home-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: none;
+  padding: 4px 6px;
+  min-height: 0;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.home-link:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
+}
+
+.home-face {
+  display: flex;
+  justify-content: center;
+}
+
+.home-bubble {
+  position: relative;
+  margin: 4px 0 6px;
+  padding: 12px 14px;
+  min-height: 3.2em;
+  border-radius: 16px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  text-align: center;
+  font-size: 1.05rem;
+  line-height: 1.45;
+}
+
+.home-bubble::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: calc(50% - 8px);
+  border: 8px solid transparent;
+  border-bottom-color: var(--line);
+  border-top: 0;
+}
+
+.mode-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mode-choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  text-align: left;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.mode-choice.on,
+.mode-choice.on:hover:not(:disabled) {
+  background: var(--round-bg);
+  color: var(--round-fg);
+  border-color: var(--round-bg);
+}
+
+.home-next,
+.setup-start {
+  font-weight: 700;
+}
+
+.home-next {
+  padding: 11px;
+  font-size: 1.05rem;
+  border-radius: 999px;
+}
+
+.home-next:disabled,
+.setup-start:disabled {
+  background: var(--line) !important;
+  border-color: var(--line) !important;
+  color: var(--disabled) !important;
+}
+
+.setup-head {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+
+.setup-head h2 {
+  font-size: 1.15rem;
+}
+
+.setup-start {
+  justify-self: end;
+  border-radius: 999px;
+  padding: 6px 18px;
+}
+
+.setup-label {
+  margin-bottom: -6px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.screen select,
+.screen textarea {
+  width: 100%;
+}
+
+.setup-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.seg {
+  display: flex;
+  gap: 6px;
+}
+
+.seg button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 4px;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+}
+
+.seg-icon {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.seg button.on,
+.seg button.on:hover:not(:disabled),
+.chips button.on,
+.chips button.on:hover:not(:disabled),
+.tabs button.on {
+  background: var(--round-bg);
+  color: var(--round-fg);
+  border-color: var(--round-bg);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chips[hidden] {
+  display: none;
+}
+
+.chips button {
+  border-radius: 999px;
+  padding: 4px 14px;
+  min-height: 30px;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: calc(var(--radius) + 3px);
+  background: var(--line);
+}
+
+.tabs button {
+  flex: 1;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  font-weight: 600;
+}
+
+.tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tab-panel[hidden] {
+  display: none;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px;
+  border-radius: var(--radius);
+  text-align: left;
+}
+
+.tile-name {
+  font-weight: 700;
+}
+
+.tile-note {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.tile.on .tile-note {
+  color: inherit;
+  opacity: 0.8;
+}
+
+.tile.on,
+.tile.on:hover:not(:disabled) {
+  background: var(--round-bg);
+  color: var(--round-fg);
+  border-color: var(--round-bg);
+}
+
+.screen textarea {
+  font: 0.85rem/1.4 Consolas, "Courier New", monospace;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: inherit;
+  background: var(--input);
+  resize: vertical;
+}
+
+/* -- The game screen ------------------------------------------------------------- */
+
+html body #game,
+html body.practice #game {
+  --top: 46px;
+  --coach-h: 58px;
+  --controls: 46px;
+  --board: min(
+    calc(100dvh - 2 * var(--gutter) - var(--bars) - var(--top) - var(--coach-h) - var(--controls) - 30px),
+    calc(100vw - 2 * var(--gutter) - 330px)
+  );
+  display: grid;
+  --evalw: 0px;
+  grid-template-columns: calc(var(--board) + var(--evalw)) minmax(220px, 300px);
+  grid-template-rows: auto 1fr;
+  grid-template-areas: "top top" "board moves";
+  gap: 10px 22px;
+  justify-content: center;
+  align-content: start;
+  max-width: none;
+  height: 100dvh;
+}
+
+html body.practice #game {
+  --evalw: 28px;
+  --board: min(
+    calc(100dvh - 2 * var(--gutter) - var(--bars) - var(--top) - var(--coach-h) - var(--controls) - 30px),
+    calc(100vw - 2 * var(--gutter) - 360px)
+  );
+}
+
+.game-top {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--top);
+}
+
+.new-game {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 7px 16px 7px 12px;
+  font-weight: 700;
+}
+
+.view-tabs {
+  display: flex;
+  gap: 3px;
+  margin-left: auto;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.view-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 32px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+}
+
+.view-tabs button.on,
+.view-tabs button.on:hover:not(:disabled) {
+  background: var(--round-bg);
+  color: var(--round-fg);
+}
+
+.board-area {
+  grid-area: board;
+}
+
+.moves-area {
+  grid-area: moves;
+}
+
+.moves-area[hidden],
+.board-area[hidden] {
+  display: none !important;
+}
+
+.stats-view,
+.history-view {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  width: min(100%, 720px);
+  justify-self: center;
+}
+
+/* The coach strip: always the same height, so the board never moves */
+.coach-strip,
+.coach-strip[hidden] {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  height: var(--coach-h);
+  margin-bottom: 2px;
+}
+
+.coach-strip .coach-face {
+  width: 46px;
+  height: 46px;
+}
+
+.coach-bubble.fixed {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 52px;
+  padding: 4px 6px 4px 12px;
+  border-radius: 16px;
+}
+
+#strip-text {
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.3;
+  font-size: 0.95rem;
+}
+
+.strip-actions {
+  display: flex;
+  gap: 5px;
+}
+
+/* The controls under the board */
+html body .board-area .board-controls {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  height: 38px;
+}
+
+.board-controls button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 0;
+  border-radius: var(--radius);
+}
+
+.board-controls button[hidden] {
+  display: none;
+}
+
+#resign {
+  flex: 0.8;
+}
+
+/* Phones get the moves as a strip that scrolls sideways */
+.move-strip {
+  display: none;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-top: 6px;
+  padding: 2px 0;
+}
+
+.move-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.move-strip button {
+  flex: none;
+  min-height: 0;
+  padding: 3px 9px;
+  border-radius: 9px;
+  border: 0;
+  background: var(--line);
+  color: var(--disabled);
+  font-size: 0.9rem;
+}
+
+.move-strip button.prev {
+  color: var(--text);
+}
+
+.move-strip button.cur,
+.move-strip button.cur:hover:not(:disabled) {
+  background: var(--round-bg);
+  color: var(--round-fg);
+  font-weight: 700;
+}
+
+/* The stepper: a line talked through one move at a time, below the board */
+.stepper {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "face text" "face actions";
+  gap: 4px 10px;
+  margin-top: 6px;
+  padding: 10px 12px;
+  min-height: 96px;
+  border-radius: 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+}
+
+.stepper[hidden] {
+  display: none;
+}
+
+#step-face {
+  grid-area: face;
+}
+
+#step-text {
+  grid-area: text;
+  margin: 0 34px 0 0;
+  line-height: 1.4;
+}
+
+.step-count {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.step-actions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.step-extra {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+#step-close {
+  margin-left: auto;
+}
+
+.step-extra:not(:empty) + #step-close {
+  margin-left: 0;
+}
+
+.board-area.stepping .coach-strip,
+.board-area.stepping .player-bar {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.board-area.stepping .board-controls,
+.board-area.stepping .move-strip {
+  display: none !important;
+}
+
+/* The overlay: the board dims and the coach explains */
+.coach-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--gutter);
+  background: rgba(20, 16, 14, 0.62);
+}
+
+.coach-overlay[hidden] {
+  display: none;
+}
+
+.overlay-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 540px);
+}
+
+.overlay-bubble {
+  width: 100%;
+  max-height: 70dvh;
+  overflow-y: auto;
+  padding: 14px 16px 12px;
+  border-radius: 18px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  line-height: 1.5;
+}
+
+:root[data-ui="violet"] .overlay-bubble {
+  background: #3f4277;
+}
+
+.overlay-bubble p {
+  margin: 0 0 8px;
+}
+
+.overlay-heading {
+  font-weight: 700;
+}
+
+.overlay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.coach-face.big {
+  width: 64px;
+  height: 64px;
+}
+
+/* Settings */
+.settings-dialog {
+  width: min(calc(100vw - 32px), 440px);
+}
+
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.settings-grid .wide {
+  grid-column: 1 / -1;
+}
+
+.settings-grid select,
+.settings-grid input[type="text"] {
+  width: 100%;
+  min-width: 0;
+}
+
+.settings-grid input[type="text"],
+.fen-row input {
+  box-sizing: border-box;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font: inherit;
+  color: inherit;
+  background: var(--input);
+}
+
+.settings-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.settings-buttons button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-dialog .fen-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+/* -- Phones ------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  html body #game,
+  html body.practice #game {
+    --board: min(calc(100vw - 2 * var(--gutter)), 64dvh);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "top" "board";
+    height: auto;
+    gap: 6px;
+  }
+
+  html body.practice #game {
+    --board: min(calc(100vw - 2 * var(--gutter) - 20px), 64dvh);
+  }
+
+  .moves-area {
+    display: none !important;
+  }
+
+  .move-strip {
+    display: flex;
+  }
+
+  .new-game {
+    padding: 6px 12px 6px 9px;
+  }
+
+  .stats-view,
+  .history-view {
+    grid-column: 1;
+  }
+}

@@ -9,6 +9,22 @@
          line (and register the site with Google Search Console) to make it findable. -->
     <meta name="robots" content="noindex, nofollow" />
     <title>Chess Trainer</title>
+    <!-- Apply the saved theme before anything is drawn, so the page never
+         flashes the Classic colours while the app loads -->
+    <script>
+      (function () {
+        var theme = "stone", pieces = "";
+        try {
+          var saved = JSON.parse(localStorage.getItem("chess-trainer-settings") || "{}");
+          if (saved.uiTheme) theme = saved.uiTheme;
+          pieces = saved.pieces || "";
+        } catch (e) {}
+        document.documentElement.dataset.ui = theme;
+        document.documentElement.dataset.pieces = pieces || theme;
+        var bars = { classic: "#fafafa", ember: "#16181e", stone: "#9a908a", violet: "#33365e" };
+        document.querySelector('meta[name="theme-color"]').setAttribute("content", bars[theme] || "#9a908a");
+      })();
+    </script>
     <!-- Installable: add to the home screen, opens full-screen, works offline -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
@@ -20,79 +36,139 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   </head>
   <body>
-    <!-- The start menu: covers the game while open -->
+    <!-- The start screens: the coach's welcome, then the setup for each mode.
+         They cover the game while open. -->
     <div id="menu" class="cover">
-      <form id="menu-card" class="card">
-        <h1>Chess Trainer</h1>
-        <p class="subtitle">How would you like to play?</p>
-
-        <div class="modes" role="radiogroup" aria-label="Mode">
-          <label class="mode">
-            <input type="radio" name="mode" value="play" checked />
-            <span class="mode-title">Play against Stockfish</span>
-            <span class="mode-blurb">Just chess. No eval bar, no hints, no move ratings - a real game.</span>
-          </label>
-          <label class="mode">
-            <input type="radio" name="mode" value="practice" />
-            <span class="mode-title">Practice mode</span>
-            <span class="mode-blurb">Strategy coach, eval bar, move ratings and opening training.</span>
-          </label>
+      <form id="menu-card" class="card home" novalidate>
+        <!-- The mode the game logic reads (set by the screens below) -->
+        <div hidden>
+          <input type="radio" name="mode" value="play" checked />
+          <input type="radio" name="mode" value="practice" />
+          <select id="opponent"><option>Stockfish</option><option>Nobody - I move both sides</option></select>
+          <select id="colour"><option>White</option><option>Black</option><option>Random</option></select>
+          <select id="time-control"></select>
         </div>
 
-        <div class="options">
-          <label for="player-name">Your name:</label>
-          <input type="text" id="player-name" maxlength="30" placeholder="You" autocomplete="nickname" />
-          <label for="opponent">Opponent:</label>
-          <select id="opponent">
-            <option>Stockfish</option>
-            <option>Nobody - I move both sides</option>
-          </select>
-          <label for="level">Stockfish's level:</label>
-          <select id="level"></select>
-          <label for="time-control">Time control:</label>
-          <select id="time-control"></select>
-          <label for="tc-minutes" id="tc-custom-label" hidden>Custom:</label>
+        <!-- 1. Welcome -->
+        <section class="screen" data-screen="welcome">
+          <div class="home-top">
+            <button type="button" id="back-to-game" class="home-link"><span data-ico="back" data-ico-size="16"></span> Back to game</button>
+            <span class="home-gap"></span>
+            <button type="button" class="icon-button gear-button" aria-label="Settings" title="Settings"><span data-ico="gear"></span></button>
+          </div>
+          <div id="home-face" class="home-face" aria-hidden="true"></div>
+          <p id="home-bubble" class="home-bubble" aria-live="polite"></p>
+          <div class="mode-choices" role="radiogroup" aria-label="What would you like to do?">
+            <button type="button" class="mode-choice" data-choice="play" role="radio" aria-checked="false"><span class="mc-icon" data-ico="knight" data-ico-size="22"></span>Play against the computer</button>
+            <button type="button" class="mode-choice" data-choice="practice" role="radio" aria-checked="false"><span class="mc-icon" data-ico="school" data-ico-size="22"></span>Practice mode</button>
+            <button type="button" class="mode-choice" data-choice="analysis" role="radio" aria-checked="false"><span class="mc-icon" data-ico="search" data-ico-size="22"></span>Game analysis</button>
+          </div>
+          <button type="button" id="home-next" class="home-next accent" disabled>Next</button>
+          <p id="engine-status" class="engine-status">Loading Stockfish...</p>
+          <p class="about-link"><a href="./about.html">About &amp; licences</a></p>
+        </section>
+
+        <!-- 2a. Play against the computer -->
+        <section class="screen" data-screen="play" hidden>
+          <div class="setup-head">
+            <button type="button" class="home-link setup-back">‹ Back</button>
+            <h2>Play</h2>
+            <button type="button" class="setup-start accent" data-start="play">Start</button>
+          </div>
+          <label class="setup-label">Stockfish's level</label>
+          <div class="slot-level"><select id="level" aria-label="Stockfish's level"></select></div>
+          <label class="setup-label">Your colour</label>
+          <div class="seg" id="colour-seg">
+            <button type="button" data-colour="White"><span class="seg-icon">♔</span>White</button>
+            <button type="button" data-colour="Black"><span class="seg-icon">♚</span>Black</button>
+            <button type="button" data-colour="Random"><span class="seg-icon" data-ico="shuffle"></span>Random</button>
+          </div>
+          <label class="setup-label">Time control</label>
+          <div class="seg" id="tc-kinds">
+            <button type="button" data-kind="bullet"><span class="seg-icon" data-ico="bullet"></span>Bullet</button>
+            <button type="button" data-kind="blitz"><span class="seg-icon" data-ico="blitz"></span>Blitz</button>
+            <button type="button" data-kind="rapid"><span class="seg-icon" data-ico="rapid"></span>Rapid</button>
+            <button type="button" data-kind="none"><span class="seg-icon" data-ico="infinity"></span>None</button>
+          </div>
+          <div class="chips" id="tc-presets"></div>
           <span id="tc-custom" class="tc-custom" hidden>
             <input type="number" id="tc-minutes" min="0.25" max="180" step="any" value="10" aria-label="Minutes each" /> min +
             <input type="number" id="tc-increment" min="0" max="60" step="1" value="5" aria-label="Seconds added per move" /> sec per move
           </span>
-          <label class="check tick-check"><input type="checkbox" id="clock-tick" checked /> Tick in your last 10 seconds</label>
-          <label for="colour">You play:</label>
-          <select id="colour">
-            <option>White</option>
-            <option>Black</option>
-            <option>Random</option>
-          </select>
-          <label for="sf-opening">Stockfish's opening:</label>
-          <select id="sf-opening"></select>
-          <label for="my-opening">Your opening to practise:</label>
-          <select id="my-opening"></select>
-        </div>
+        </section>
 
-        <p id="engine-status" class="engine-status">Loading Stockfish...</p>
+        <!-- 2b. Practice: learn an opening, or a practice match -->
+        <section class="screen" data-screen="practice" hidden>
+          <div class="setup-head">
+            <button type="button" class="home-link setup-back">‹ Back</button>
+            <h2>Practice</h2>
+            <button type="button" class="setup-start accent" data-start="practice" disabled>Start</button>
+          </div>
+          <div class="tabs" role="tablist">
+            <button type="button" role="tab" data-tab="learn">Learn an opening</button>
+            <button type="button" role="tab" data-tab="match">Practice match</button>
+          </div>
+          <div class="tab-panel" data-panel="learn">
+            <div class="seg" id="learn-colour">
+              <button type="button" data-colour="white"><span class="seg-icon">♔</span>White</button>
+              <button type="button" data-colour="black"><span class="seg-icon">♚</span>Black</button>
+            </div>
+            <div class="tiles" id="opening-tiles"></div>
+          </div>
+          <div class="tab-panel" data-panel="match" hidden>
+            <label class="setup-label">Stockfish's level</label>
+            <div class="slot-level"></div>
+            <label class="setup-label" for="my-opening">Your opening</label>
+            <select id="my-opening"></select>
+            <label class="setup-label" for="sf-opening">Stockfish's opening</label>
+            <select id="sf-opening"></select>
+            <p id="practice-note" class="setup-note"></p>
+          </div>
+        </section>
 
-        <div class="menu-buttons">
-          <button type="button" id="back-to-game">Back to current game</button>
-          <button type="submit" id="start" class="accent">Start game</button>
-        </div>
-        <p class="menu-pgn">
-          <button type="button" id="menu-demo">Learn an opening (demo)&hellip;</button>
-          <button type="button" id="menu-open-pgn">Review a game from a PGN file&hellip;</button>
-        </p>
-        <p class="about-link">
-          <button type="button" class="link-button" id="menu-tour">Show the feature tour</button> &middot;
-          <a href="./about.html">About &amp; licences</a>
-        </p>
+        <!-- 2c. Game analysis: a game from a PGN -->
+        <section class="screen" data-screen="analysis" hidden>
+          <div class="setup-head">
+            <button type="button" class="home-link setup-back">‹ Back</button>
+            <h2>Game analysis</h2>
+            <button type="button" class="setup-start accent" data-start="analysis" disabled>Start</button>
+          </div>
+          <p class="setup-note">Paste a game in PGN format (from lichess, chess.com or anywhere), or open a .pgn file.</p>
+          <textarea id="pgn-text" rows="8" spellcheck="false" placeholder='[White "..."]&#10;[Black "..."]&#10;&#10;1. e4 e5 2. Nf3 Nc6 ...'></textarea>
+          <div class="pgn-file-row">
+            <label class="file-button">Open a .pgn file&hellip;<input type="file" id="pgn-file" accept=".pgn,.txt,application/x-chess-pgn,text/plain" hidden /></label>
+            <span id="pgn-file-name" class="muted"></span>
+          </div>
+          <div id="pgn-pick-row" class="pgn-pick-row" hidden>
+            <label for="pgn-pick">Game:</label>
+            <select id="pgn-pick"></select>
+          </div>
+          <p id="pgn-status" class="pgn-status"></p>
+          <p class="setup-note"><button type="button" class="link-button" id="empty-board">Or explore on an empty board</button></p>
+        </section>
       </form>
     </div>
 
     <!-- The game screen -->
     <main id="game">
-      <section class="board-area">
-        <!-- The coach on phones: a face and a speech bubble above the board -->
-        <div id="coach-strip" class="coach-strip" hidden>
-          <button type="button" id="strip-face" class="coach-face" aria-label="Open the full move review"></button>
-          <div id="strip-bubble" class="coach-bubble" aria-live="polite"></div>
+      <header class="game-top">
+        <button type="button" id="new-game" class="new-game accent"><span data-ico="plus" data-ico-size="18"></span>New game</button>
+        <nav class="view-tabs" aria-label="Views">
+          <button type="button" data-view="board" class="on" aria-label="Board" title="Board"><span data-ico="board"></span></button>
+          <button type="button" data-view="stats" aria-label="Statistics" title="Statistics"><span data-ico="chart"></span></button>
+          <button type="button" data-view="history" aria-label="Game history" title="Game history"><span data-ico="history"></span></button>
+        </nav>
+        <button type="button" class="icon-button gear-button" aria-label="Settings" title="Settings"><span data-ico="gear"></span></button>
+      </header>
+
+      <section class="board-area view" data-view-panel="board">
+        <!-- The coach: always the same size, so the board never moves -->
+        <div id="coach-strip" class="coach-strip">
+          <button type="button" id="strip-face" class="coach-face" aria-label="Tell me more"></button>
+          <div class="coach-bubble fixed">
+            <p id="strip-text" aria-live="polite"></p>
+            <div id="strip-actions" class="strip-actions"></div>
+          </div>
         </div>
         <!-- Your opponent's bar above the board, yours below (they swap when the board flips) -->
         <div class="player-bar" id="bar-top">
@@ -110,61 +186,30 @@
           <span class="pb-name"></span><span class="pb-captured"></span><span class="pb-diff"></span>
           <span class="pb-clock" hidden></span>
         </div>
-        <!-- On phones the step buttons sit right under the board -->
-        <div class="nav board-nav" aria-label="Step through the game">
-          <button type="button" data-nav="first" title="First position">&laquo;</button>
-          <button type="button" data-nav="back" title="Back one move">&lsaquo;</button>
-          <button type="button" data-nav="forward" title="Forward one move">&rsaquo;</button>
-          <button type="button" data-nav="last" title="Current position">&raquo;</button>
-        </div>
-      </section>
-
-      <section class="moves-area">
-        <h2>Moves</h2>
-        <div class="nav list-nav" aria-label="Step through the game">
-          <button type="button" data-nav="first" title="First position">&laquo;</button>
-          <button type="button" data-nav="back" title="Back one move">&lsaquo;</button>
-          <button type="button" data-nav="forward" title="Forward one move">&rsaquo;</button>
-          <button type="button" data-nav="last" title="Current position">&raquo;</button>
-        </div>
-        <p id="view-label" class="muted">No moves yet</p>
-        <p id="opening-label" class="opening-label" hidden></p>
-        <p id="repertoire-label" class="repertoire-label" hidden></p>
-        <ol id="move-list"></ol>
-
-        <div id="review-area" hidden>
-          <div class="review-header">
-            <h2>Move review</h2>
-            <label class="check"><input type="checkbox" id="rate-moves" checked /> Rate moves</label>
+        <!-- One move at a time: a line the coach talks through -->
+        <div id="stepper" class="stepper" hidden>
+          <span id="step-count" class="step-count"></span>
+          <div id="step-face" class="coach-face small" aria-hidden="true"></div>
+          <p id="step-text" aria-live="polite"></p>
+          <div class="step-actions">
+            <button type="button" id="step-back" class="round" aria-label="Back one move"><span data-ico="back"></span></button>
+            <span id="step-extra" class="step-extra"></span>
+            <button type="button" id="step-close" class="round soft" aria-label="Close"><span data-ico="close"></span></button>
+            <button type="button" id="step-next" class="round" aria-label="Next move"><span data-ico="next"></span></button>
           </div>
-          <p id="review-progress" class="muted"></p>
-          <details id="game-report" class="game-report" open hidden>
-            <summary>Game report</summary>
-            <div id="game-report-body"></div>
-          </details>
-          <!-- The coach on desktops: key moments, a feed of earlier moves, and the
-               review of the move on screen as a speech bubble -->
-          <div id="key-moments" class="key-moments" hidden></div>
-          <ol id="coach-feed" class="coach-feed"></ol>
-          <div class="coach-say">
-            <div id="review-face" class="coach-face" aria-hidden="true"></div>
-            <div id="review" class="coach-bubble" aria-live="polite"></div>
-          </div>
-          <button type="button" id="reply-button" class="reply-button" disabled>See Stockfish's reply &rsaquo;</button>
         </div>
-      </section>
-
-      <section class="panel">
-        <h2 id="mode-title">Play</h2>
-        <p id="turn" class="turn"></p>
-        <div class="game-bar">
-          <span id="game-info"></span>
-          <button type="button" id="resign">Resign</button>
-          <button type="button" id="review-game" class="accent" hidden>Review this game</button>
-          <button type="button" id="exit-analysis" class="accent" hidden>&lsaquo; Back to game review</button>
+        <!-- Phones: the moves in a strip that scrolls sideways -->
+        <div id="move-strip" class="move-strip" aria-label="Moves"></div>
+        <div class="board-controls nav board-nav" aria-label="Step through the game">
+          <button type="button" data-nav="first" title="First position"><span data-ico="first"></span></button>
+          <button type="button" data-nav="back" title="Back one move"><span data-ico="back"></span></button>
+          <button type="button" data-nav="forward" title="Forward one move"><span data-ico="next"></span></button>
+          <button type="button" data-nav="last" title="Current position"><span data-ico="last"></span></button>
+          <button type="button" id="undo" title="Take back" hidden><span data-ico="undo"></span></button>
+          <button type="button" id="flip" title="Flip board"><span data-ico="flip"></span></button>
+          <button type="button" id="resign" title="Resign"><span data-ico="flag"></span></button>
         </div>
-
-        <!-- An opening demonstration: Stockfish plays the lines and explains -->
+        <!-- An opening demonstration: the controls (the coach speaks the notes) -->
         <div id="demo-panel" class="demo-panel" hidden>
           <p id="demo-line" class="demo-line"></p>
           <div id="demo-note" class="demo-note" aria-live="polite"></div>
@@ -180,64 +225,100 @@
           <div class="demo-buttons">
             <button type="button" id="demo-next-line">Next variation &rsaquo;</button>
             <button type="button" id="demo-try" class="accent">Try it yourself</button>
-            <button type="button" id="demo-exit">Exit demo</button>
+            <button type="button" id="demo-exit">Exit</button>
           </div>
         </div>
+      </section>
 
-        <!-- The strategy coach (Practice mode) -->
-        <div id="coach" hidden>
-          <div class="coach-header">
-            <span id="tools-face" class="coach-face small" aria-hidden="true"></span>
-            <h3>Strategy coach</h3>
-            <span id="quiz-score" class="muted"></span>
-          </div>
-          <div class="coach-tools">
-            <button type="button" id="threat-button">What's the threat?</button>
-            <button type="button" id="plan-button">Plan ahead</button>
-            <button type="button" id="quiz-button">Spot their idea (quiz)</button>
-            <button type="button" id="ideas-button">Explain the ideas</button>
-            <button type="button" id="brilliant-button" class="wide">Is there a brilliant move?</button>
-            <button type="button" id="show-demo" class="wide" hidden>Show me this opening (demo)</button>
-          </div>
-          <!-- Only while practising an opening: what Plan ahead follows -->
-          <div id="plan-mode-row" class="plan-mode-row" hidden>
-            <label for="plan-mode">Plan ahead:</label>
-            <select id="plan-mode">
-              <option value="best">Stockfish's best moves</option>
-              <option value="stick">My opening - stick to it</option>
-              <option value="chances">My opening - take chances</option>
-            </select>
-          </div>
-          <div id="coach-text" class="coach-text" aria-live="polite"></div>
-          <div class="line-row">
-            <span>Stockfish's line:</span>
-            <button type="button" id="line-back" title="Back one move in the line">&lsaquo;</button>
-            <button type="button" id="line-forward" title="Forward one move in the line">&rsaquo;</button>
-            <button type="button" id="line-exit">Back to position</button>
-          </div>
-          <p id="coach-status" class="coach-status"></p>
+      <!-- Desktops: the move list beside the board -->
+      <section class="moves-area" data-view-panel="board">
+        <h2>Moves</h2>
+        <div class="nav list-nav" aria-label="Step through the game">
+          <button type="button" data-nav="first" title="First position"><span data-ico="first"></span></button>
+          <button type="button" data-nav="back" title="Back one move"><span data-ico="back"></span></button>
+          <button type="button" data-nav="forward" title="Forward one move"><span data-ico="next"></span></button>
+          <button type="button" data-nav="last" title="Current position"><span data-ico="last"></span></button>
         </div>
+        <p id="view-label" class="muted">No moves yet</p>
+        <p id="opening-label" class="opening-label" hidden></p>
+        <p id="repertoire-label" class="repertoire-label" hidden></p>
+        <ol id="move-list"></ol>
+      </section>
 
-        <div class="spacer"></div>
-        <div class="bottom-buttons">
-          <button type="button" id="undo" hidden>Undo move</button>
-          <button type="button" id="flip">Flip board</button>
-          <button type="button" id="new-game">New game</button>
-          <label class="check" id="eval-check-label" hidden><input type="checkbox" id="eval-check" checked /> Eval bar</label>
+      <section class="view stats-view" data-view-panel="stats" hidden>
+        <div id="stats"></div>
+      </section>
+      <section class="view history-view" data-view-panel="history" hidden>
+        <div id="history"></div>
+      </section>
+
+      <!-- The older panels: still filled in by the game logic, but not shown;
+           the coach's bubble, overlays and the tabs show their content now -->
+      <div id="legacy" hidden>
+        <h2 id="mode-title">Play</h2>
+        <p id="turn" class="turn"></p>
+        <span id="game-info"></span>
+        <button type="button" id="review-game">Review this game</button>
+        <button type="button" id="exit-analysis">Back to game review</button>
+        <div id="review-area">
+          <p id="review-progress"></p>
+          <details id="game-report"><summary>Game report</summary><div id="game-report-body"></div></details>
+          <div id="key-moments"></div>
+          <ol id="coach-feed"></ol>
+          <div id="review-face"></div>
+          <div id="review"></div>
+          <button type="button" id="reply-button" disabled>See Stockfish's reply</button>
         </div>
-        <div class="pgn-row">
-          <button type="button" id="open-pgn">Open PGN&hellip;</button>
-          <button type="button" id="download-pgn">Download PGN</button>
+        <div id="coach">
+          <span id="tools-face"></span>
+          <span id="quiz-score"></span>
+          <button type="button" id="threat-button">What's the threat?</button>
+          <button type="button" id="plan-button">Plan ahead</button>
+          <button type="button" id="quiz-button">Spot their idea (quiz)</button>
+          <button type="button" id="ideas-button">Explain the ideas</button>
+          <button type="button" id="brilliant-button">Is there a brilliant move?</button>
+          <button type="button" id="show-demo">Show me this opening</button>
+          <div id="plan-mode-row"></div>
+          <div id="coach-text"></div>
+          <button type="button" id="line-back">‹</button>
+          <button type="button" id="line-forward">›</button>
+          <button type="button" id="line-exit">Back to position</button>
+          <p id="coach-status"></p>
         </div>
-        <div class="look-row">
-          <label for="ui-theme">Theme:</label>
+        <button type="button" id="open-pgn">Open PGN</button>
+        <label id="eval-check-label"></label>
+      </div>
+    </main>
+
+    <!-- The coach, close up: the board dims and the full explanation shows -->
+    <div id="coach-overlay" class="coach-overlay" hidden>
+      <div class="overlay-card" role="dialog" aria-modal="true" aria-label="Coach">
+        <div id="overlay-face" class="coach-face big" aria-hidden="true"></div>
+        <div class="overlay-bubble">
+          <div id="overlay-text" aria-live="polite"></div>
+          <div id="overlay-actions" class="overlay-actions"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings (the gear) -->
+    <dialog id="settings-dialog" class="settings-dialog">
+      <form method="dialog">
+        <div class="settings-head">
+          <h3>Settings</h3>
+          <button value="close" class="round soft" aria-label="Close"><span data-ico="close"></span></button>
+        </div>
+        <div class="settings-grid">
+          <label for="player-name">Your name</label>
+          <input type="text" id="player-name" maxlength="30" placeholder="You" autocomplete="nickname" />
+          <label for="ui-theme">Theme</label>
           <select id="ui-theme">
             <option value="stone">Warm stone</option>
             <option value="classic">Classic</option>
             <option value="ember">Midnight ember</option>
             <option value="violet">Violet glass</option>
           </select>
-          <label for="board-theme">Board:</label>
+          <label for="board-theme">Board</label>
           <select id="board-theme">
             <option value="wood">Wood</option>
             <option value="grey">Grey &amp; white</option>
@@ -245,54 +326,30 @@
             <option value="walnut">Cream &amp; walnut</option>
             <option value="lavender">Lavender</option>
           </select>
-          <label for="pieces">Pieces:</label>
+          <label for="pieces">Pieces</label>
           <select id="pieces"></select>
-          <label class="check sound-check"><input type="checkbox" id="sound-on" checked /> Sounds</label>
+          <label class="check"><input type="checkbox" id="sound-on" checked /> Sounds</label>
           <input type="range" id="sound-volume" min="0" max="100" value="70" aria-label="Sound volume" />
+          <label class="check wide"><input type="checkbox" id="clock-tick" checked /> Tick in your last 10 seconds</label>
+          <label class="check wide"><input type="checkbox" id="eval-check" checked /> Eval bar (practice)</label>
+          <label class="check wide"><input type="checkbox" id="rate-moves" checked /> Rate moves (practice)</label>
+          <label for="plan-mode">Strategy follows</label>
+          <select id="plan-mode">
+            <option value="best">Stockfish's best moves</option>
+            <option value="stick">My opening - stick to it</option>
+            <option value="chances">My opening - take chances</option>
+          </select>
         </div>
-        <form id="fen-row" class="fen-row" hidden>
-          <label for="fen">FEN:</label>
+        <div class="settings-buttons">
+          <button type="button" id="download-pgn"><span data-ico="download" data-ico-size="16"></span> Download this game (PGN)</button>
+          <button type="button" id="settings-tour">Show the feature tour</button>
+        </div>
+        <div id="fen-row" class="fen-row">
+          <label for="fen">Position (FEN)</label>
           <input id="fen" type="text" autocomplete="off" spellcheck="false" placeholder="Paste a position" />
-          <button type="submit" id="load-fen">Load position</button>
-        </form>
-        <p class="about-link">
-          <button type="button" class="link-button" id="panel-tour">Feature tour</button> &middot;
-          <a href="./about.html">About &amp; licences</a>
-        </p>
-      </section>
-    </main>
-
-    <!-- Reviewing a game from PGN -->
-    <dialog id="pgn-dialog" class="pgn-dialog">
-      <form id="pgn-form">
-        <h3>Review a game</h3>
-        <p class="muted">Paste a game in PGN format (e.g. copied from lichess or chess.com), or open a .pgn file.</p>
-        <textarea id="pgn-text" rows="8" spellcheck="false" placeholder='[White "..."]&#10;[Black "..."]&#10;&#10;1. e4 e5 2. Nf3 Nc6 ...'></textarea>
-        <div class="pgn-file-row">
-          <label class="file-button">Open a .pgn file&hellip;<input type="file" id="pgn-file" accept=".pgn,.txt,application/x-chess-pgn,text/plain" hidden /></label>
-          <span id="pgn-file-name" class="muted"></span>
+          <button type="button" id="load-fen">Load</button>
         </div>
-        <div id="pgn-pick-row" class="pgn-pick-row" hidden>
-          <label for="pgn-pick">Game:</label>
-          <select id="pgn-pick"></select>
-        </div>
-        <p id="pgn-status" class="pgn-status"></p>
-        <div class="dialog-buttons">
-          <button type="button" id="pgn-cancel">Cancel</button>
-          <button type="submit" id="pgn-review" class="accent" disabled>Review game</button>
-        </div>
-      </form>
-    </dialog>
-
-    <!-- Choosing an opening demo -->
-    <dialog id="demo-dialog" class="demo-dialog">
-      <form method="dialog">
-        <h3>Learn an opening</h3>
-        <p class="muted">Stockfish plays the main line and the important variations, and pauses to explain the ideas.</p>
-        <div id="demo-choices" class="demo-choices"></div>
-        <div class="dialog-buttons">
-          <button value="cancel" id="demo-cancel">Cancel</button>
-        </div>
+        <p class="about-link"><a href="./about.html">About &amp; licences</a></p>
       </form>
     </dialog>
 

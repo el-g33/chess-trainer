@@ -10,7 +10,7 @@ import type { Key } from "@lichess-org/chessground/types";
 import { Chess, normalizeMove } from "chessops/chess";
 import { chessgroundDests } from "chessops/compat";
 import { parseFen } from "chessops/fen";
-import { makeSan, parseSan } from "chessops/san";
+import { makeSan } from "chessops/san";
 import type { Color, NormalMove, Role } from "chessops/types";
 import { makeSquare, makeUci, opposite, parseSquare, parseUci } from "chessops/util";
 
@@ -18,13 +18,16 @@ import "@fontsource/permanent-marker/latin-400.css";
 import "@lichess-org/chessground/assets/chessground.base.css";
 import "./style.css";
 import "./themes.css";
+import "./layout.css";
 import { Analyser, lineMove, lineScore } from "./analyser";
 import { avatarSvg, moodForRating, type Mood } from "./avatar";
+import { drawIcons, icon } from "./icons";
 import { badgeSvg } from "./badge";
 import { afterMove as positionAfter, colourName, isCastling, standardUci, variationSan } from "./coach";
 import { Engine } from "./engine";
 import { Game, type Outcome } from "./game";
 import { explainIdeas } from "./ideas";
+import { narrateMove, targetsOf, verdict } from "./narrate";
 import { middlegameNotes } from "./middlegame";
 import { DEFAULT_LEVEL, LEVELS, OPPONENT_MIN_DELAY, shortName } from "./levels";
 import {
@@ -57,7 +60,7 @@ import {
 import { DEMOS, demoFor, demoSteps, type Demo, type DemoStep } from "./demos";
 import { runTour, tourOpen, type TourStep } from "./tour";
 import { readPgn, saveFile, today, writePgn, type Headers, type PgnGame } from "./pgn";
-import { addMisses, fenOf, formatScore, isDrawnPosition, reviewMove, type Review } from "./review";
+import { addMisses, fenOf, formatScore, isDrawnPosition, isSacrifice, reviewMove, type Review } from "./review";
 import { gradeGuess, planAhead, threatCheck, type CoachEngine, type Plan, type Threat } from "./strategy";
 
 // Opening choices in the start menu (the openings themselves are in openings.ts)
@@ -92,6 +95,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 
 const menu = $("menu");
 const menuCard = $<HTMLFormElement>("menu-card");
+const settingsDialog = $<HTMLDialogElement>("settings-dialog");
 const opponentBox = $<HTMLSelectElement>("opponent");
 const levelBox = $<HTMLSelectElement>("level");
 const colourBox = $<HTMLSelectElement>("colour");
@@ -101,7 +105,6 @@ const tcIncrement = $<HTMLInputElement>("tc-increment");
 const clockTickBox = $<HTMLInputElement>("clock-tick");
 const sfOpeningBox = $<HTMLSelectElement>("sf-opening");
 const myOpeningBox = $<HTMLSelectElement>("my-opening");
-const startButton = $<HTMLButtonElement>("start");
 const engineStatus = $("engine-status");
 const backButton = $<HTMLButtonElement>("back-to-game");
 const moveList = $("move-list");
@@ -123,11 +126,9 @@ const evalBar = $("eval-bar");
 const evalCheck = $<HTMLInputElement>("eval-check");
 const coachPanel = $("coach");
 const demoPanel = $("demo-panel");
-const gameBar = document.querySelector<HTMLElement>(".game-bar")!;
 const showDemoButton = $<HTMLButtonElement>("show-demo");
 const demoPlay = $<HTMLButtonElement>("demo-play");
 const demoPick = $<HTMLSelectElement>("demo-pick");
-const demoDialog = $<HTMLDialogElement>("demo-dialog");
 const coachText = $("coach-text");
 const coachStatus = $("coach-status");
 const quizScoreLabel = $("quiz-score");
@@ -143,7 +144,7 @@ const lineForward = $<HTMLButtonElement>("line-forward");
 const lineExit = $<HTMLButtonElement>("line-exit");
 const undoButton = $<HTMLButtonElement>("undo");
 const newButton = $<HTMLButtonElement>("new-game");
-const fenRow = $<HTMLFormElement>("fen-row");
+const fenRow = $("fen-row");
 const fenInput = $<HTMLInputElement>("fen");
 const loadButton = $<HTMLButtonElement>("load-fen");
 const themeBox = $<HTMLSelectElement>("board-theme");
@@ -338,6 +339,7 @@ function base(): Chess {
 
 /** What the board draws: a position of Stockfish's line during a preview. */
 function shown(): Chess {
+  if (stepper) return stepper.positions[stepper.step];
   const line = quizLinePositions();
   if (line && quiz?.lineStep) return line[quiz.lineStep];
   const plan = previewPlan();
@@ -504,13 +506,14 @@ function buildMenu() {
   applyUiTheme();
   applyTheme();
 
+  // The practice match: the first choice of "your opening" is a prompt
+  const prompt = myOpeningBox.options[0];
+  prompt.value = NO_OPENING;
+  prompt.text = "Choose your opening...";
   menuCard.addEventListener("change", updateMenu);
-  menuCard.addEventListener("submit", (event) => {
-    event.preventDefault();
-    saveSettings();
-    onStartGame();
-  });
+  menuCard.addEventListener("submit", (event) => event.preventDefault());
   backButton.addEventListener("click", hideMenu);
+  setupHome();
   updateMenu();
 }
 
@@ -540,34 +543,235 @@ function applyTheme() {
 
 /** Grey out the options that don't apply to the chosen mode. */
 function updateMenu() {
-  const practice = menuMode() === "practice";
-  const againstStockfish = !practice || opponentBox.selectedIndex === 0;
-  const usable: [HTMLSelectElement, boolean][] = [
-    [opponentBox, practice],
-    [levelBox, againstStockfish],
-    [colourBox, againstStockfish],
-    [sfOpeningBox, againstStockfish],
-    [myOpeningBox, practice && againstStockfish],
-    [timeControlBox, againstStockfish],
-  ];
-  for (const [box, on] of usable) {
-    box.disabled = !on;
-    box.previousElementSibling?.classList.toggle("disabled", !on);
-  }
-  const custom = againstStockfish && timeControlBox.value === "custom";
-  $("tc-custom").hidden = $("tc-custom-label").hidden = !custom;
-  const clockOn = againstStockfish && timeControlBox.value !== "none";
-  clockTickBox.disabled = !clockOn;
-  clockTickBox.parentElement!.classList.toggle("disabled", !clockOn);
-  startButton.textContent = practice ? "Start practice" : "Start game";
+  drawHome();
 }
 
 function showMenu() {
   menuOpen = true;
-  backButton.disabled = game.length === 0 && match === null;
-  updateMenu();
+  backButton.hidden = game.length === 0 && match === null && !demo;
+  homeChoice = null;
+  greeting = pickGreeting();
+  showScreen("welcome");
   menu.hidden = false;
-  startButton.focus();
+}
+
+// ---------------------------------------------------------------------------
+// The start screens: the coach's welcome, then the setup for each mode
+// ---------------------------------------------------------------------------
+
+type HomeScreen = "welcome" | "play" | "practice" | "analysis";
+type HomeChoice = "play" | "practice" | "analysis";
+
+let homeChoice: HomeChoice | null = null;
+let greeting = "";
+let practiceTab: "learn" | "match" = "learn";
+let learnColour: Color = "white";
+let learnOpening: string | null = null;
+
+/** Five ways to say hello, so it doesn't feel the same every time. */
+function pickGreeting(): string {
+  const name = playerNameBox.value.trim();
+  const hi = name ? `Hi ${name}!` : "Hi!";
+  const options = [
+    `${hi} What are we doing today?`,
+    name ? `Good to see you, ${name}. Fancy a game?` : "Good to see you. Fancy a game?",
+    "Hey! Ready for some chess?",
+    name ? `Welcome back, ${name}! What shall we work on?` : "Welcome back! What shall we work on?",
+    `${hi} Shall we play, practise or look at a game?`,
+  ];
+  return options[Math.floor(Math.random() * options.length)];
+}
+
+const MODE_LINES: Record<HomeChoice, string> = {
+  play: "A real game against Stockfish. No hints until it's over, then I'll go through it with you.",
+  practice: "Learn an opening, or play a game with me helping along the way.",
+  analysis: "Got a game from lichess or chess.com? Let's look at it together.",
+};
+
+// The time controls under each icon (values as in the clock's PRESETS)
+const TC_KINDS: Record<string, [string, string][]> = {
+  bullet: [["60+0", "1+0"], ["120+1", "2+1"]],
+  blitz: [["180+0", "3+0"], ["180+2", "3+2"], ["300+0", "5+0"]],
+  rapid: [["600+0", "10+0"], ["900+10", "15+10"], ["1800+0", "30+0"], ["custom", "Custom"]],
+  none: [],
+};
+
+const tcKindOf = (value: string) =>
+  Object.entries(TC_KINDS).find(([, presets]) => presets.some(([v]) => v === value))?.[0] ?? "none";
+
+function showScreen(screen: HomeScreen) {
+  for (const section of menu.querySelectorAll<HTMLElement>(".screen")) section.hidden = section.dataset.screen !== screen;
+  // The level box is shared by the Play and Practice screens
+  const slot = menu.querySelector<HTMLElement>(`.screen[data-screen="${screen}"] .slot-level`);
+  if (slot && levelBox.parentElement !== slot) slot.append(levelBox);
+  drawHome();
+}
+
+/** How strictly Stockfish follows its opening at this level, in a line. */
+function stickinessNote(): string {
+  const level = levelBox.selectedIndex;
+  const name = shortName(LEVELS[level]);
+  if (level <= 2) return `At ${name} level Stockfish sticks to its opening even when that costs it a little.`;
+  if (level <= 4) return `At ${name} level Stockfish keeps to its opening unless that would cost it material.`;
+  return `At ${name} level Stockfish only plays its opening moves when they're as good as anything else, and punishes mistakes.`;
+}
+
+function drawHome() {
+  // Welcome
+  setFace($("home-face"), homeChoice ? "talk" : "happy", 96);
+  $("home-bubble").textContent = homeChoice ? MODE_LINES[homeChoice] : greeting;
+  for (const button of menu.querySelectorAll<HTMLButtonElement>(".mode-choice")) {
+    const on = button.dataset.choice === homeChoice;
+    button.classList.toggle("on", on);
+    button.setAttribute("aria-checked", String(on));
+  }
+  $<HTMLButtonElement>("home-next").disabled = !homeChoice;
+
+  // Play
+  for (const button of menu.querySelectorAll<HTMLButtonElement>("#colour-seg button")) {
+    button.classList.toggle("on", button.dataset.colour === colourBox.value);
+  }
+  const kind = tcKindOf(timeControlBox.value);
+  for (const button of menu.querySelectorAll<HTMLButtonElement>("#tc-kinds button")) {
+    button.classList.toggle("on", button.dataset.kind === kind);
+  }
+  const chips = $("tc-presets");
+  chips.replaceChildren(...TC_KINDS[kind].map(([value, label]) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.textContent = label;
+    chip.classList.toggle("on", value === timeControlBox.value);
+    chip.addEventListener("click", () => {
+      timeControlBox.value = value;
+      saveSettings();
+      drawHome();
+    });
+    return chip;
+  }));
+  chips.hidden = !TC_KINDS[kind].length;
+  $("tc-custom").hidden = timeControlBox.value !== "custom";
+
+  // Practice
+  for (const button of menu.querySelectorAll<HTMLButtonElement>(".tabs button")) {
+    const on = button.dataset.tab === practiceTab;
+    button.classList.toggle("on", on);
+    button.setAttribute("aria-selected", String(on));
+  }
+  for (const panel of menu.querySelectorAll<HTMLElement>(".tab-panel")) panel.hidden = panel.dataset.panel !== practiceTab;
+  for (const button of menu.querySelectorAll<HTMLButtonElement>("#learn-colour button")) {
+    button.classList.toggle("on", button.dataset.colour === learnColour);
+  }
+  const tiles = $("opening-tiles");
+  tiles.replaceChildren(...DEMOS.filter((d) => REPERTOIRE.find((o) => o.name === d.opening)?.colour === learnColour).map((d) => {
+    const opening = REPERTOIRE.find((o) => o.name === d.opening)!;
+    const tile = document.createElement("button");
+    tile.type = "button";
+    tile.className = "tile";
+    tile.classList.toggle("on", d.opening === learnOpening);
+    tile.innerHTML = `<span class="tile-name"></span><span class="tile-note"></span>`;
+    tile.querySelector(".tile-name")!.textContent = d.opening.replace(/ \(.*\)$/, "");
+    tile.querySelector(".tile-note")!.textContent = opening.gambit ? "Gambit & traps" : `${d.lines.length} lines`;
+    tile.addEventListener("click", () => {
+      learnOpening = d.opening;
+      drawHome();
+    });
+    return tile;
+  }));
+  // Your opening decides your colour; Stockfish's choices are the other colour's
+  const mine = REPERTOIRE.find((o) => menuName(o) === myOpeningBox.value);
+  for (const option of sfOpeningBox.querySelectorAll("option")) {
+    const theirs = REPERTOIRE.find((o) => menuName(o) === option.value);
+    option.hidden = !!(mine && theirs && theirs.colour === mine.colour);
+  }
+  if (sfOpeningBox.selectedOptions[0]?.hidden) sfOpeningBox.value = STOCKFISH_DECIDES;
+  $("practice-note").textContent = stickinessNote();
+  const practiceReady = practiceTab === "learn" ? learnOpening !== null : myOpeningBox.value !== NO_OPENING;
+  menu.querySelector<HTMLButtonElement>('[data-start="practice"]')!.disabled = !practiceReady;
+
+  // Analysis
+  menu.querySelector<HTMLButtonElement>('[data-start="analysis"]')!.disabled = !pgnGames.length;
+}
+
+function setupHome() {
+  drawIcons();
+  for (const button of menu.querySelectorAll<HTMLButtonElement>(".mode-choice")) {
+    button.addEventListener("click", () => {
+      homeChoice = button.dataset.choice as HomeChoice;
+      drawHome();
+    });
+  }
+  $("home-next").addEventListener("click", () => homeChoice && showScreen(homeChoice));
+  for (const button of menu.querySelectorAll<HTMLButtonElement>(".setup-back")) {
+    button.addEventListener("click", () => showScreen("welcome"));
+  }
+  for (const button of menu.querySelectorAll<HTMLButtonElement>("#colour-seg button")) {
+    button.addEventListener("click", () => {
+      colourBox.value = button.dataset.colour!;
+      saveSettings();
+      drawHome();
+    });
+  }
+  for (const button of menu.querySelectorAll<HTMLButtonElement>("#tc-kinds button")) {
+    button.addEventListener("click", () => {
+      const presets = TC_KINDS[button.dataset.kind!];
+      if (tcKindOf(timeControlBox.value) !== button.dataset.kind) timeControlBox.value = presets[0]?.[0] ?? "none";
+      saveSettings();
+      drawHome();
+    });
+  }
+  for (const button of menu.querySelectorAll<HTMLButtonElement>(".tabs button")) {
+    button.addEventListener("click", () => {
+      practiceTab = button.dataset.tab as "learn" | "match";
+      drawHome();
+    });
+  }
+  for (const button of menu.querySelectorAll<HTMLButtonElement>("#learn-colour button")) {
+    button.addEventListener("click", () => {
+      learnColour = button.dataset.colour as Color;
+      learnOpening = null;
+      drawHome();
+    });
+  }
+  for (const box of [levelBox, sfOpeningBox, myOpeningBox, tcMinutes, tcIncrement]) {
+    box.addEventListener("change", () => {
+      saveSettings();
+      drawHome();
+    });
+  }
+  menu.querySelector('[data-start="play"]')!.addEventListener("click", () => startFromHome("play"));
+  menu.querySelector('[data-start="practice"]')!.addEventListener("click", () => startFromHome("practice"));
+  menu.querySelector('[data-start="analysis"]')!.addEventListener("click", (event) => void reviewPgnGame(event));
+  $("empty-board").addEventListener("click", () => {
+    mode = "practice";
+    resetBoard(new Game());
+    orientation = "white";
+    canReview = false;
+    reviewing = false;
+    hideMenu();
+    refresh();
+  });
+}
+
+function setMode(value: Mode) {
+  const radio = menuCard.querySelector<HTMLInputElement>(`input[name="mode"][value="${value}"]`);
+  if (radio) radio.checked = true;
+}
+
+function startFromHome(kind: "play" | "practice") {
+  if (kind === "practice" && practiceTab === "learn") {
+    const chosen = demoFor(learnOpening ?? undefined);
+    if (chosen) startDemo(chosen);
+    return;
+  }
+  setMode(kind);
+  opponentBox.selectedIndex = 0;
+  if (kind === "practice") {
+    // Your colour follows the opening you practise
+    const mine = REPERTOIRE.find((o) => menuName(o) === myOpeningBox.value);
+    colourBox.value = mine ? (mine.colour === "white" ? "White" : "Black") : "Random";
+  }
+  saveSettings();
+  onStartGame();
 }
 
 function hideMenu() {
@@ -599,6 +803,9 @@ function onStartGame() {
 /** A fresh game from a position, with nothing else going on. */
 function resetBoard(newGame: Game, headers: Headers = { White: "?", Black: "?", Date: today() }) {
   gameHeaders = { ...headers };
+  stepper = null;
+  closeOverlay(false);
+  currentView = "board";
   if (demo) clearTimeout(demo.timer);
   demo = null;
   clock = null;
@@ -639,7 +846,7 @@ function startMatch() {
   const you = playerName();
   gameHeaders = { White: user === "white" ? you : stockfish, Black: user === "white" ? stockfish : you, Date: today() };
   orientation = user; // your pieces at the bottom
-  const control = menuTimeControl();
+  const control = mode === "play" ? menuTimeControl() : undefined;
   if (control) {
     clock = new Clock(control);
     clock.start("white");
@@ -681,6 +888,8 @@ function coachMyOpening(move: NormalMove) {
 
 /** Called after every move of the game, yours or Stockfish's. */
 function afterMove() {
+  stepper = null;
+  closeOverlay(false);
   if (match && clock?.running()) {
     clockTimes[game.length - 1] = clock.moved();
     clockHistory[game.length] = clock.snapshot();
@@ -860,7 +1069,7 @@ function clickPosition(): Chess {
 
 /** Can pieces be moved right now, and which side's? */
 function movableColour(): Color | undefined {
-  if (busy || thinking || preview || menuOpen || quiz?.lineStep || demo) return undefined;
+  if (busy || thinking || preview || menuOpen || quiz?.lineStep || demo || stepper || overlayOpen()) return undefined;
   if (quizWaiting()) return quiz!.threat!.them;
   if (analysing()) return base().turn;
   if (viewPly !== null) return undefined; // looking back in Play mode
@@ -925,6 +1134,7 @@ function exitAnalysis() {
 // -- Stepping through the game ------------------------------------------------
 
 function goTo(ply: number) {
+  stepper = null;
   if (demo && !demoStepping) {
     clearTimeout(demo.timer);
     if (demo.playing) demo.interrupted = true;
@@ -1175,24 +1385,6 @@ function drawDemo() {
   demoPick.value = String(demo.line);
 }
 
-function openDemoDialog() {
-  const choices = $("demo-choices");
-  choices.replaceChildren(
-    ...DEMOS.map((d) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      const colour = REPERTOIRE.find((o) => o.name === d.opening)?.colour === "black" ? "Black" : "White";
-      button.textContent = `${d.opening} (${colour}) - ${d.lines.length} lines`;
-      button.addEventListener("click", () => {
-        demoDialog.close();
-        startDemo(d);
-      });
-      return button;
-    }),
-  );
-  demoDialog.showModal();
-}
-
 /** "Show me this opening" while practising it: leave the game for the demo. */
 async function onShowDemo() {
   const chosen = demoFor(match?.myOpening?.name);
@@ -1215,6 +1407,9 @@ function onDemoTry() {
   }
   refresh();
   showMenu();
+  homeChoice = "practice";
+  practiceTab = "match";
+  showScreen("practice");
 }
 
 function onDemoExit() {
@@ -1520,6 +1715,8 @@ function refresh() {
   drawMoveList(reviews, info);
   drawReview(reviews, info);
   drawCoachFace(reviews);
+  drawMoveStrip(reviews);
+  applyView();
   drawTurn();
   drawButtons();
   drawCoach();
@@ -1531,9 +1728,9 @@ function applyMode() {
   const practice = mode === "practice";
   document.body.classList.toggle("practice", practice);
   modeTitle.textContent = practice ? "Practice" : "Play";
-  for (const element of [coachPanel, reviewArea, fenRow, undoButton]) element.hidden = !practice || demo !== null;
+  for (const element of [coachPanel, reviewArea, fenRow]) element.hidden = !practice || demo !== null;
+  undoButton.hidden = !practice || demo !== null || !match;
   demoPanel.hidden = demo === null;
-  gameBar.hidden = demo !== null;
   if (demo) modeTitle.textContent = "Opening demo";
   showDemoButton.hidden = !(practice && match?.myOpening && demoFor(match.myOpening.name));
   planModeRow.hidden = !(practice && match?.myOpening);
@@ -1637,7 +1834,10 @@ function drawBoard(reviews: (Review | undefined)[], info: OpeningInfo[]) {
   let last: [Key, Key] | undefined;
   const plan = previewPlan();
   const quizLine = quizLinePositions();
-  if (quizLine && quiz?.lineStep) {
+  if (stepper && stepper.step > 0) {
+    const move = stepper.moves[stepper.step - 1];
+    last = [makeSquare(move.from) as Key, arrowEnd(stepper.positions[stepper.step - 1], move)];
+  } else if (quizLine && quiz?.lineStep) {
     const move = quiz.explanation!.line[quiz.lineStep - 1];
     last = [makeSquare(move.from) as Key, arrowEnd(quizLine[quiz.lineStep - 1], move)];
   } else if (plan && preview) {
@@ -1652,7 +1852,7 @@ function drawBoard(reviews: (Review | undefined)[], info: OpeningInfo[]) {
   }
   const colour = movableColour();
   const movesFrom = quizWaiting() ? quiz!.threat!.passed! : position;
-  ground.setAutoShapes([...badgeShapes(reviews, info), ...arrowShapes()]);
+  ground.setAutoShapes(stepper ? stepperShapes() : [...badgeShapes(reviews, info), ...arrowShapes()]);
   ground.set({
     fen: fenOf(position),
     orientation,
@@ -1798,7 +1998,7 @@ function clockShouldPause(): boolean {
   if (menuOpen || tourOpen()) return true;
   if (mode !== "practice") return false;
   return busy || viewPly !== null || analysis !== null || preview !== null || quiz !== null ||
-    document.querySelector("dialog[open]") !== null;
+    stepper !== null || overlayOpen() || document.querySelector("dialog[open]") !== null;
 }
 
 function drawClocks() {
@@ -2081,21 +2281,24 @@ function drawReview(reviews: (Review | undefined)[], info: OpeningInfo[]) {
 // phones; a feed of earlier moves and a speech bubble on desktops)
 // ---------------------------------------------------------------------------
 
-interface CoachAction {
+// The coach's bubble above the board is always the same size: one short,
+// natural line (the board and its rating icon show which move), with icon
+// buttons for more. "Tell me more" opens the overlay; lines of moves are
+// talked through one move at a time by the stepper.
+
+interface CoachButton {
+  ico: string;
   label: string;
   run: () => void;
-  phoneOnly?: boolean;
+  kind?: "accent" | "soft" | "hazard";
 }
 
-interface CoachLine {
+interface CoachSay {
   mood: Mood;
-  rating?: string;
   text: string;
-  actions: CoachAction[];
+  buttons: CoachButton[];
 }
 
-// Ratings where the coach offers the better move (inaccuracies too)
-const WORTH_SHOWING = new Set(["Inaccuracy", "Mistake", "Miss", "Missed Win", "Blunder"]);
 const faces = new Map<HTMLElement, string>(); // what each face shows, so it's only redrawn on a change
 
 function setFace(element: HTMLElement, mood: Mood, size: number) {
@@ -2105,163 +2308,356 @@ function setFace(element: HTMLElement, mood: Mood, size: number) {
   element.innerHTML = avatarSvg(mood, size);
 }
 
-/** "Nf3 - Best move. This is exactly what Stockfish would play." plus, if
- *  that's short, the first sentence of the explanation. */
-function shortReview(review: Review): string {
-  const [full, ...rest] = review.text.split("\n");
-  // the rating is on the tag, so it isn't repeated: "Qh5?! The problem: ..."
-  const heading = full.replace(new RegExp(` - ${review.rating}( move)?\\.?`, "i"), "");
-  const body = rest.join(" ").replace(/\u2022/g, "").replace(/\s+/g, " ").trim();
-  const first = body.match(/^[^.!?]*[.!?]/)?.[0] ?? "";
-  return heading.length < 80 && first ? `${heading} ${first}` : heading;
+/** Who the coach is talking to: you in a match, otherwise nobody in particular. */
+function listener(): Color | null {
+  if (match) return match.user;
+  if (reviewing && !reviewTitle) return orientation; // your own finished game
+  return null;
 }
 
-/** Stockfish's better move, played as analysis from the position before. */
-function showBetterMove(ply: number, review: Review) {
-  if (!review.bestSan) return;
-  const before = game.positionAt(ply - 1);
-  const move = parseSan(before, review.bestSan) as NormalMove | undefined;
-  if (!move) return;
-  goTo(ply - 1);
-  analysisMove(move);
-}
+const TELL_MORE: CoachButton = { ico: "dots", label: "Tell me more", run: () => openMore() };
+const STRATEGY: CoachButton = { ico: "target", label: "Strategy", run: () => void openStrategy(), kind: "accent" };
 
-/** What the coach says about the move on screen. */
-function coachLine(reviews: (Review | undefined)[]): CoachLine {
-  if (busy) return { mood: "think", text: statusMessage || "Stockfish is thinking...", actions: [] };
+/** What the coach says about the position on screen. */
+function coachSays(reviews: (Review | undefined)[]): CoachSay {
+  if (busy) return { mood: "think", text: statusMessage || "Hmm, let me think...", buttons: [] };
+  if (demo) {
+    const ply = currentPly();
+    const step = ply ? demo.steps[ply - 1] : undefined;
+    const text = step?.note ?? (ply ? "Watch how it goes." : demo.line === 0 ? demo.demo.intro : demo.demo.lines[demo.line].title);
+    return { mood: step?.note ? "talk" : "happy", text, buttons: [TELL_MORE] };
+  }
+  if (mode === "play") {
+    if (match) {
+      const yours = game.position.turn === match.user;
+      return thinking || !yours
+        ? { mood: "think", text: "Stockfish is thinking...", buttons: [] }
+        : { mood: "talk", text: game.length ? "Your move." : "Your move. Good luck!", buttons: [] };
+    }
+    if (canReview) return { mood: "happy", text: "Good game! Shall we go through it together?", buttons: [{ ico: "search", label: "Review the game", run: onReviewGame, kind: "accent" }] };
+    return { mood: "talk", text: game.length ? "That's the end of the game." : "Press New game to start.", buttons: [] };
+  }
+  if (quizWaiting()) {
+    return { mood: "think", text: "What are they threatening? Play their move on the board.", buttons: [{ ico: "close", label: "Stop the quiz", run: () => { quiz = null; refresh(); }, kind: "soft" }] };
+  }
+  if (quiz?.answered && quiz.result) {
+    const [correct, text] = quiz.result;
+    const short = correct ? "Yes, that's their idea. Well spotted!" : "Not quite. Tap the dots and I'll show you.";
+    void text;
+    return { mood: correct ? "happy" : "worried", text: short, buttons: [TELL_MORE, { ico: "close", label: "Done", run: () => { quiz = null; refresh(); }, kind: "soft" }] };
+  }
   if (analysis) {
     const review = ratingsOn() ? analysisReview() : undefined;
-    if (!analysis.line.length) return { mood: "talk", text: "Try any move here to see what would have happened.", actions: [{ label: "Back to the game", run: exitAnalysis }] };
-    if (!review) return { mood: "think", text: "Let me check that move...", actions: [] };
-    return { mood: moodForRating(review.rating), rating: review.rating, text: `What if: ${shortReview(review)}`, actions: [{ label: "Back to the game", run: exitAnalysis }] };
+    const exit: CoachButton = { ico: "close", label: "Back to the game", run: exitAnalysis, kind: "soft" };
+    if (!analysis.line.length) return { mood: "talk", text: "Try any move to see what would have happened.", buttons: [exit] };
+    if (!review) return { mood: "think", text: "Let me check that move...", buttons: [exit] };
+    const line = analysis.line;
+    const before = line.positionAt(line.length - 1);
+    const after = line.positionAt(line.length);
+    return { mood: moodForRating(review.rating), text: `What if: ${verdict(review, before, after, analyser.evals.get(fenOf(after)), before.turn, line.length)}`, buttons: [exit] };
   }
   const ply = reviewPly();
-  if (!ratingsOn()) return { mood: "talk", text: "Move ratings are switched off.", actions: [] };
-  if (ply === 0) return { mood: "talk", text: "Make a move and I'll tell you what Stockfish thinks of it.", actions: [] };
+  if (!ratingsOn()) return { mood: "talk", text: "Move ratings are off.", buttons: [STRATEGY] };
+  if (ply === 0) return { mood: "talk", text: game.length ? "The starting position." : "Make a move and I'll tell you what I think.", buttons: [STRATEGY] };
   const review = reviews[ply - 1];
-  if (!review) return { mood: "think", text: "Hmm, let me check that move...", actions: [] };
-  const actions: CoachAction[] = [];
-  const live = match !== null && viewPly === null && !preview;
-  const harsh = WORTH_SHOWING.has(review.rating);
-  if (harsh && review.bestSan) actions.push({ label: `Show me ${review.bestSan}`, run: () => showBetterMove(ply, review) });
-  if (harsh && live && match && game.moverOf(ply) === match.user && !thinking) actions.push({ label: "Undo and retry", run: onUndo });
-  if (!replyButton.disabled) actions.push({ label: showReply ? "Back to my move" : "Their reply", run: () => replyButton.click() });
-  if (!harsh && live && !thinking && !game.outcome()) actions.push({ label: "What's their threat?", run: () => void startTask("threat") });
-  // at most three, plus "Tell me more" (phones only: desktops show the full review anyway)
-  const kept = actions.slice(0, 3);
-  kept.push({ label: "Tell me more", run: () => reviewArea.scrollIntoView({ behavior: "smooth", block: "start" }), phoneOnly: true });
-  return { mood: moodForRating(review.rating), rating: review.rating, text: shortReview(review), actions: kept };
+  if (!review) return { mood: "think", text: "Hmm, let me check that move...", buttons: [STRATEGY] };
+  const before = game.positionAt(ply - 1);
+  const after = game.positionAt(ply);
+  const text = verdict(review, before, after, analyser.evals.get(fenOf(after)), listener(), ply);
+  return { mood: moodForRating(review.rating), text, buttons: [TELL_MORE, STRATEGY] };
 }
 
-function fillBubble(bubble: HTMLElement, line: CoachLine, withActions: boolean) {
-  bubble.replaceChildren();
-  if (line.rating) {
-    const tag = document.createElement("span");
-    tag.className = `coach-tag ${ratingClass(line.rating)}`;
-    tag.textContent = line.rating;
-    bubble.append(tag);
-  }
-  bubble.append(line.text);
-  if (withActions && line.actions.length) {
-    const row = document.createElement("div");
-    row.className = "coach-actions";
-    for (const action of line.actions) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = action.label;
-      if (action.phoneOnly) button.className = "phone-only";
-      button.addEventListener("click", action.run);
-      row.append(button);
-    }
-    bubble.append(row);
-  }
+function iconButton(button: CoachButton, size = 18): HTMLButtonElement {
+  const element = document.createElement("button");
+  element.type = "button";
+  element.className = `round ${button.kind ?? ""}`;
+  element.title = button.label;
+  element.setAttribute("aria-label", button.label);
+  element.innerHTML = icon(button.ico, size);
+  element.addEventListener("click", button.run);
+  return element;
 }
-
-/** The plies the coach comments on: in a match only yours, otherwise every move. */
-function coachPlies(upTo: number): number[] {
-  const plies: number[] = [];
-  for (let ply = 1; ply <= upTo; ply++) if (!match || game.moverOf(ply) === match.user) plies.push(ply);
-  return plies;
-}
-
-const moveLabel = (ply: number) => {
-  const position = game.positionAt(ply - 1);
-  return `${position.fullmoves}${position.turn === "white" ? "." : "..."}${game.moves[ply - 1].san}`;
-};
 
 function drawCoachFace(reviews: (Review | undefined)[]) {
-  const practice = mode === "practice" && !demo;
-  const strip = $("coach-strip");
-  strip.hidden = !practice;
-  setFace($("tools-face"), busy ? "think" : "talk", 30);
-  if (!practice) return;
-  const line = coachLine(reviews);
-  setFace($("strip-face"), line.mood, 52);
-  setFace($("review-face"), line.mood, 44);
-  fillBubble($("strip-bubble"), line, true);
-
-  // Desktop feed: the last few moves before the one on screen
-  const feed = $("coach-feed");
-  feed.replaceChildren();
-  if (!analysis && ratingsOn()) {
-    const plies = coachPlies(reviewPly() - 1).slice(-5);
-    for (const ply of plies) {
-      const review = reviews[ply - 1];
-      const item = document.createElement("li");
-      const face = document.createElement("span");
-      face.className = "coach-face";
-      face.innerHTML = avatarSvg(moodForRating(review?.rating), 26);
-      const button = document.createElement("button");
-      button.type = "button";
-      button.title = review ? shortReview(review) : "";
-      button.textContent = `${moveLabel(ply)}${review ? ` - ${review.rating}` : ""}`;
-      if (review) button.classList.add(ratingClass(review.rating));
-      button.addEventListener("click", () => goTo(ply));
-      item.append(face, button);
-      feed.append(item);
-    }
-  }
-  drawKeyMoments(reviews);
+  const say = coachSays(reviews);
+  setFace($("strip-face"), say.mood, 46);
+  $("strip-text").textContent = say.text;
+  $("strip-actions").replaceChildren(...say.buttons.map((b) => iconButton(b)));
+  drawStepper();
 }
 
-/** After a game: the biggest turning points, and any brilliant moves. */
-function drawKeyMoments(reviews: (Review | undefined)[]) {
-  const box = $("key-moments");
-  const finished = reviewing && match === null && game.length > 0;
-  const { done, total } = analyser.progress();
-  if (!finished || done < total || !ratingsOn()) {
-    box.hidden = true;
+// -- Tell me more: the board dims and the coach explains in full ----------------
+
+const overlay = () => $("coach-overlay");
+const overlayOpen = () => !overlay().hidden;
+
+function showOverlay(mood: Mood, content: (Node | string)[], buttons: CoachButton[]) {
+  setFace($("overlay-face"), mood, 64);
+  $("overlay-text").replaceChildren(...content);
+  $("overlay-actions").replaceChildren(...buttons.map((b) => {
+    const element = iconButton(b, 20);
+    const label = document.createElement("span");
+    label.textContent = b.label;
+    element.append(label);
+    element.classList.add("labelled");
+    return element;
+  }));
+  overlay().hidden = false;
+  refresh();
+}
+
+function closeOverlay(redraw = true) {
+  if (overlay().hidden) return;
+  overlay().hidden = true;
+  if (redraw) refresh();
+}
+
+const para = (text: string, className = "") => {
+  const p = document.createElement("p");
+  p.className = className;
+  p.textContent = text;
+  return p;
+};
+
+const CLOSE: CoachButton = { ico: "close", label: "Back", run: () => closeOverlay(), kind: "soft" };
+
+/** Tell me more: the full review of the move (or the demo note, or the quiz result). */
+function openMore() {
+  if (demo) {
+    const ply = currentPly();
+    const note = ply ? demo.steps[ply - 1].note : demo.demo.intro;
+    showOverlay("talk", [para(note ?? "Watch how the line goes.")], [CLOSE]);
     return;
   }
-  const side: Color | null = reviewTitle ? null : orientation; // a PGN game: both sides
-  const moments: [number, Review][] = [];
-  reviews.forEach((review, i) => {
-    if (review && (!side || game.moverOf(i + 1) === side)) moments.push([i + 1, review]);
-  });
-  const brilliant = moments.filter(([, r]) => r.rating === "Brilliant" || r.rating === "Great").slice(0, 2);
-  // the costliest moves (inaccuracies count too, ranked below bigger mistakes by what they cost)
-  const turning = moments.filter(([, r]) => WORTH_SHOWING.has(r.rating))
-    .sort((a, b) => b[1].loss - a[1].loss).slice(0, 3);
-  const chosen = [...brilliant, ...turning].sort((a, b) => a[0] - b[0]);
-  const line: CoachLine = chosen.length
-    ? {
-        mood: turning.length ? "talk" : "wow",
-        text: `Game over! ${chosen.length === 1 ? "Here's the key moment" : `Here are the ${chosen.length} key moments`} - tap one to look at it:`,
-        actions: chosen.map(([ply, review]) => ({ label: `${moveLabel(ply)} ${review.rating}`, run: () => goTo(ply) })),
+  if (quiz?.answered && quiz.result) {
+    const parts = [para(quiz.result[1])];
+    if (quiz.explanation) parts.push(para(quiz.explanation.text));
+    const buttons: CoachButton[] = [];
+    const explanation = quiz.explanation;
+    if (explanation?.line.length) {
+      buttons.push({ ico: "hazard", label: "Show me", kind: "hazard", run: () => {
+        closeOverlay(false);
+        const positions = [explanation.start];
+        for (const move of explanation.line) positions.push(positionAfter(positions[positions.length - 1], move));
+        startStepper(positions, explanation.line, explanation.line.map((m, i) => narrateMove(positions[i], m, listener())), "worried");
+      } });
+    }
+    buttons.push(CLOSE);
+    showOverlay(quiz.result[0] ? "happy" : "talk", parts, buttons);
+    return;
+  }
+  const ply = reviewPly();
+  const review = ratingsOn() && ply > 0 ? reviews()[ply - 1] : undefined;
+  if (!review) return;
+  const [heading, ...rest] = review.text.split("\n");
+  const parts: Node[] = [para(heading, "overlay-heading")];
+  for (const chunk of rest.join("\n").split(/\n\s*\n/)) if (chunk.trim()) parts.push(para(chunk.trim()));
+  const missed = missedBrilliant(game.positionAt(ply - 1), game.moves[ply - 1].move, analyser.evals);
+  if (missed) parts.push(para(missed));
+  const buttons: CoachButton[] = [];
+  if (!game.positionAt(ply).isEnd()) {
+    buttons.push({ ico: "hazard", label: "What can they do now?", kind: "hazard", run: () => void openThreatLine(ply) });
+  }
+  buttons.push(CLOSE);
+  showOverlay(moodForRating(review.rating), parts, buttons);
+}
+
+/** The reviews of the game's moves (the same ones the move list shows). */
+function reviews(): (Review | undefined)[] {
+  return moveReviews();
+}
+
+// -- The stepper: a line of moves, talked through one move at a time -----------
+
+interface Stepper {
+  positions: Chess[]; // before the first move, then after each
+  moves: NormalMove[];
+  texts: string[];
+  step: number; // 1 = after the first move
+  mood: Mood;
+  extra?: CoachButton;
+}
+
+let stepper: Stepper | null = null;
+
+function startStepper(positions: Chess[], moves: NormalMove[], texts: string[], mood: Mood, extra?: CoachButton) {
+  if (!moves.length) return;
+  closeOverlay(false);
+  stepper = { positions, moves, texts, step: 1, mood, extra };
+  void play(soundForMove(makeSan(positions[0], moves[0])));
+  refresh();
+}
+
+function stepTo(step: number) {
+  if (!stepper) return;
+  const next = Math.max(1, Math.min(step, stepper.moves.length));
+  if (next > stepper.step) void play(soundForMove(makeSan(stepper.positions[next - 1], stepper.moves[next - 1])));
+  stepper.step = next;
+  refresh();
+}
+
+function closeStepper() {
+  stepper = null;
+  refresh();
+}
+
+function drawStepper() {
+  const box = $("stepper");
+  const area = document.querySelector<HTMLElement>(".board-area")!;
+  area.classList.toggle("stepping", stepper !== null);
+  box.hidden = !stepper;
+  if (!stepper) return;
+  $("step-count").textContent = `${stepper.step}/${stepper.moves.length}`;
+  $("step-text").textContent = stepper.texts[stepper.step - 1] ?? "";
+  setFace($("step-face"), stepper.mood, 34);
+  $<HTMLButtonElement>("step-back").disabled = stepper.step <= 1;
+  $<HTMLButtonElement>("step-next").disabled = stepper.step >= stepper.moves.length;
+  $("step-extra").replaceChildren(...(stepper.extra ? [iconButton(stepper.extra)] : []));
+}
+
+/** On the board while stepping: the move just played, and what it hits. */
+function stepperShapes(): DrawShape[] {
+  if (!stepper || stepper.step < 1) return [];
+  const before = stepper.positions[stepper.step - 1];
+  const after = stepper.positions[stepper.step];
+  const move = stepper.moves[stepper.step - 1];
+  const mover = before.board.get(move.from)?.color;
+  const yours = mover === (listener() ?? orientation);
+  const shapes: DrawShape[] = [{ orig: makeSquare(move.from) as Key, dest: arrowEnd(before, move), brush: yours ? "you" : "them" }];
+  const landing = isCastling(before, move) ? undefined : move.to;
+  if (landing !== undefined) {
+    for (const square of targetsOf(after, landing)) shapes.push({ orig: makeSquare(square) as Key, brush: "threat" });
+  }
+  return shapes;
+}
+
+/** What can they do now? Stockfish's best line for the opponent after the move. */
+async function openThreatLine(ply: number) {
+  closeOverlay(false);
+  const position = game.positionAt(ply);
+  setBusy(true, "Let me see what they can do...");
+  try {
+    const plan = await planAhead(coachAnalysis, position);
+    const moves = plan.steps.slice(0, 4).map((step) => step.move);
+    const positions = plan.positions.slice(0, moves.length + 1);
+    const texts = moves.map((move, i) => narrateMove(positions[i], move, game.moverOf(ply)));
+    setBusy(false);
+    startStepper(positions, moves, texts, "worried");
+  } catch (error) {
+    errorText = `Something went wrong: ${error}`;
+    setBusy(false);
+    refresh();
+  }
+}
+
+// -- Strategy: straight to the main idea --------------------------------------
+
+/** If the position is in one of the opening demos, the next few moves of
+ *  that line (with the demo's notes where it has them). */
+function demoLineFrom(position: Chess): { moves: NormalMove[]; texts: string[]; name: string } | undefined {
+  const key = fenOf(position).split(" ").slice(0, 4).join(" ");
+  const preferred = match?.myOpening?.name;
+  const order = [...DEMOS].sort((a, b) => Number(b.opening === preferred) - Number(a.opening === preferred));
+  for (const d of order) {
+    for (let i = 0; i < d.lines.length; i++) {
+      const steps = demoSteps(d, i);
+      let board = Chess.default();
+      for (let k = 0; k < steps.length; k++) {
+        if (fenOf(board).split(" ").slice(0, 4).join(" ") === key) {
+          const rest = steps.slice(k, k + 4);
+          const positions = [position];
+          for (const step of rest) positions.push(positionAfter(positions[positions.length - 1], step.move));
+          return {
+            name: d.opening,
+            moves: rest.map((step) => step.move),
+            texts: rest.map((step, n) => step.note?.replace(/Transposition:.*$/, "").trim() || narrateMove(positions[n], step.move, listener())),
+          };
+        }
+        board = positionAfter(board, steps[k].move);
       }
-    : { mood: "happy", text: "Game over! No big mistakes in this game - nicely played.", actions: [] };
-  box.replaceChildren();
-  const say = document.createElement("div");
-  say.className = "coach-say";
-  const face = document.createElement("div");
-  face.className = "coach-face";
-  face.innerHTML = avatarSvg(line.mood, 44);
-  const bubble = document.createElement("div");
-  bubble.className = "coach-bubble";
-  fillBubble(bubble, line, true);
-  say.append(face, bubble);
-  box.append(say);
-  box.hidden = false;
+    }
+  }
+  return undefined;
+}
+
+const QUIZ: CoachButton = { ico: "quiz", label: "Quiz me: spot their idea", run: () => { closeStepper(); void startTask("quiz"); }, kind: "accent" };
+
+/** Strategy: the opening's main line if we're in one, otherwise Stockfish's plan. */
+async function openStrategy() {
+  if (busy) return;
+  const position = base();
+  const known = demoLineFrom(position);
+  if (known) {
+    const texts = [...known.texts];
+    texts[0] = `The ${known.name.replace(/ \(.*\)$/, "")} plan: ${texts[0].charAt(0).toLowerCase()}${texts[0].slice(1)}`;
+    const positions = [position];
+    for (const move of known.moves) positions.push(positionAfter(positions[positions.length - 1], move));
+    startStepper(positions, known.moves, texts, "talk", QUIZ);
+    return;
+  }
+  setBusy(true, "Let me find the best plan...");
+  try {
+    const plan = await planAhead(coachAnalysis, position);
+    const moves = plan.steps.slice(0, 4).map((step) => step.move);
+    const positions = plan.positions.slice(0, moves.length + 1);
+    const texts = moves.map((move, i) => narrateMove(positions[i], move, listener()));
+    if (moves.length && isSacrifice(positions[0], moves[0], positions[1])) texts[0] = `There's a brilliant idea here! ${texts[0]}`;
+    else if (texts.length) texts[0] = `The plan: ${texts[0].charAt(0).toLowerCase()}${texts[0].slice(1)}`;
+    setBusy(false);
+    startStepper(positions, moves, texts, "talk", QUIZ);
+  } catch (error) {
+    errorText = `Something went wrong: ${error}`;
+    setBusy(false);
+    refresh();
+  }
+}
+
+// -- The move strip (phones) and the views (board, statistics, history) --------
+
+let currentView: "board" | "stats" | "history" = "board";
+
+function drawMoveStrip(list: (Review | undefined)[]) {
+  const strip = $("move-strip");
+  const current = currentPly();
+  strip.replaceChildren(...game.moves.map((played, i) => {
+    const ply = i + 1;
+    const position = game.positionAt(i);
+    const button = document.createElement("button");
+    button.type = "button";
+    const number = position.turn === "white" ? `${position.fullmoves}.` : "";
+    button.textContent = `${number}${played.san}${list[i]?.symbol && list[i]!.symbol !== "#" ? list[i]!.symbol : ""}`;
+    button.className = ply === current ? "cur" : ply === current - 1 ? "prev" : "";
+    if (list[i] && ply === current) button.classList.add(ratingClass(list[i]!.rating));
+    button.addEventListener("click", () => goTo(ply));
+    return button;
+  }));
+  strip.hidden = game.length === 0;
+  strip.querySelector(".cur")?.scrollIntoView({ inline: "center", block: "nearest" });
+}
+
+function applyView() {
+  for (const tab of document.querySelectorAll<HTMLButtonElement>(".view-tabs button")) {
+    tab.classList.toggle("on", tab.dataset.view === currentView);
+  }
+  for (const panel of document.querySelectorAll<HTMLElement>("[data-view-panel]")) {
+    panel.hidden = panel.dataset.viewPanel !== currentView;
+  }
+  document.body.dataset.view = currentView;
+  if (currentView === "stats") drawStats();
+  if (currentView === "history") drawHistory();
+}
+
+function drawStats() {
+  $("stats").textContent = "";
+}
+
+function drawHistory() {
+  $("history").textContent = "";
+}
+
+async function onNewGame() {
+  if (match && game.length && !game.outcome() && !(await message("New game?", "This game will end.", true))) return;
+  showMenu();
 }
 
 function drawTurn() {
@@ -2485,16 +2881,17 @@ function textBlock(text: string, className = ""): HTMLElement {
 // PGN: reviewing a game from a file or pasted text, and downloading games
 // ---------------------------------------------------------------------------
 
-const pgnDialog = $<HTMLDialogElement>("pgn-dialog");
 const pgnText = $<HTMLTextAreaElement>("pgn-text");
 const pgnPick = $<HTMLSelectElement>("pgn-pick");
 const pgnStatus = $("pgn-status");
-const pgnReview = $<HTMLButtonElement>("pgn-review");
 let pgnGames: PgnGame[] = [];
 
+/** "Open PGN": the Game analysis screen. */
 function openPgnDialog() {
+  showMenu();
+  homeChoice = "analysis";
+  showScreen("analysis");
   readPgnText();
-  pgnDialog.showModal();
   pgnText.focus();
 }
 
@@ -2504,7 +2901,7 @@ function readPgnText() {
   pgnGames = text ? readPgn(text).filter((g) => g.load().game.length > 0 || g.headers.FEN) : [];
   pgnPick.replaceChildren(...pgnGames.map((g, i) => new Option(`${i + 1}. ${g.title}`, String(i))));
   $("pgn-pick-row").hidden = pgnGames.length < 2;
-  pgnReview.disabled = !pgnGames.length;
+  drawHome();
   pgnStatus.classList.toggle("problem", !!text && !pgnGames.length);
   pgnStatus.textContent = !text
     ? ""
@@ -2520,7 +2917,6 @@ async function reviewPgnGame(event: Event) {
   const chosen = pgnGames[Number(pgnPick.value) || 0];
   if (!chosen) return;
   const { game: loaded, problem } = chosen.load();
-  pgnDialog.close();
   mode = "practice";
   resetBoard(loaded, chosen.headers);
   canReview = false;
@@ -2620,7 +3016,7 @@ function wireButtons() {
     orientation = opposite(orientation);
     refresh();
   });
-  newButton.addEventListener("click", showMenu);
+  newButton.addEventListener("click", () => void onNewGame());
   undoButton.addEventListener("click", onUndo);
   resignButton.addEventListener("click", () => void onResign());
   reviewButton.addEventListener("click", onReviewGame);
@@ -2637,7 +3033,10 @@ function wireButtons() {
     saveSettings();
     refresh();
   });
-  fenRow.addEventListener("submit", (event) => void onLoadFen(event));
+  $("load-fen").addEventListener("click", (event) => {
+    settingsDialog.close();
+    void onLoadFen(event);
+  });
   window.setInterval(clockTick, 100);
   for (const control of [soundOn, soundVolume]) {
     control.addEventListener("input", () => {
@@ -2650,10 +3049,17 @@ function wireButtons() {
   document.addEventListener("pointerdown", unlockSounds, { once: true });
   document.addEventListener("keydown", unlockSounds, { once: true });
   $("open-pgn").addEventListener("click", openPgnDialog);
-  $("menu-open-pgn").addEventListener("click", openPgnDialog);
-  $("menu-demo").addEventListener("click", openDemoDialog);
-  $("menu-tour").addEventListener("click", onMenuTour);
-  $("panel-tour").addEventListener("click", () => void showTour(true));
+  for (const gear of document.querySelectorAll(".gear-button")) gear.addEventListener("click", () => settingsDialog.showModal());
+  settingsDialog.addEventListener("close", () => refresh());
+  playerNameBox.addEventListener("change", () => {
+    saveSettings();
+    refresh();
+  });
+  $("settings-tour").addEventListener("click", () => {
+    settingsDialog.close();
+    if (menuOpen) onMenuTour();
+    else void showTour(true);
+  });
   showDemoButton.addEventListener("click", () => void onShowDemo());
   demoPlay.addEventListener("click", onDemoPlay);
   $("demo-back").addEventListener("click", () => goTo(currentPly() - 1));
@@ -2661,11 +3067,22 @@ function wireButtons() {
   $("demo-next-line").addEventListener("click", () => demo && loadDemoLine(demo.line + 1));
   demoPick.addEventListener("change", () => loadDemoLine(Number(demoPick.value)));
   $("demo-try").addEventListener("click", onDemoTry);
-  $("strip-face").addEventListener("click", () => reviewArea.scrollIntoView({ behavior: "smooth", block: "start" }));
+  $("strip-face").addEventListener("click", () => openMore());
+  for (const tab of document.querySelectorAll<HTMLButtonElement>(".view-tabs button")) {
+    tab.addEventListener("click", () => {
+      currentView = tab.dataset.view as typeof currentView;
+      refresh();
+    });
+  }
+  $("step-back").addEventListener("click", () => stepper && stepTo(stepper.step - 1));
+  $("step-next").addEventListener("click", () => stepper && stepTo(stepper.step + 1));
+  $("step-close").addEventListener("click", closeStepper);
+  overlay().addEventListener("click", (event) => {
+    if (event.target === overlay()) closeOverlay();
+  });
+  drawIcons();
   $("demo-exit").addEventListener("click", onDemoExit);
   $("download-pgn").addEventListener("click", downloadPgn);
-  $("pgn-cancel").addEventListener("click", () => pgnDialog.close());
-  $("pgn-form").addEventListener("submit", (event) => void reviewPgnGame(event));
   pgnText.addEventListener("input", readPgnText);
   $<HTMLInputElement>("pgn-file").addEventListener("change", async (event) => {
     const file = (event.target as HTMLInputElement).files?.[0];
@@ -2694,8 +3111,19 @@ function wireButtons() {
   document.addEventListener("keydown", (event) => {
     if (menuOpen || dialog.open || tourOpen()) return;
     if (event.target instanceof HTMLSelectElement || event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement || pgnDialog.open || demoDialog.open) return;
+        event.target instanceof HTMLTextAreaElement || settingsDialog.open) return;
     if (event.key === " " && event.target instanceof HTMLButtonElement) return; // the button's own click
+    if (stepper && (event.key === "ArrowLeft" || event.key === "ArrowRight" || event.key === "Escape")) {
+      event.preventDefault();
+      if (event.key === "Escape") closeStepper();
+      else stepTo(stepper.step + (event.key === "ArrowRight" ? 1 : -1));
+      return;
+    }
+    if (overlayOpen() && event.key === "Escape") {
+      event.preventDefault();
+      closeOverlay();
+      return;
+    }
     const keys: Record<string, () => void> = {
       ArrowLeft: () => (preview ? stepPreview(-1) : analysis ? analysisTakeBack() : goTo(currentPly() - 1)),
       ArrowRight: () => (preview ? stepPreview(1) : goTo(currentPly() + 1)),
