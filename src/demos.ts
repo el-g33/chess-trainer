@@ -719,6 +719,253 @@ export const DEMOS: Demo[] = [
       },
     ],
   },
+  {
+    opening: "Catalan Opening",
+    intro: "d4 and c4 like the Queen's Gambit, but the bishop goes to g2, where it presses on the long diagonal towards b7. Knight to f3 and castle; if Black takes on c4, win the pawn back calmly.",
+    lines: [
+      {
+        title: "Main line: the Closed Catalan",
+        moves: "d4 Nf6 c4 e6 g3 d5 Bg2 Be7 Nf3 O-O O-O Nbd7 Qc2 c6 Nbd2 b6 e4",
+        notes: {
+          "3.g3": "The Catalan: g3 and Bg2 instead of Nc3.",
+          "4.Bg2": "The bishop's long diagonal runs through d5 towards b7 and a8.",
+          "6.O-O": "Castled. White's king is safe behind the g2 bishop.",
+          "7.Qc2": "Qc2 guards c4 and supports e4.",
+          "8...b6": "Black prepares ...Bb7 to fight the g2 bishop.",
+          "9.e4": "White takes more of the centre. A small, lasting edge (about +0.3).",
+        },
+      },
+      {
+        title: "Open Catalan: 4...dxc4 5.Qa4+",
+        moves: "d4 Nf6 c4 e6 g3 d5 Bg2 dxc4 Qa4+ Nbd7 Qxc4 a6 Qc2",
+        notes: {
+          "4...dxc4": "The Open Catalan: Black takes the pawn.",
+          "5.Qa4+": "Win it back at once, with check.",
+          "6.Qxc4": "Pawn regained.",
+          "7.Qc2": "The queen steps back before ...b5 can kick it. About equal, with easy play for White.",
+        },
+      },
+      {
+        title: "Open Catalan: taking after castling",
+        moves: "d4 Nf6 c4 e6 Nf3 d5 g3 Be7 Bg2 O-O O-O dxc4 Qc2 a6 Qxc4 b5 Qc2 Bb7",
+        notes: {
+          "6...dxc4": "Black takes after both sides have castled.",
+          "7.Qc2": "No hurry: Qc2, then Qxc4.",
+          "8...b5": "Black gains queenside space with tempo.",
+          "9...Bb7": "Black's bishop fights for the long diagonal. White carries on with Bf4 or Bd2 and Rc1.",
+        },
+      },
+      {
+        title: "3...Bb4+: a check to disturb you",
+        moves: "d4 Nf6 c4 e6 g3 Bb4+ Bd2 Be7 Bg2 d5 Nf3 O-O O-O",
+        notes: {
+          "3...Bb4+": "A check to disturb White's development.",
+          "4.Bd2": "Block with the bishop.",
+          "4...Be7": "Black drops back: the d2 bishop is a little passive now, but White is still fine.",
+          "7.O-O": "Castled, with the usual Catalan setup.",
+        },
+      },
+      {
+        title: "Move order: 1...d5",
+        moves: "d4 d5 c4 e6 Nf3 Nf6 g3 Be7 Bg2 O-O O-O",
+        notes: {
+          "4.g3": "Against ...d5 and ...e6 the Catalan works just the same.",
+        },
+      },
+      {
+        title: "Against the Slav: 2...c6",
+        moves: "d4 d5 c4 c6 Nf3 Nf6 g3 Bf5 Bg2 e6 O-O",
+        notes: {
+          "2...c6": "The Slav: Black's light-squared bishop can come out to f5.",
+          "4.g3": "The Catalan setup still works.",
+          "6.O-O": "About equal. White's plans include Nc3, Nh4 or Qb3.",
+        },
+      },
+    ],
+  },
+  {
+    opening: "Stafford Gambit",
+    intro: "Trap practice. After 1.e4 e5 2.Nf3 Nf6 3.Nxe5, Black gives up the e-pawn with ...Nc6 for open lines and quick threats against f2. It's unsound (about +2 for White with correct play), so learn the traps AND the refutation.",
+    lines: [
+      {
+        title: "The gambit: 3...Nc6",
+        moves: "e4 e5 Nf3 Nf6 Nxe5 Nc6 Nxc6 dxc6 d3 Bc5",
+        notes: {
+          "3.Nxe5": "White takes the e5 pawn.",
+          "3...Nc6": "The Stafford Gambit: instead of winning the pawn back, Black develops and invites Nxc6.",
+          "4...dxc6": "Take back towards the centre: the d-file and the c8 bishop open up.",
+          "5...Bc5": "The bishop aims at f2, the weak point next to White's king.",
+        },
+      },
+      {
+        title: "Trap 1: 6.Bg5? ends in mate",
+        moves: "e4 e5 Nf3 Nf6 Nxe5 Nc6 Nxc6 dxc6 d3 Bc5 Bg5 Nxe4 Bxd8 Bxf2+ Ke2 Bg4#",
+        notes: {
+          "6.Bg5": "Pinning the knight to the queen looks natural, but it's a blunder:",
+          "6...Nxe4": "Let the queen go!",
+          "7.Bxd8": "Taking the queen loses at once. (After 7.dxe4 Qxg5 Black has won the pawn back.)",
+          "7...Bxf2+": "Check, and the king has only one square.",
+          "8...Bg4#": "Checkmate: the king on e2 has no escape. This is the trap that made the Stafford famous.",
+        },
+      },
+      {
+        title: "Trap 2: 6.Bc4? and 7.O-O??",
+        moves: "e4 e5 Nf3 Nf6 Nxe5 Nc6 Nxc6 dxc6 Nc3 Bc5 Bc4 Ng4 O-O Qh4 h3 Nxf2 Rxf2 Qxf2+",
+        notes: {
+          "6.Bc4": "Natural but inaccurate: now Black's threats on f2 start (about -0.6).",
+          "6...Ng4": "Two pieces hit f2.",
+          "7.O-O": "Castling into it is the real blunder:",
+          "7...Qh4": "Threatening Qxh2 mate.",
+          "9...Qxf2+": "Black wins material and White's king is in trouble (about -6).",
+        },
+      },
+      {
+        title: "The refutation: calm 6.Be2!",
+        moves: "e4 e5 Nf3 Nf6 Nxe5 Nc6 Nxc6 dxc6 d3 Bc5 Be2",
+        notes: {
+          "6.Be2": "The calm Be2 takes the sting out of ...Ng4 and ...Bg4 ideas. White castles next and stays a pawn up (about +2). Expect strong players to answer like this.",
+        },
+      },
+      {
+        title: "When White plays 3.d4",
+        moves: "e4 e5 Nf3 Nf6 d4 Nxe4 Bd3 d5 Nxe5 Nd7",
+        notes: {
+          "3.d4": "No gambit: White opens the centre instead.",
+          "3...Nxe4": "Take e4: it's Petrov theory now, and equal.",
+          "5...Nd7": "Challenge the strong e5 knight.",
+        },
+      },
+      {
+        title: "When White plays 3.Nc3",
+        moves: "e4 e5 Nf3 Nf6 Nc3 Nc6 Bb5 Bb4 O-O O-O",
+        notes: {
+          "3.Nc3": "White just develops (the Four Knights).",
+          "4...Bb4": "Mirror White's setup. Equal.",
+        },
+      },
+    ],
+  },
+  {
+    opening: "Black Lion (Philidor, Hanham)",
+    intro: "A compact setup: ...d6, ...Nf6, ...Nbd7 and ...e5, then ...Be7, ...c6 and castle. Keep the pawn on e5, and watch for Bc4 with Ng5 aiming at f7. Playable but a little passive (about +0.5 to +0.9 for White).",
+    lines: [
+      {
+        title: "Main line: the Lion move order",
+        moves: "e4 d6 d4 Nf6 Nc3 Nbd7 Nf3 e5 Bc4 Be7 O-O O-O a4 c6",
+        notes: {
+          "1...d6": "Start with ...d6.",
+          "2...Nf6": "Attack e4 straight away.",
+          "3...Nbd7": "The Lion: the knight goes to d7 to support ...e5.",
+          "4...e5": "Now ...e5 is fully supported, and Black keeps a pawn in the centre.",
+          "6...O-O": "Castled: f7 is much safer now.",
+          "7...c6": "...c6 makes room for ...Qc7 and prepares ...b5 later. Solid (about +0.4 for White).",
+        },
+      },
+      {
+        title: "The bishop sacrifice: 6.Bxf7+?",
+        moves: "e4 e5 Nf3 d6 d4 Nf6 Nc3 Nbd7 Bc4 Be7 Bxf7+ Kxf7 Ng5+ Kg8 Ne6 Qe8 Nxc7 Qg6",
+        notes: {
+          "6.Bxf7+": "A well-known trap, but it's a mistake if Black defends well (about -1.9).",
+          "7...Kg8": "The right square. (7...Kg6? gives White a strong attack.)",
+          "8.Ne6": "The knight hits the queen and c7.",
+          "9.Nxc7": "It forks the queen and rook...",
+          "9...Qg6": "...but Black counter-attacks g2 and e4, and White's knight on c7 is stranded. Black is better (-1.9). (9...Qd8? 10.Nxa8 gives White too much.)",
+        },
+      },
+      {
+        title: "The forcing line: 6.Ng5 and Bxf7+",
+        moves: "e4 e5 Nf3 d6 d4 Nf6 Nc3 Nbd7 Bc4 Be7 Ng5 O-O Bxf7+ Rxf7 Ne6 Qe8",
+        notes: {
+          "6.Ng5": "Knight and bishop both aim at f7.",
+          "8.Ne6": "The queen is attacked...",
+          "8...Qe8": "...and e8 is the only good square: about equal. Taking on e4 or d4 instead loses (+4.5 or more).",
+        },
+      },
+      {
+        title: "Why not the Hanham order (...Nd7 before ...Nf6)?",
+        moves: "e4 e5 Nf3 d6 d4 Nd7 Bc4 c6 O-O Be7 dxe5 dxe5 Ng5 Bxg5 Qh5 Qe7 Qxg5",
+        notes: {
+          "3...Nd7": "The Hanham move order: ...Nd7 before ...Nf6.",
+          "4.Bc4": "Now Bc4 with Ng5 ideas is awkward to meet.",
+          "7.Ng5": "Strong: f7 is hit, and after ...Bxg5 the queen wins the piece back.",
+          "9.Qxg5": "White is clearly better (+1.1). That's why this repertoire plays the Lion order, ...Nf6 first.",
+        },
+      },
+      {
+        title: "Hanham: 5.Ng5 and ...Nh6",
+        moves: "e4 e5 Nf3 d6 d4 Nd7 Bc4 c6 Ng5 Nh6",
+        notes: {
+          "5.Ng5": "Threatening Nxf7 or Bxf7+.",
+          "5...Nh6": "Cover f7 with the knight. Black holds (about +0.9 for White).",
+        },
+      },
+      {
+        title: "Against 1.d4: the Old Indian Lion",
+        moves: "d4 Nf6 c4 d6 Nc3 Nbd7 e4 e5 Nf3 Be7 Be2 O-O O-O c6",
+        notes: {
+          "2...d6": "The Old Indian: the same ...d6, ...Nbd7, ...e5 setup.",
+          "4...e5": "The Lion's centre pawn.",
+          "7...c6": "Solid but cramped (about +0.85 for White). Plans: ...a6, ...b5 or ...Re8 and ...Bf8.",
+        },
+      },
+      {
+        title: "Anti-Philidor: 4.f4",
+        moves: "e4 d6 d4 Nf6 Nc3 Nbd7 f4 e5 Nf3 exd4 Qxd4 c6",
+        notes: {
+          "4.f4": "White grabs space with f4.",
+          "4...e5": "Strike at once.",
+          "5...exd4": "Take: holding e5 doesn't work here.",
+          "6...c6": "...c6 and ...d5 next challenge the centre (about +0.7 for White).",
+        },
+      },
+    ],
+  },
+  {
+    opening: "Alien Gambit (vs the Caro-Kann)",
+    intro: "Trap practice. Against the Caro-Kann with 4...Nf6, White plays 5.Ng5 and sacrifices the knight on f7 to drag Black's king out. It's unsound (Black is clearly better with correct play), so learn where Black goes wrong, and when not to try it. Against other first moves, play the Italian.",
+    lines: [
+      {
+        title: "The gambit, and Black's best answer",
+        moves: "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 h6 Nxf7 Kxf7 Bc4+ Be6 Bxe6+ Kxe6",
+        notes: {
+          "4...Nf6": "The gambit only works against this knight move.",
+          "5.Ng5": "Heading for f7. Already slightly risky (about -0.3).",
+          "5...h6": "Black asks the knight.",
+          "6.Nxf7": "The Alien Gambit: a whole knight to expose Black's king (about -2.7).",
+          "7.Bc4+": "Check, aiming at the e6 square and the king.",
+          "7...Be6": "The best defence: Black blocks and gives back a little material.",
+          "8...Kxe6": "Black's king is out, but Black is a piece for two pawns up and clearly better (-3.1).",
+        },
+      },
+      {
+        title: "Where Black goes wrong: 7...Kg6?",
+        moves: "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 h6 Nxf7 Kxf7 Bc4+ Kg6",
+        notes: {
+          "7...Kg6": "The natural-looking king move throws away Black's advantage: White's attack (Nf3, Ne5+, Bd3+) is now worth the knight. About equal. (7...Ke8 keeps Black better.)",
+        },
+      },
+      {
+        title: "No gambit: 4...Bf5",
+        moves: "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5 Ng3 Bg6 h4 h6 Nf3 Nd7",
+        notes: {
+          "4...Bf5": "Black plays the Classical Caro-Kann instead: no gambit possible.",
+          "5.Ng3": "Kick the bishop.",
+          "6.h4": "Threatening h5 to trap the bishop.",
+          "7...Nd7": "A normal, equal Caro-Kann. Develop with Bd3 and castle.",
+        },
+      },
+      {
+        title: "No gambit: 4...Nd7",
+        moves: "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nd7 Bc4 Ngf6 Ng5 e6 Qe2 Nb6",
+        notes: {
+          "4...Nd7": "Black prepares ...Ngf6 instead.",
+          "6.Ng5": "The same f7 idea, but here there's no sacrifice: just pressure.",
+          "7.Qe2": "Lining up on the e-file.",
+          "7...Nb6": "Black kicks the bishop. Equal.",
+        },
+      },
+    ],
+  },
 ];
 
 export const demoFor = (opening: string | undefined) => DEMOS.find((d) => d.opening === opening);

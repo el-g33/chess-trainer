@@ -153,6 +153,17 @@ any difference. The tests folder isn't part of the built site.
 - **Themes** (`src/themes.css`): Warm stone (default), Classic, Midnight ember,
   Violet glass, each with a matching board and piece colours; the Pieces box
   adds four lichess sets (Chessnut, MPChess, Staunty, Spatial - see About).
+- **The coach** (`src/avatar.ts`, main.ts): a cartoon face that speaks the move
+  review in speech bubbles - a strip above the board on phones, a feed of earlier
+  moves on desktops - with buttons to see the better move, undo and retry, see
+  the reply or check the threat. After a game, Key moments lists the turning
+  points. Its expression follows the rating.
+- **More openings** (web only, added at the end of REPERTOIRE so the desktop
+  comparison tests keep their indexes): Catalan, Black Lion (Philidor / Hanham /
+  Old Indian setup), and in a Gambits & traps group the Stafford Gambit and the
+  Alien Gambit (which uses the Italian against anything but 1...c6; systems of a
+  White opening are chosen by both first moves). Stockfish plays a gambit's book
+  moves at every level (GAMBIT_TOLERANCE).
 - **Feature tour** (`src/tour.ts`): callouts shown the first time each mode is
   used, with Back / Next / No thanks and "Don't show this again"; can be watched
   again from the menu or the panel.

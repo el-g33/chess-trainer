@@ -29,6 +29,7 @@ const TOLERANCE_BY_LEVEL = [12, 12, 10, 8, 8, 5, 4, 3];
 
 // Levels 1-3, 4-5 and 6-8 (counting from 0) get openings from tiers 1, 2 and 3.
 const TIER_BY_LEVEL = [1, 1, 1, 2, 2, 3, 3, 3];
+const GAMBIT_TOLERANCE = 25; // winning-chance points a gambit's book move may cost
 export const TIER_NAMES: Record<number, string> = { 1: "levels 1-3", 2: "levels 4-5", 3: "levels 6-8" };
 
 // Catch-all names for the first moves, before a real opening takes shape
@@ -180,7 +181,9 @@ export function inFamily(name: string, families: string[]): boolean {
 export type Goal = "O-O" | "castled" | [piece: string, squares: string[], kind?: "break"];
 
 export interface OpeningSystem {
-  when: string[] | null; // White's first moves this system answers (null: any)
+  // The first moves this system answers (null: any): White's first move for a
+  // Black opening ("e4"), or both first moves for a White opening ("e4 c6")
+  when: string[] | null;
   label: string;
   families: string[];
   setup: Goal[];
@@ -190,6 +193,7 @@ export interface Opening {
   name: string;
   colour: Color;
   tier: number;
+  gambit?: boolean; // unsound but tricky: listed under "Gambits & traps", never suggested
   plan: string;
   systems: OpeningSystem[];
 }
@@ -293,6 +297,58 @@ export const REPERTOIRE: Opening[] = [
         setup: [["P", ["c5"]], ["P", ["d6"]], ["N", ["f6"]], ["N", ["c6"]], ["P", ["e6"]], ["B", ["e7"]], "O-O"] },
       { when: null, label: "King's Indian Defence", families: ["King's Indian Defense", "East Indian Defense"],
         setup: [["N", ["f6"]], ["P", ["g6"]], ["B", ["g7"]], ["P", ["d6"]], "O-O", ["P", ["e5", "c5"], "break"]] },
+    ],
+  },
+  // ---- Added in the web version (no desktop equivalent) ----
+  {
+    name: "Catalan Opening", colour: "white", tier: 3,
+    plan: "Pawns to d4 and c4 like the Queen's Gambit, but the bishop goes to g2 " +
+      "(after g3), where it presses on the long diagonal towards b7 and Black's " +
+      "queenside. Knight to f3 and castle; if Black takes on c4, win the pawn back " +
+      "calmly with Qa4+ or Qc2.",
+    systems: [{ when: null, label: "Catalan Opening",
+      families: ["Catalan Opening", "Queen's Pawn Game", "Indian Defense", "Queen's Gambit Declined", "Slav Defense"],
+      setup: [["P", ["d4"]], ["P", ["c4"]], ["P", ["g3"]], ["B", ["g2"]], ["N", ["f3"]], "O-O"] }],
+  },
+  {
+    name: "Black Lion (Philidor, Hanham)", colour: "black", tier: 2,
+    plan: "A compact setup: ...d6, ...Nf6, ...Nbd7 and ...e5, then ...Be7, ...c6 and " +
+      "castle. Keep the pawn on e5 so White can't open the centre, and watch out for " +
+      "Bc4 with Ng5 aiming at f7. Later, ...h6 and ...g5 ('the Lion's claw') can grab " +
+      "space on the kingside.",
+    systems: [
+      { when: ["e4"], label: "Black Lion (Philidor)", families: ["Philidor Defense", "Lion Defense", "Pirc Defense"],
+        setup: [["P", ["d6"]], ["N", ["f6"]], ["N", ["d7"]], ["P", ["e5"]], ["B", ["e7"]], ["P", ["c6"]], "O-O"] },
+      { when: null, label: "Old Indian (Lion setup)", families: ["Old Indian Defense", "Indian Defense", "Queen's Pawn Game"],
+        setup: [["N", ["f6"]], ["P", ["d6"]], ["N", ["d7"]], ["P", ["e5"]], ["B", ["e7"]], ["P", ["c6"]], "O-O"] },
+    ],
+  },
+  {
+    name: "Stafford Gambit", colour: "black", tier: 1, gambit: true,
+    plan: "After 1.e4 e5 2.Nf3 Nf6 3.Nxe5, give up the e-pawn with ...Nc6 and, after " +
+      "Nxc6, take back with ...dxc6 for open lines, ...Bc5 and quick threats against " +
+      "f2. It's unsound (about +2 for White with correct play), but the traps catch " +
+      "many players. Against other moves, develop normally: ...Nf6, ...Nc6, ...Bc5.",
+    systems: [
+      { when: ["e4"], label: "Stafford Gambit", families: ["Petrov's Defense"],
+        setup: [["P", ["e5"]], ["N", ["f6"]], ["N", ["c6"]], ["B", ["c5"]], "O-O"] },
+      { when: null, label: "Queen's Gambit Declined (...d5)",
+        families: ["Queen's Gambit Declined", "Queen's Pawn Game", "English Opening", "Zukertort Opening",
+          "Réti Opening"],
+        setup: [["P", ["d5"]], ["P", ["e6"]], ["N", ["f6"]], ["B", ["e7"]], "O-O", ["N", ["d7"]]] },
+    ],
+  },
+  {
+    name: "Alien Gambit (vs the Caro-Kann)", colour: "white", tier: 1, gambit: true,
+    plan: "Against the Caro-Kann (1...c6) with 4...Nf6: 5.Ng5 and, after ...h6, the " +
+      "knight sacrifice Nxf7 to drag Black's king out. It's unsound (Black is clearly " +
+      "better with correct play), but dangerous in practice. Against anything else, " +
+      "play the Italian Game.",
+    systems: [
+      { when: ["e4 c6"], label: "Alien Gambit", families: ["Caro-Kann Defense: Alien Gambit"],
+        setup: [["P", ["e4"]], ["P", ["d4"]], ["N", ["c3"]], ["N", ["f3"]], ["B", ["c4", "d3"]], "O-O"] },
+      { when: null, label: "Italian Game", families: ["Italian Game"],
+        setup: [["P", ["e4"]], ["N", ["f3"]], ["B", ["c4"]], "O-O", ["P", ["d3"]], ["P", ["c3"]]] },
     ],
   },
 ];
@@ -413,7 +469,23 @@ const JOBAVA_NB5: Adaptation = {
   source: "lichess: Rapport-Jobava System with e6 (Nb5 idea)",
 };
 
+const CATALAN_OPEN: Adaptation = {
+  name: "Open Catalan (...dxc4)",
+  moves: ["Qa4+", "Qc2"],
+  when: (p, me) => early(p, 8) && has(p, me, "P", "d4", "g3") && has(p, opp(me), "P", "c4") && !has(p, me, "P", "c4"),
+  why: "Black has taken your c-pawn. Win it back calmly instead of spending moves on b3 or a4: Qa4+ (with check) early on, or Qc2 once you have castled. Your g2 bishop then rules the long diagonal.",
+  source: "lichess: Catalan Opening: Open Defense 5. Qa4+ / Classical Line 7. Qc2",
+};
+
 // -- Black openings --
+
+const LION_NG5: Adaptation = {
+  name: "Ng5 with Bc4, aiming at f7",
+  moves: ["Nh6"],
+  when: (p, me) => early(p, 7) && has(p, opp(me), "N", "g5") && has(p, opp(me), "B", "c4") && has(p, me, "P", "f7") && has(p, me, "N", "g8"),
+  why: "White's knight and bishop both hit f7. Cover it with ...Nh6: the knight defends f7, and ...Ngf6 can't work here because e5 would drop.",
+  source: "lichess: Philidor Defense: Hanham, Kmoch Variation 5. Ng5 Nh6",
+};
 
 const SCOTCH: Adaptation = {
   name: "Scotch Game (d4)",
@@ -553,6 +625,11 @@ const ADAPTATIONS: Record<string, Adaptation[]> = {
   "Pirc Defence": [BIG_CENTRE_C5, KID_VS_LONDON],
   "King's Indian Defence": [BIG_CENTRE_C5, SAEMISCH, KID_VS_LONDON],
   "Sicilian Defence": [OPEN_SICILIAN, ALAPIN, MOSCOW, GRAND_PRIX],
+  "Catalan Opening": [ENGLUND, ALBIN, CATALAN_OPEN],
+  "Black Lion (Philidor)": [LION_NG5],
+  "Old Indian (Lion setup)": [],
+  "Stafford Gambit": [SCOTCH, WAYWARD_QUEEN, KINGS_GAMBIT],
+  "Alien Gambit": [],
 };
 
 /** The adaptation moves that fit this position for the side to move. */
@@ -578,20 +655,22 @@ export function openingsFor(colour: Color): Opening[] {
 
 export function suggestedFor(colour: Color, levelIndex: number): Opening[] {
   const tier = TIER_BY_LEVEL[levelIndex];
-  return openingsFor(colour).filter((o) => o.tier === tier);
+  return openingsFor(colour).filter((o) => o.tier === tier && !o.gambit);
 }
 
 /** The system the opening uses, given White's first move (for Black openings). */
 export function systemFor(opening: Opening, firstMove: string | null): OpeningSystem {
   for (const system of opening.systems) {
-    if (system.when === null || (firstMove && system.when.includes(firstMove))) return system;
+    if (system.when === null) return system;
+    if (firstMove && system.when.some((w) => firstMove === w || firstMove.startsWith(`${w} `))) return system;
   }
   return opening.systems[opening.systems.length - 1];
 }
 
 /** How the opening is listed in the start menu, e.g. "Italian Game (White, levels 1-3)" */
 export function menuName(opening: Opening): string {
-  return `${opening.name} (${opening.colour === "white" ? "White" : "Black"}, ${TIER_NAMES[opening.tier]})`;
+  const colour = opening.colour === "white" ? "White" : "Black";
+  return `${opening.name} (${colour}, ${opening.gambit ? "trap practice" : TIER_NAMES[opening.tier]})`;
 }
 
 // ---------------------------------------------------------------------------
@@ -664,9 +743,13 @@ export function setupMoves(position: Chess, setup: Goal[]): NormalMove[] {
 
 /** White's first move of the game in notation, e.g. "e4" (null if the game
  *  didn't start from the usual position). */
+/** The game's first moves, which decide the system an opening uses: "e4",
+ *  or "e4 c6" once Black has replied. */
 export function firstMoveOf(start: Chess, moves: NormalMove[]): string | null {
   if (!moves.length || !isStartPosition(start)) return null;
-  return makeSan(start, moves[0]);
+  const first = makeSan(start, moves[0]);
+  if (moves.length < 2) return first;
+  return `${first} ${makeSan(afterMove(start, moves[0]), moves[1])}`;
 }
 
 /** The usual starting position (python-chess's STARTING_FEN, clocks included). */
@@ -752,7 +835,9 @@ export async function chooseOpeningMove(
     return { note: `The ${label} setup is complete, so Stockfish now plays normally.`, finished: true };
   }
 
-  const tolerance = TOLERANCE_BY_LEVEL[levelIndex];
+  // A gambit opening is chosen to practise the gambit, so Stockfish plays its
+  // (objectively dubious) book moves at every level
+  const tolerance = opening.gambit ? Math.max(TOLERANCE_BY_LEVEL[levelIndex], GAMBIT_TOLERANCE) : TOLERANCE_BY_LEVEL[levelIndex];
   const infos = await engine.lines(position, thinkTime, 5);
   const bestChance = winningChance(infos[0].score, colour);
   const known = new Map<string, number>();

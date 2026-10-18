@@ -452,9 +452,18 @@ const menuMode = (): Mode =>
 function buildMenu() {
   for (const level of LEVELS) levelBox.add(new Option(level.name));
   for (const [value, label] of PRESETS) timeControlBox.add(new Option(label, value));
-  const openingNames = REPERTOIRE.map(menuName);
-  for (const name of [STOCKFISH_DECIDES, SUGGESTED, ...openingNames]) sfOpeningBox.add(new Option(name));
-  for (const name of [NO_OPENING, SUGGESTED, ...openingNames]) myOpeningBox.add(new Option(name));
+  // The usual openings, then the unsound-but-tricky ones in their own group
+  const openingNames = REPERTOIRE.filter((o) => !o.gambit).map(menuName);
+  const gambitNames = REPERTOIRE.filter((o) => o.gambit).map(menuName);
+  for (const [box, first] of [[sfOpeningBox, STOCKFISH_DECIDES], [myOpeningBox, NO_OPENING]] as const) {
+    for (const name of [first, SUGGESTED, ...openingNames]) box.add(new Option(name));
+    if (gambitNames.length) {
+      const group = document.createElement("optgroup");
+      group.label = "Gambits & traps";
+      for (const name of gambitNames) group.append(new Option(name));
+      box.append(group);
+    }
+  }
 
   const saved = loadSettings();
   if (saved.mode) {

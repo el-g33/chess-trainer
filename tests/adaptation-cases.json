@@ -43,6 +43,14 @@
     { "opening": "Sicilian Defence", "line": "1. e4 c5 2. Nf3 d6 3. d4", "expect": ["cxd4"], "source": "Open Sicilian 3...cxd4" },
     { "opening": "Sicilian Defence", "line": "1. e4 c5 2. c3", "expect": ["Nf6", "d5"], "source": "Sicilian Alapin 2...Nf6 / 2...d5" },
     { "opening": "Sicilian Defence", "line": "1. e4 c5 2. Nf3 d6 3. Bb5+", "expect": ["Bd7", "Nd7"], "source": "Sicilian Moscow Variation 3...Bd7" },
-    { "opening": "Sicilian Defence", "line": "1. e4 c5 2. Nc3 Nc6 3. f4", "expect": ["g6", "e6"], "source": "Sicilian Grand Prix Attack: ...g6 / ...e6" }
+    { "opening": "Sicilian Defence", "line": "1. e4 c5 2. Nc3 Nc6 3. f4", "expect": ["g6", "e6"], "source": "Sicilian Grand Prix Attack: ...g6 / ...e6" },
+    { "opening": "Catalan Opening", "line": "1. d4 Nf6 2. c4 e6 3. g3 d5 4. Bg2 dxc4", "expect": ["Qa4+", "Qc2"], "source": "Catalan Opening: Open Defense 5. Qa4+" },
+    { "opening": "Catalan Opening", "line": "1. d4 Nf6 2. c4 e6 3. Nf3 d5 4. g3 Be7 5. Bg2 O-O 6. O-O dxc4", "expect": ["Qa4+", "Qc2"], "source": "Catalan Opening: Open Defense, Classical Line 7. Qc2" },
+    { "opening": "Catalan Opening", "line": "1. d4 e5", "expect": ["dxe5"], "source": "Englund Gambit 2. dxe5" },
+    { "opening": "Catalan Opening", "line": "1. d4 d5 2. c4 e5", "expect": ["dxe5"], "source": "Albin Countergambit 3. dxe5" },
+    { "opening": "Black Lion (Philidor, Hanham)", "line": "1. e4 e5 2. Nf3 d6 3. d4 Nd7 4. Bc4 c6 5. Ng5", "expect": ["Nh6"], "source": "Philidor Defense: Hanham, Kmoch Variation 5...Nh6" },
+    { "opening": "Stafford Gambit", "line": "1. e4 e5 2. Qh5 Nc6 3. Bc4", "expect": ["g6", "Qe7"], "source": "early queen attack: ...g6 / ...Qe7" },
+    { "opening": "Stafford Gambit", "line": "1. e4 e5 2. d4", "expect": ["exd4"], "source": "Center Game 2...exd4" },
+    { "opening": "Stafford Gambit", "line": "1. e4 e5 2. f4", "expect": ["exf4", "d5"], "source": "King's Gambit Accepted / Falkbeer" }
   ]
 }
