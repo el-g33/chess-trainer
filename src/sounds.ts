@@ -1,10 +1,11 @@
 // Sound effects (Kenney's CC0 sounds, public/sounds): a wooden knock for a
 // move, a slap for a capture, a metal click for check, a cloth swish for
-// castling, a bell when the game ends, and tones for quiz answers.
+// castling, a bell when the game ends, tones for quiz answers and a tick
+// when you're nearly out of time.
 // Played with Web Audio (pitched up, see PITCH), which phones allow once the
 // page has been touched.
 
-export type Sound = "move" | "capture" | "check" | "castle" | "gameover" | "right" | "wrong";
+export type Sound = "move" | "capture" | "check" | "castle" | "gameover" | "right" | "wrong" | "tick";
 
 const FILES: Record<Sound, string[]> = {
   move: ["move1", "move2", "move3"], // a few knocks, so moves don't sound mechanical
@@ -14,6 +15,7 @@ const FILES: Record<Sound, string[]> = {
   gameover: ["gameover"],
   right: ["right"],
   wrong: ["wrong"],
+  tick: ["tick"],
 };
 
 let context: AudioContext | null = null;

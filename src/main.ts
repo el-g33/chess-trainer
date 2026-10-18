@@ -49,6 +49,9 @@ import { brilliantCandidates, findBrilliant, missedBrilliant, type Brilliant } f
 import { accuracyRating, divide, gameAccuracy, phaseAccuracy, winPercent, type Phase } from "./accuracy";
 import type { Score } from "./coach";
 import { explainGuess, type GuessExplanation } from "./quizExplain";
+import {
+  Clock, formatClock, parseTimeControl, PRESETS, thinkTime, timeControlTag, type TimeControl, type Times,
+} from "./clock";
 import { readPgn, saveFile, today, writePgn, type Headers, type PgnGame } from "./pgn";
 import { addMisses, fenOf, formatScore, isDrawnPosition, reviewMove, type Review } from "./review";
 import { gradeGuess, planAhead, threatCheck, type CoachEngine, type Plan, type Threat } from "./strategy";
@@ -88,6 +91,10 @@ const menuCard = $<HTMLFormElement>("menu-card");
 const opponentBox = $<HTMLSelectElement>("opponent");
 const levelBox = $<HTMLSelectElement>("level");
 const colourBox = $<HTMLSelectElement>("colour");
+const timeControlBox = $<HTMLSelectElement>("time-control");
+const tcMinutes = $<HTMLInputElement>("tc-minutes");
+const tcIncrement = $<HTMLInputElement>("tc-increment");
+const clockTickBox = $<HTMLInputElement>("clock-tick");
 const sfOpeningBox = $<HTMLSelectElement>("sf-opening");
 const myOpeningBox = $<HTMLSelectElement>("my-opening");
 const startButton = $<HTMLButtonElement>("start");
@@ -196,6 +203,10 @@ let orientation: Color = "white";
 let thinking = false; // Stockfish is choosing its move
 let result = ""; // how the last match ended, e.g. "You resigned - Stockfish wins"
 let menuOpen = true;
+let clock: Clock | null = null; // the chess clock, in a match with a time control
+let clockTimes: number[] = []; // each move's time left afterwards (for the PGN)
+let clockHistory: Times[] = []; // the clocks after each move (for Undo)
+let lastTickSecond = -1;
 let canReview = false; // a finished Play game can be reviewed in Practice mode
 let reviewing = false; // reviewing a Play game in Practice mode
 let reviewTitle = ""; // for a game opened from PGN, e.g. "Reviewing: Carlsen - Nakamura (1-0)"
@@ -363,6 +374,10 @@ interface Settings {
   soundOn?: boolean;
   soundVolume?: number;
   playerName?: string;
+  timeControl?: string;
+  tcMinutes?: number;
+  tcIncrement?: number;
+  clockTick?: boolean;
 }
 
 function loadSettings(): Settings {
@@ -388,6 +403,10 @@ function saveSettings() {
     soundOn: soundOn.checked,
     soundVolume: Number(soundVolume.value),
     playerName: playerNameBox.value.trim(),
+    timeControl: timeControlBox.value,
+    tcMinutes: Number(tcMinutes.value),
+    tcIncrement: Number(tcIncrement.value),
+    clockTick: clockTickBox.checked,
   };
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -405,6 +424,7 @@ const menuMode = (): Mode =>
 
 function buildMenu() {
   for (const level of LEVELS) levelBox.add(new Option(level.name));
+  for (const [value, label] of PRESETS) timeControlBox.add(new Option(label, value));
   const openingNames = REPERTOIRE.map(menuName);
   for (const name of [STOCKFISH_DECIDES, SUGGESTED, ...openingNames]) sfOpeningBox.add(new Option(name));
   for (const name of [NO_OPENING, SUGGESTED, ...openingNames]) myOpeningBox.add(new Option(name));
@@ -429,6 +449,11 @@ function buildMenu() {
   if (saved.soundOn !== undefined) soundOn.checked = saved.soundOn;
   if (saved.soundVolume !== undefined) soundVolume.value = String(saved.soundVolume);
   if (saved.playerName) playerNameBox.value = saved.playerName;
+  if (saved.timeControl) timeControlBox.value = saved.timeControl;
+  if (timeControlBox.selectedIndex < 0) timeControlBox.selectedIndex = 0;
+  if (saved.tcMinutes) tcMinutes.value = String(saved.tcMinutes);
+  if (saved.tcIncrement !== undefined) tcIncrement.value = String(saved.tcIncrement);
+  if (saved.clockTick !== undefined) clockTickBox.checked = saved.clockTick;
   applySound();
   if (themeBox.selectedIndex < 0) themeBox.selectedIndex = 0;
   applyTheme();
@@ -465,11 +490,17 @@ function updateMenu() {
     [colourBox, againstStockfish],
     [sfOpeningBox, againstStockfish],
     [myOpeningBox, practice && againstStockfish],
+    [timeControlBox, againstStockfish],
   ];
   for (const [box, on] of usable) {
     box.disabled = !on;
     box.previousElementSibling?.classList.toggle("disabled", !on);
   }
+  const custom = againstStockfish && timeControlBox.value === "custom";
+  $("tc-custom").hidden = $("tc-custom-label").hidden = !custom;
+  const clockOn = againstStockfish && timeControlBox.value !== "none";
+  clockTickBox.disabled = !clockOn;
+  clockTickBox.parentElement!.classList.toggle("disabled", !clockOn);
   startButton.textContent = practice ? "Start practice" : "Start game";
 }
 
@@ -509,6 +540,9 @@ function onStartGame() {
 /** A fresh game from a position, with nothing else going on. */
 function resetBoard(newGame: Game, headers: Headers = { White: "?", Black: "?", Date: today() }) {
   gameHeaders = { ...headers };
+  clock = null;
+  clockTimes = [];
+  clockHistory = [];
   match = null;
   analysis = null;
   viewPly = null;
@@ -544,7 +578,22 @@ function startMatch() {
   const you = playerName();
   gameHeaders = { White: user === "white" ? you : stockfish, Black: user === "white" ? stockfish : you, Date: today() };
   orientation = user; // your pieces at the bottom
+  const control = menuTimeControl();
+  if (control) {
+    clock = new Clock(control);
+    clock.start("white");
+    clockHistory = [clock.snapshot()];
+    gameHeaders.TimeControl = timeControlTag(control);
+  }
   void engine.newGame();
+}
+
+/** The time control chosen in the menu (undefined = no clock). */
+function menuTimeControl(): TimeControl | undefined {
+  if (timeControlBox.value !== "custom") return parseTimeControl(timeControlBox.value);
+  const minutes = Math.min(180, Math.max(0.25, Number(tcMinutes.value) || 10));
+  const increment = Math.min(60, Math.max(0, Math.round(Number(tcIncrement.value) || 0)));
+  return { base: Math.round(minutes * 60), increment };
 }
 
 /** Turn a choice from an opening box into an opening for this colour (or null). */
@@ -571,6 +620,11 @@ function coachMyOpening(move: NormalMove) {
 
 /** Called after every move of the game, yours or Stockfish's. */
 function afterMove() {
+  if (match && clock?.running()) {
+    clockTimes[game.length - 1] = clock.moved();
+    clockHistory[game.length] = clock.snapshot();
+    if (game.outcome()) clock.stop();
+  }
   const last = game.moves[game.length - 1];
   if (last) void play(soundForMove(last.san));
   if (!match && game.outcome()) setTimeout(() => void play("gameover"), 350);
@@ -620,18 +674,37 @@ async function maybeOpponentMove() {
         }
       }
     }
+    const gameClock = clock;
+    const target = gameClock
+      ? thinkTime({
+          left: gameClock.timeLeft(position.turn),
+          increment: gameClock.control.increment,
+          fullmoves: position.fullmoves,
+          legalMoves: legalMoveCount(position),
+          inCheck: position.isCheck(),
+          book: move !== undefined,
+        })
+      : 0;
     if (move === undefined) {
       const uci = await engine.bestMove(fenOf(position), {
         skill: level.skill,
         depth: level.depth,
-        movetime: level.seconds * 1000,
+        // with a clock it mustn't think longer than a person would
+        movetime: gameClock ? Math.min(level.seconds * 1000, Math.max(50, target * 0.7)) : level.seconds * 1000,
       });
       const parsed = parseUci(uci);
       if (!parsed || !("from" in parsed)) throw new Error(`unexpected answer "${uci}"`);
       move = parsed;
     }
-    const wait = OPPONENT_MIN_DELAY * 1000 - (performance.now() - started);
-    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    if (gameClock) {
+      // Its clock runs while it "thinks" (and stops while yours is paused)
+      while (match?.id === id && clock === gameClock && gameClock.running() === position.turn && gameClock.usedThisMove() < target) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    } else {
+      const wait = OPPONENT_MIN_DELAY * 1000 - (performance.now() - started);
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    }
     // Ignore a move meant for a match that has since been stopped or changed (Undo)
     if (match?.id !== id || fenOf(game.position) !== fenOf(position)) {
       thinking = false;
@@ -664,8 +737,25 @@ function finishMatch() {
   endMatch(text);
 }
 
+/** Out of time: a loss - or a draw if the other side can't possibly checkmate. */
+function onFlag(colour: Color) {
+  if (!match || !clock) return;
+  clock.stop();
+  const other = opposite(colour);
+  const draw = game.position.hasInsufficientMaterial(other);
+  const you = colour === match.user;
+  gameHeaders.Result = draw ? "1/2-1/2" : other === "white" ? "1-0" : "0-1";
+  gameHeaders.Termination = "Time forfeit";
+  result = draw ? "Out of time - a draw" : you ? "You ran out of time - Stockfish wins" : "Stockfish ran out of time - you win";
+  const text = draw
+    ? `${you ? "You" : "Stockfish"} ran out of time, but ${you ? "Stockfish" : "you"} can't checkmate with the pieces left, so it's a draw.`
+    : you ? "You ran out of time - Stockfish wins." : "Stockfish ran out of time - you win!";
+  endMatch(text);
+}
+
 /** The match is over: Play games can then be reviewed in Practice mode. */
 function endMatch(text: string) {
+  clock?.stop();
   void play("gameover");
   match = null;
   thinking = false;
@@ -787,6 +877,11 @@ function onUndo() {
   // In a match, take back Stockfish's reply too, so it's your turn again.
   if (match && game.position.turn !== match.user && game.length) game.undo();
   for (const ply of [...plyNotes.keys()]) if (ply > game.length) plyNotes.delete(ply);
+  if (match && clock && clockHistory[game.length]) {
+    clockHistory.length = game.length + 1;
+    clockTimes.length = game.length;
+    clock.restore(clockHistory[game.length], game.position.turn);
+  }
   viewPly = null;
   refresh();
   if (match) void maybeOpponentMove();
@@ -1102,6 +1197,8 @@ function refresh() {
   applyMode();
   drawBoard(reviews, info);
   drawPlayerBars();
+  clock?.setPaused(clockShouldPause());
+  drawClocks();
   drawEvalBar();
   drawMoveList(reviews, info);
   drawReview(reviews, info);
@@ -1363,6 +1460,58 @@ function drawPlayerBars() {
     }
     const lead = material[colour] - material[taken];
     bar.querySelector<HTMLElement>(".pb-diff")!.textContent = lead > 0 ? `+${lead}` : "";
+  }
+}
+
+function legalMoveCount(position: Chess): number {
+  let count = 0;
+  for (const targets of position.allDests().values()) count += targets.size();
+  return count;
+}
+
+/** Practice mode stops the clock while you use the coach, look back or
+ *  analyse; both modes stop it while the menu is open. */
+function clockShouldPause(): boolean {
+  if (menuOpen) return true;
+  if (mode !== "practice") return false;
+  return busy || viewPly !== null || analysis !== null || preview !== null || quiz !== null ||
+    document.querySelector("dialog[open]") !== null;
+}
+
+function drawClocks() {
+  const bars: [string, Color][] = [["bar-top", opposite(orientation)], ["bar-bottom", orientation]];
+  for (const [id, colour] of bars) {
+    const box = $(id).querySelector<HTMLElement>(".pb-clock")!;
+    box.hidden = !clock;
+    if (!clock) continue;
+    const left = clock.timeLeft(colour);
+    const running = clock.running() === colour;
+    box.textContent = formatClock(left);
+    box.classList.toggle("running", running);
+    box.classList.toggle("low", left < 20_000);
+    box.classList.toggle("paused", running && clock.isPaused());
+    box.title = running && clock.isPaused() ? "Clock paused" : "";
+  }
+}
+
+function clockTick() {
+  if (!clock?.running()) return;
+  clock.setPaused(clockShouldPause());
+  const flagged = match ? clock.flagged() : null;
+  if (flagged) {
+    drawClocks();
+    onFlag(flagged);
+    return;
+  }
+  drawClocks();
+  // A soft tick each second when you're nearly out of time
+  if (match && clock.running() === match.user && !clock.isPaused() && clockTickBox.checked) {
+    const left = clock.timeLeft(match.user);
+    const second = Math.ceil(left / 1000);
+    if (left < 10_000 && second !== lastTickSecond) {
+      lastTickSecond = second;
+      void play("tick");
+    }
   }
 }
 
@@ -1882,7 +2031,7 @@ function downloadPgn() {
   }
   const name = `${headers.White ?? "White"}-vs-${headers.Black ?? "Black"}-${(headers.Date ?? today()).replace(/\./g, "-")}`
     .replace(/[^A-Za-z0-9-]+/g, "_");
-  saveFile(`${name}.pgn`, writePgn(game, headers));
+  saveFile(`${name}.pgn`, writePgn(game, headers, clockTimes));
 }
 
 // ---------------------------------------------------------------------------
@@ -1960,6 +2109,7 @@ function wireButtons() {
     refresh();
   });
   fenRow.addEventListener("submit", (event) => void onLoadFen(event));
+  window.setInterval(clockTick, 100);
   for (const control of [soundOn, soundVolume]) {
     control.addEventListener("input", () => {
       applySound();
@@ -2029,6 +2179,7 @@ function wireButtons() {
 if (import.meta.env.DEV) {
   (window as unknown as { trainer: unknown }).trainer = {
     analyser, game: () => game, gameScores, answerQuiz, startTask, quiz: () => quiz, parseUci, normalizeMove, base,
+    boardMove: onBoardMove, clock: () => clock, clockTimes: () => clockTimes, onUndo,
   };
 }
 

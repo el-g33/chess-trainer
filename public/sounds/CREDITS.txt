@@ -12,3 +12,4 @@ Converted from OGG to short mono WAV files (trimmed) for the Chess Trainer.
   gameover.wav  Impact Sounds: impactBell_heavy_004
   right.wav     Interface Sounds: confirmation_001
   wrong.wav     Interface Sounds: error_004
+  tick.wav      Interface Sounds: tick_001

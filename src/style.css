@@ -181,6 +181,25 @@ select:focus-visible,
   width: 100%;
 }
 
+.tc-custom input {
+  width: 4.5em;
+  box-sizing: border-box;
+  font: inherit;
+  min-height: 32px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+
+.options .tick-check {
+  grid-column: 1 / -1;
+  font-size: 0.9rem;
+}
+
+.options .check.disabled {
+  color: #a0a0a0;
+}
+
 .options input[type="text"] {
   box-sizing: border-box;
   font: inherit;
@@ -298,6 +317,10 @@ body.practice .player-bar {
   background: #fff;
   color: var(--text);
   box-shadow: 0 0 0 2px var(--accent) inset;
+}
+
+.pb-clock.paused {
+  opacity: 0.6;
 }
 
 .pb-clock.low {

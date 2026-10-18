@@ -6,6 +6,7 @@ import { parsePgn, startingPosition } from "chessops/pgn";
 import { parseSan } from "chessops/san";
 import type { NormalMove } from "chessops/types";
 
+import { pgnClock } from "./clock";
 import { Game } from "./game";
 
 export type Headers = Record<string, string>;
@@ -51,7 +52,7 @@ export function readPgn(text: string): PgnGame[] {
 const cleanDate = (date?: string) => (date && !date.includes("?") ? date : "");
 
 /** A game as PGN text. */
-export function writePgn(game: Game, headers: Headers): string {
+export function writePgn(game: Game, headers: Headers, clocks: number[] = []): string {
   const start = game.positionAt(0);
   const all: Headers = {
     Event: headers.Event ?? "Chess Trainer game",
@@ -77,6 +78,8 @@ export function writePgn(game: Game, headers: Headers): string {
     if (position.turn === "white") words.push(`${position.fullmoves}.`);
     else if (index === 0) words.push(`${position.fullmoves}...`);
     words.push(played.san);
+    // the time left after the move, as lichess and chess.com write it
+    if (clocks[index] !== undefined) words.push(`{[%clk ${pgnClock(clocks[index])}]}`);
   });
   words.push(all.Result);
 

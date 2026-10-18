@@ -49,6 +49,14 @@
           </select>
           <label for="level">Stockfish's level:</label>
           <select id="level"></select>
+          <label for="time-control">Time control:</label>
+          <select id="time-control"></select>
+          <label for="tc-minutes" id="tc-custom-label" hidden>Custom:</label>
+          <span id="tc-custom" class="tc-custom" hidden>
+            <input type="number" id="tc-minutes" min="0.25" max="180" step="any" value="10" aria-label="Minutes each" /> min +
+            <input type="number" id="tc-increment" min="0" max="60" step="1" value="5" aria-label="Seconds added per move" /> sec per move
+          </span>
+          <label class="check tick-check"><input type="checkbox" id="clock-tick" checked /> Tick in your last 10 seconds</label>
           <label for="colour">You play:</label>
           <select id="colour">
             <option>White</option>
