@@ -144,6 +144,9 @@
             <select id="pgn-pick"></select>
           </div>
           <p id="pgn-status" class="pgn-status"></p>
+          <label class="setup-label" for="fen">Or a position (FEN)</label>
+          <input id="fen" class="fen-input" type="text" autocomplete="off" spellcheck="false" placeholder="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" />
+          <p id="fen-status" class="pgn-status"></p>
           <p class="setup-note"><button type="button" class="link-button" id="empty-board">Or explore on an empty board</button></p>
         </section>
       </form>
@@ -159,6 +162,7 @@
           <button type="button" data-view="stats" aria-label="Statistics" title="Statistics"><span data-ico="chart"></span></button>
           <button type="button" data-view="history" aria-label="Game history" title="Game history"><span data-ico="history"></span></button>
         </nav>
+        <button type="button" id="save-button" class="icon-button" aria-label="Save the game (PGN)" title="Save the game (PGN)" hidden><span data-ico="download"></span></button>
         <button type="button" class="icon-button help-button" aria-label="Help" title="Help"><span data-ico="quiz"></span></button>
         <button type="button" class="icon-button gear-button" aria-label="Settings" title="Settings"><span data-ico="gear"></span></button>
       </header>
@@ -350,31 +354,37 @@
             <option value="chances">My opening - take chances</option>
           </select>
         </div>
-        <div class="settings-buttons">
-          <button type="button" id="download-pgn"><span data-ico="download" data-ico-size="16"></span> Download PGNs</button>
-        </div>
-        <div id="fen-row" class="fen-row">
-          <label for="fen">Position (FEN)</label>
-          <input id="fen" type="text" autocomplete="off" spellcheck="false" placeholder="Paste a position" />
-          <button type="button" id="load-fen">Load</button>
-        </div>
       </form>
     </dialog>
 
     <!-- Help: About, and a tour of the screen you're on -->
     <div id="help-menu" class="help-menu" role="menu" hidden></div>
 
-    <!-- Download PGNs: choose from your games -->
-    <dialog id="pgn-download-dialog" class="settings-dialog">
+    <!-- Save a game: copy the PGN text, or download a .pgn file -->
+    <dialog id="save-dialog" class="settings-dialog">
       <form method="dialog">
         <div class="settings-head">
-          <h3>Download PGNs</h3>
+          <h3 id="save-title">Save this game</h3>
           <button value="close" class="round soft" aria-label="Close"><span data-ico="close"></span></button>
         </div>
-        <p class="setup-note">Tap a game to save it as a .pgn file, or save them all in one file.</p>
-        <div id="pgn-download-list" class="history-list pgn-download-list"></div>
-        <div class="settings-buttons">
-          <button type="button" id="pgn-download-all" class="accent"><span data-ico="download" data-ico-size="16"></span> Download all</button>
+        <p id="save-note" class="setup-note"></p>
+        <div class="save-choices">
+          <button type="button" id="save-copy"><span data-ico="copy" data-ico-size="20"></span><span>Copy the PGN text</span></button>
+          <button type="button" id="save-file" class="accent"><span data-ico="download" data-ico-size="20"></span><span>Download a .pgn file</span></button>
+        </div>
+        <p id="save-status" class="stats-note" aria-live="polite"></p>
+      </form>
+    </dialog>
+
+    <!-- Game analysis with both a game and a position filled in: which one? -->
+    <dialog id="load-choice" class="settings-dialog">
+      <form method="dialog">
+        <h3>What shall we load?</h3>
+        <p class="setup-note">You've filled in both a game and a position.</p>
+        <div class="save-choices">
+          <button value="pgn" class="accent">The game (PGN)</button>
+          <button value="fen">The position (FEN)</button>
+          <button value="cancel">Cancel</button>
         </div>
       </form>
     </dialog>

@@ -1303,3 +1303,53 @@ select.dd-native {
 .game-top .help-button {
   margin-left: 0;
 }
+
+/* Analysis screen: the position box */
+.fen-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font: 0.85rem/1.4 Consolas, "Courier New", monospace;
+  color: inherit;
+  background: var(--input);
+}
+
+#fen-status {
+  margin: -6px 0 0;
+}
+
+/* Save: copy or download */
+.save-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.save-choices button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-weight: 600;
+}
+
+.save-text {
+  display: block;
+  width: 100%;
+  height: 120px;
+  margin-top: 6px;
+  font: 0.8rem/1.4 Consolas, monospace;
+  color: inherit;
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+#save-button[hidden] {
+  display: none;
+}

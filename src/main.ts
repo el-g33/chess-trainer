@@ -145,9 +145,7 @@ const lineForward = $<HTMLButtonElement>("line-forward");
 const lineExit = $<HTMLButtonElement>("line-exit");
 const undoButton = $<HTMLButtonElement>("undo");
 const newButton = $<HTMLButtonElement>("new-game");
-const fenRow = $("fen-row");
 const fenInput = $<HTMLInputElement>("fen");
-const loadButton = $<HTMLButtonElement>("load-fen");
 const themeBox = $<HTMLSelectElement>("board-theme");
 const soundOn = $<HTMLInputElement>("sound-on");
 const soundVolume = $<HTMLInputElement>("sound-volume");
@@ -699,7 +697,7 @@ function drawHome() {
   menu.querySelector<HTMLButtonElement>('[data-start="practice"]')!.disabled = !practiceReady;
 
   // Analysis
-  menu.querySelector<HTMLButtonElement>('[data-start="analysis"]')!.disabled = !pgnGames.length;
+  menu.querySelector<HTMLButtonElement>('[data-start="analysis"]')!.disabled = !pgnGames.length && !fenPosition;
 }
 
 function setupHome() {
@@ -750,7 +748,7 @@ function setupHome() {
   }
   menu.querySelector('[data-start="play"]')!.addEventListener("click", () => startFromHome("play"));
   menu.querySelector('[data-start="practice"]')!.addEventListener("click", () => startFromHome("practice"));
-  menu.querySelector('[data-start="analysis"]')!.addEventListener("click", (event) => void reviewPgnGame(event));
+  menu.querySelector('[data-start="analysis"]')!.addEventListener("click", (event) => void startAnalysis(event));
   $("empty-board").addEventListener("click", () => {
     mode = "practice";
     resetBoard(new Game());
@@ -1185,23 +1183,68 @@ function onUndo() {
   if (match) void maybeOpponentMove();
 }
 
-async function onLoadFen(event: Event) {
-  event.preventDefault();
-  const fen = fenInput.value.trim();
-  if (!fen) return;
-  let loaded: Game;
-  try {
-    const position = Chess.fromSetup(parseFen(fen).unwrap()).unwrap();
-    loaded = new Game(fenOf(position));
-  } catch {
-    await message("Chess Trainer", "That doesn't look like a valid FEN position.");
-    return;
+let fenPosition: Chess | null = null; // the position typed on the analysis screen, if it's valid
+
+/** Check the position box on the analysis screen. */
+function readFen() {
+  const text = fenInput.value.trim();
+  fenPosition = null;
+  if (text) {
+    try {
+      fenPosition = Chess.fromSetup(parseFen(text).unwrap()).unwrap();
+    } catch {
+      fenPosition = null;
+    }
   }
-  fenInput.value = "";
-  resetBoard(loaded);
+  const status = $("fen-status");
+  status.classList.toggle("problem", !!text && !fenPosition);
+  status.textContent = !text ? "" : fenPosition ? `A position with ${colourName(fenPosition.turn)} to move.` : "That doesn't look like a valid FEN position.";
+}
+
+/** Explore the position from the analysis screen. */
+function loadFenPosition() {
+  if (!fenPosition) return;
+  mode = "practice";
+  resetBoard(new Game(fenOf(fenPosition)));
+  gameOrigin = "analysis";
+  orientation = fenPosition.turn;
   canReview = false;
   reviewing = false;
+  if (menuOpen) hideMenu();
   refresh();
+}
+
+/** Start on the analysis screen: the game, the position, or ask which. */
+async function startAnalysis(event: Event) {
+  event.preventDefault();
+  const both = pgnGames.length > 0 && fenPosition !== null;
+  let choice: string = pgnGames.length ? "pgn" : "fen";
+  if (both) {
+    // (resolved from the buttons: some browsers don't send the dialog's close event)
+    const ask = $<HTMLDialogElement>("load-choice");
+    ask.showModal();
+    choice = await new Promise<string>((resolve) => {
+      const buttons = [...ask.querySelectorAll<HTMLButtonElement>("button[value]")];
+      const done = (value: string) => {
+        for (const button of buttons) button.onclick = null;
+        ask.oncancel = null;
+        ask.close();
+        resolve(value);
+      };
+      for (const button of buttons) {
+        button.onclick = (event) => {
+          event.preventDefault();
+          done(button.value);
+        };
+      }
+      ask.oncancel = (event) => {
+        event.preventDefault();
+        done("cancel");
+      };
+    });
+  }
+  if (choice === "pgn") void reviewPgnGame(event);
+  else if (choice === "fen") loadFenPosition();
 }
 
 // ---------------------------------------------------------------------------
@@ -1783,7 +1826,7 @@ function applyMode() {
   const practice = mode === "practice";
   document.body.classList.toggle("practice", practice);
   modeTitle.textContent = practice ? "Practice" : "Play";
-  for (const element of [coachPanel, reviewArea, fenRow]) element.hidden = !practice || demo !== null;
+  for (const element of [coachPanel, reviewArea]) element.hidden = !practice || demo !== null;
   undoButton.hidden = !practice || demo !== null || !match;
   demoPanel.hidden = demo === null;
   if (demo) modeTitle.textContent = "Opening demo";
@@ -2719,6 +2762,7 @@ function drawMoveStrip(list: (Review | undefined)[]) {
 }
 
 function applyView() {
+  $("save-button").hidden = currentView === "history" ? !loadHistory().length : !game.length || menuOpen;
   for (const tab of document.querySelectorAll<HTMLButtonElement>(".view-tabs button")) {
     tab.classList.toggle("on", tab.dataset.view === currentView);
   }
@@ -3148,7 +3192,6 @@ function drawButtons() {
   // No take-backs while looking back or previewing: Undo only works on the live game.
   undoButton.disabled = waiting || looking || quizOpen || !game.length;
   newButton.disabled = busy;
-  loadButton.disabled = busy;
 
   resignButton.hidden = !(match && !analysis);
   resignButton.disabled = busy;
@@ -3337,60 +3380,20 @@ async function reviewPgnGame(event: Event) {
   if (problem) await message("PGN", problem);
 }
 
-/** Download PGNs: choose from the game on screen and your saved games. */
-function downloadPgn() {
-  settingsDialog.close();
-  const list = $("pgn-download-list");
-  list.replaceChildren();
-  const add = (title: string, meta: string, save: () => void) => {
-    const item = document.createElement("button");
-    item.type = "button";
-    item.className = "history-game";
-    const text = document.createElement("span");
-    text.className = "history-text";
-    const t = document.createElement("span");
-    t.className = "history-title";
-    t.textContent = title;
-    const m = document.createElement("span");
-    m.className = "history-meta";
-    m.textContent = meta;
-    text.append(t, m);
-    const glyph = document.createElement("span");
-    glyph.innerHTML = icon("download", 20);
-    item.append(text, glyph);
-    item.addEventListener("click", save);
-    list.append(item);
-  };
-  if (game.length && !currentGameId) add("The game on screen", `${game.length} moves`, downloadCurrentPgn);
-  for (const saved of loadHistory()) {
-    const result = saved.result === "win" ? "Won" : saved.result === "loss" ? "Lost" : "Drawn";
-    add(`vs Stockfish · ${shortName(LEVELS[saved.level] ?? LEVELS[0])} · ${result}`,
-      [saved.opening || "Game", saved.user === "white" ? "White" : "Black", shortDate(saved.date)].join(" · "),
-      () => saveFile(`chess-trainer-${saved.date.slice(0, 10)}-${saved.id}.pgn`, saved.pgn));
+/** What the download button saves: the game on screen, or (on the History
+ *  tab) all your games. */
+function saveTarget(): { title: string; note: string; name: string; text: string } | null {
+  if (currentView === "history") {
+    const games = loadHistory();
+    if (!games.length) return null;
+    return {
+      title: "Save all your games",
+      note: `${games.length} game${games.length === 1 ? "" : "s"} against Stockfish, in one PGN.`,
+      name: `chess-trainer-games-${today().replace(/\./g, "-")}.pgn`,
+      text: games.map((g) => g.pgn.trim()).join("\n\n") + "\n",
+    };
   }
-  if (!list.children.length) {
-    const empty = document.createElement("p");
-    empty.className = "stats-note";
-    empty.textContent = "No games yet: play against Stockfish and they'll be listed here.";
-    list.append(empty);
-  }
-  $<HTMLButtonElement>("pgn-download-all").disabled = !loadHistory().length;
-  $<HTMLDialogElement>("pgn-download-dialog").showModal();
-}
-
-/** Every saved game, in one .pgn file. */
-function downloadAllPgns() {
-  const games = loadHistory();
-  if (!games.length) return;
-  saveFile(`chess-trainer-games-${today().replace(/\./g, "-")}.pgn`, games.map((g) => g.pgn.trim()).join("\n\n") + "\n");
-}
-
-/** The game on screen as a .pgn file. */
-function downloadCurrentPgn() {
-  if (!game.length) {
-    void message("Download PGN", "There are no moves to save yet.");
-    return;
-  }
+  if (!game.length) return null;
   const outcome = game.outcome();
   const headers = { ...gameHeaders };
   if (!headers.Result || headers.Result === "*") {
@@ -3398,7 +3401,46 @@ function downloadCurrentPgn() {
   }
   const name = `${headers.White ?? "White"}-vs-${headers.Black ?? "Black"}-${(headers.Date ?? today()).replace(/\./g, "-")}`
     .replace(/[^A-Za-z0-9-]+/g, "_");
-  saveFile(`${name}.pgn`, writePgn(game, headers, clockTimes));
+  return { title: "Save this game", note: `${game.length} moves, as PGN.`, name: `${name}.pgn`, text: writePgn(game, headers, clockTimes) };
+}
+
+function openSave() {
+  const target = saveTarget();
+  if (!target) return;
+  $("save-title").textContent = target.title;
+  $("save-note").textContent = target.note;
+  $("save-status").textContent = "";
+  $<HTMLDialogElement>("save-dialog").showModal();
+}
+
+async function saveCopy() {
+  const target = saveTarget();
+  if (!target) return;
+  try {
+    await navigator.clipboard.writeText(target.text);
+    $("save-status").textContent = "Copied. Paste it wherever you like (lichess, chess.com, a message...).";
+  } catch {
+    // No clipboard access (older browsers, or not allowed): select it for copying by hand
+    const box = document.createElement("textarea");
+    box.value = target.text;
+    box.className = "save-text";
+    box.readOnly = true;
+    $("save-status").replaceChildren("Select all and copy:", box);
+    box.select();
+    // the older way of copying still works on plain-http pages
+    try {
+      if (document.execCommand("copy")) $("save-status").replaceChildren("Copied. Paste it wherever you like (lichess, chess.com, a message...).");
+    } catch {
+      // leave the text selected for copying by hand
+    }
+  }
+}
+
+function saveDownload() {
+  const target = saveTarget();
+  if (!target) return;
+  saveFile(target.name, target.text);
+  $<HTMLDialogElement>("save-dialog").close();
 }
 
 // ---------------------------------------------------------------------------
@@ -3489,10 +3531,13 @@ function wireButtons() {
     saveSettings();
     refresh();
   });
-  $("load-fen").addEventListener("click", (event) => {
-    settingsDialog.close();
-    void onLoadFen(event);
+  fenInput.addEventListener("input", () => {
+    readFen();
+    drawHome();
   });
+  $("save-button").addEventListener("click", openSave);
+  $("save-copy").addEventListener("click", () => void saveCopy());
+  $("save-file").addEventListener("click", saveDownload);
   window.setInterval(clockTick, 100);
   for (const control of [soundOn, soundVolume]) {
     control.addEventListener("input", () => {
@@ -3521,7 +3566,7 @@ function wireButtons() {
     const menuBox = $("help-menu");
     if (!menuBox.hidden && !menuBox.contains(event.target as Node) && !(event.target as Element).closest?.(".help-button")) menuBox.hidden = true;
   });
-  $("pgn-download-all").addEventListener("click", downloadAllPgns);
+
   showDemoButton.addEventListener("click", () => void onShowDemo());
   demoPlay.addEventListener("click", onDemoPlay);
   $("demo-back").addEventListener("click", () => goTo(currentPly() - 1));
@@ -3548,7 +3593,7 @@ function wireButtons() {
   });
   drawIcons();
   $("demo-exit").addEventListener("click", onDemoExit);
-  $("download-pgn").addEventListener("click", downloadPgn);
+
   pgnText.addEventListener("input", readPgnText);
   $<HTMLInputElement>("pgn-file").addEventListener("change", async (event) => {
     const file = (event.target as HTMLInputElement).files?.[0];
