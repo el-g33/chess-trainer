@@ -49,6 +49,8 @@ export async function loadPieces(): Promise<void> {
         const side = colour === "w" ? "white" : "black";
         if (role === "king") kings[side] = svg;
         rules.push(`.cg-wrap piece.${role}.${side} { background-image: url("${dataUrl(svg)}"); }`);
+        // the small captured pieces on the player bars
+        rules.push(`.mini-piece.${role}.${side} { background-image: url("${dataUrl(svg)}"); }`);
       }),
     ),
   );

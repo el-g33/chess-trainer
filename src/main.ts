@@ -11,7 +11,7 @@ import { Chess, normalizeMove } from "chessops/chess";
 import { chessgroundDests } from "chessops/compat";
 import { parseFen } from "chessops/fen";
 import { makeSan } from "chessops/san";
-import type { Color, NormalMove } from "chessops/types";
+import type { Color, NormalMove, Role } from "chessops/types";
 import { makeSquare, makeUci, opposite, parseSquare, parseUci } from "chessops/util";
 
 import "@fontsource/permanent-marker/latin-400.css";
@@ -132,6 +132,7 @@ const loadButton = $<HTMLButtonElement>("load-fen");
 const themeBox = $<HTMLSelectElement>("board-theme");
 const soundOn = $<HTMLInputElement>("sound-on");
 const soundVolume = $<HTMLInputElement>("sound-volume");
+const playerNameBox = $<HTMLInputElement>("player-name");
 const planModeBox = $<HTMLSelectElement>("plan-mode");
 const planModeRow = $("plan-mode-row");
 // « ‹ › » - above the move list, and (on phones) right under the board
@@ -361,6 +362,7 @@ interface Settings {
   planMode?: string;
   soundOn?: boolean;
   soundVolume?: number;
+  playerName?: string;
 }
 
 function loadSettings(): Settings {
@@ -385,6 +387,7 @@ function saveSettings() {
     planMode: planModeBox.value,
     soundOn: soundOn.checked,
     soundVolume: Number(soundVolume.value),
+    playerName: playerNameBox.value.trim(),
   };
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -425,6 +428,7 @@ function buildMenu() {
   if (planModeBox.selectedIndex < 0) planModeBox.selectedIndex = 0;
   if (saved.soundOn !== undefined) soundOn.checked = saved.soundOn;
   if (saved.soundVolume !== undefined) soundVolume.value = String(saved.soundVolume);
+  if (saved.playerName) playerNameBox.value = saved.playerName;
   applySound();
   if (themeBox.selectedIndex < 0) themeBox.selectedIndex = 0;
   applyTheme();
@@ -537,7 +541,8 @@ function startMatch() {
     myActive: mode === "practice" && myOpening !== null,
   };
   const stockfish = `Stockfish (${shortName(LEVELS[level])})`;
-  gameHeaders = { White: user === "white" ? "You" : stockfish, Black: user === "white" ? stockfish : "You", Date: today() };
+  const you = playerName();
+  gameHeaders = { White: user === "white" ? you : stockfish, Black: user === "white" ? stockfish : you, Date: today() };
   orientation = user; // your pieces at the bottom
   void engine.newGame();
 }
@@ -1096,6 +1101,7 @@ function refresh() {
   const info = openingInfo();
   applyMode();
   drawBoard(reviews, info);
+  drawPlayerBars();
   drawEvalBar();
   drawMoveList(reviews, info);
   drawReview(reviews, info);
@@ -1305,6 +1311,59 @@ function drawEvalBar() {
   const tag = evalBar.querySelector<HTMLElement>(".eval-label")!;
   tag.textContent = label;
   tag.classList.toggle("on-white", fraction >= 0.5);
+}
+
+// ---------------------------------------------------------------------------
+// The player bars: name, captured pieces and material lead
+// ---------------------------------------------------------------------------
+
+const VALUES: Record<Role, number> = { pawn: 1, knight: 3, bishop: 3, rook: 5, queen: 9, king: 0 };
+const START_COUNT: Record<Role, number> = { pawn: 8, knight: 2, bishop: 2, rook: 2, queen: 1, king: 1 };
+const CAPTURE_ORDER: Role[] = ["pawn", "knight", "bishop", "rook", "queen"];
+
+/** Your name from the start menu ("You" if none is set). */
+function playerName(): string {
+  return playerNameBox.value.trim() || "You";
+}
+
+/** The name on a colour's bar: from the game's headers, with the rating if known. */
+function barName(colour: Color): string {
+  const key = colour === "white" ? "White" : "Black";
+  const name = gameHeaders[key];
+  if (!name || name === "?") return colour === "white" ? "White" : "Black";
+  const elo = gameHeaders[`${key}Elo`];
+  return elo && elo !== "?" && elo !== "-" ? `${name} (${elo})` : name;
+}
+
+function drawPlayerBars() {
+  const board = shown().board;
+  const material = { white: 0, black: 0 };
+  for (const colour of ["white", "black"] as const) {
+    for (const role of CAPTURE_ORDER) material[colour] += VALUES[role] * board.pieces(colour, role).size();
+  }
+  const bars: [HTMLElement, Color][] = [
+    [$("bar-top"), opposite(orientation)],
+    [$("bar-bottom"), orientation],
+  ];
+  for (const [bar, colour] of bars) {
+    const name = bar.querySelector<HTMLElement>(".pb-name")!;
+    name.textContent = barName(colour);
+    name.title = `${name.textContent} - ${colour === "white" ? "White" : "Black"}`;
+    // The pieces this side has taken (the other side's missing pieces)
+    const taken = opposite(colour);
+    const captured = bar.querySelector<HTMLElement>(".pb-captured")!;
+    captured.replaceChildren();
+    for (const role of CAPTURE_ORDER) {
+      const missing = Math.max(0, START_COUNT[role] - board.pieces(taken, role).size());
+      for (let i = 0; i < missing; i++) {
+        const icon = document.createElement("span");
+        icon.className = `mini-piece ${role} ${taken}${i === 0 && captured.childElementCount ? " gap" : ""}`;
+        captured.append(icon);
+      }
+    }
+    const lead = material[colour] - material[taken];
+    bar.querySelector<HTMLElement>(".pb-diff")!.textContent = lead > 0 ? `+${lead}` : "";
+  }
 }
 
 function drawMoveList(reviews: (Review | undefined)[], info: OpeningInfo[]) {

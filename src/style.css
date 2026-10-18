@@ -176,8 +176,18 @@ select:focus-visible,
   margin: 20px 0 6px;
 }
 
-.options select {
+.options select,
+.options input[type="text"] {
   width: 100%;
+}
+
+.options input[type="text"] {
+  box-sizing: border-box;
+  font: inherit;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
 }
 
 .engine-status {
@@ -220,6 +230,82 @@ select:focus-visible,
 .board-row {
   display: flex;
   gap: 6px;
+}
+
+/* -- Player bars: name, captured pieces, material lead, clock -- */
+
+.player-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 4px;
+  font-size: 0.95rem;
+}
+
+body.practice .player-bar {
+  padding-left: 32px; /* line up with the board, past the eval bar */
+}
+
+.pb-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 45%;
+}
+
+.pb-captured {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.mini-piece {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin-right: -5px;
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+
+.mini-piece.gap {
+  margin-left: 6px;
+}
+
+.pb-diff {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.pb-clock {
+  margin-left: auto;
+  min-width: 78px;
+  padding: 3px 10px;
+  border-radius: 5px;
+  background: #e8e8e8;
+  color: #555;
+  font: 600 1.15rem/1.2 "Segoe UI", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.pb-clock.running {
+  background: #fff;
+  color: var(--text);
+  box-shadow: 0 0 0 2px var(--accent) inset;
+}
+
+.pb-clock.low {
+  color: #c62828;
+}
+
+.pb-clock.low.running {
+  background: #fdecea;
 }
 
 /* The step buttons under the board are for phones; desktops have them above the move list */

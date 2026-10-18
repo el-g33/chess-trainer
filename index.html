@@ -40,6 +40,8 @@
         </div>
 
         <div class="options">
+          <label for="player-name">Your name:</label>
+          <input type="text" id="player-name" maxlength="30" placeholder="You" autocomplete="nickname" />
           <label for="opponent">Opponent:</label>
           <select id="opponent">
             <option>Stockfish</option>
@@ -73,12 +75,21 @@
     <!-- The game screen -->
     <main id="game">
       <section class="board-area">
+        <!-- Your opponent's bar above the board, yours below (they swap when the board flips) -->
+        <div class="player-bar" id="bar-top">
+          <span class="pb-name"></span><span class="pb-captured"></span><span class="pb-diff"></span>
+          <span class="pb-clock" hidden></span>
+        </div>
         <div class="board-row">
           <div id="eval-bar" hidden aria-label="Evaluation">
             <div class="eval-white"></div>
             <span class="eval-label"></span>
           </div>
           <div id="board" class="wood"></div>
+        </div>
+        <div class="player-bar" id="bar-bottom">
+          <span class="pb-name"></span><span class="pb-captured"></span><span class="pb-diff"></span>
+          <span class="pb-clock" hidden></span>
         </div>
         <!-- On phones the step buttons sit right under the board -->
         <div class="nav board-nav" aria-label="Step through the game">
