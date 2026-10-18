@@ -662,6 +662,64 @@ body.practice .bottom-buttons button {
   display: none;
 }
 
+/* -- Game report: accuracy per phase, and how many moves of each rating -- */
+
+.game-report {
+  margin: 0 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  padding: 6px 10px 8px;
+  font-size: 0.88rem;
+}
+
+.game-report summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.game-report table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 6px;
+}
+
+.game-report th,
+.game-report td {
+  text-align: center;
+  padding: 2px 3px;
+}
+
+.game-report th {
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.game-report td:first-child,
+.game-report th:first-child {
+  text-align: left;
+  max-width: 7em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-report .acc {
+  font-weight: 700;
+}
+
+.game-report .counts {
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+
+.game-report .phases {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 /* Rating colours (the desktop app's move-list colours) */
 .r-brilliant { color: #159c82; }
 .r-great { color: #4f7aa3; }

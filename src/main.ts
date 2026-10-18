@@ -46,6 +46,8 @@ import { openingPlanAhead, reviewOpeningChoice, type OpeningPlan, type PlanMode 
 import { FALL_ANGLES, fallenKing, loadPieces } from "./pieces";
 import { play, setSound, soundForMove, unlockSounds } from "./sounds";
 import { brilliantCandidates, findBrilliant, missedBrilliant, type Brilliant } from "./brilliant";
+import { accuracyRating, divide, gameAccuracy, phaseAccuracy, winPercent, type Phase } from "./accuracy";
+import type { Score } from "./coach";
 import { readPgn, saveFile, today, writePgn, type Headers, type PgnGame } from "./pgn";
 import { addMisses, fenOf, formatScore, isDrawnPosition, reviewMove, type Review } from "./review";
 import { gradeGuess, planAhead, threatCheck, type CoachEngine, type Plan, type Threat } from "./strategy";
@@ -956,21 +958,56 @@ function openingInfo(): OpeningInfo[] {
   return openingCache.info;
 }
 
+// Ratings this harsh get a second, longer look by Stockfish before they're final
+const HARSH = new Set(["Mistake", "Blunder", "Miss", "Missed Win"]);
+let deepNeeded: Chess[] = []; // positions waiting for that second look
+
+// A drop in the mover's winning chance this big (lichess's measure) also gets the second look
+const BIG_DROP = 8;
+
 function rateMove(before: Chess, move: NormalMove): Review | undefined {
   const key = `${fenOf(before)} ${makeUci(move)}`;
   let review = reviewCache.get(key);
   if (!review) {
     review = reviewMove(before, move, analyser.evals);
-    if (review) reviewCache.set(key, review);
+    if (!review) return undefined;
+    const after = positionAfter(before, move);
+    const checked = analyser.isDeep(before) && analyser.isDeep(after);
+    const suspicious = HARSH.has(review.rating) || bigDrop(before, after);
+    if (!suspicious || checked) reviewCache.set(key, review);
+    else deepNeeded.push(before, after);
   }
   return review;
+}
+
+/** Did the mover's winning chance drop sharply between these positions? */
+function bigDrop(before: Chess, after: Chess): boolean {
+  const score = (position: Chess): Score | undefined => {
+    if (position.isCheckmate()) return { mate: position.turn === "black" ? 1 : -1 };
+    if (isDrawnPosition(position)) return { cp: 0 };
+    return analyser.evals.get(fenOf(position))?.score;
+  };
+  const a = score(before);
+  const b = score(after);
+  if (!a || !b) return false;
+  const sign = before.turn === "white" ? 1 : -1;
+  const drop = sign * (winPercent(a) - winPercent(b));
+  return drop >= BIG_DROP;
 }
 
 /** A rating for every move of the game (undefined while Stockfish hasn't
  *  finished, and when ratings are off). */
 function moveReviews(): (Review | undefined)[] {
+  deepNeeded = [];
   if (!ratingsOn()) return game.moves.map(() => undefined);
-  return addMisses(game.moves.map((played, i) => rateMove(game.positionAt(i), played.move)));
+  const reviews = addMisses(game.moves.map((played, i) => rateMove(game.positionAt(i), played.move)));
+  // A Miss is decided after the ratings, so make sure its positions get the second look too
+  reviews.forEach((review, i) => {
+    if (review?.rating === "Miss" && !(analyser.isDeep(game.positionAt(i)) && analyser.isDeep(game.positionAt(i + 1)))) {
+      deepNeeded.push(game.positionAt(i), game.positionAt(i + 1));
+    }
+  });
+  return reviews;
 }
 
 /** The rating of the last analysis move (undefined until Stockfish has looked). */
@@ -1004,6 +1041,7 @@ function requestEval() {
     const all = Array.from({ length: game.length + 1 }, (_, i) => game.positionAt(i));
     wanted.push(...all);
     wanted.push(...brilliantCandidates(all.slice(0, -1), analyser.evals));
+    analyser.requestDeep(deepNeeded);
   }
   analyser.request(wanted);
 }
@@ -1015,6 +1053,7 @@ function requestEval() {
 function refresh() {
   tidyState();
   const reviews = moveReviews();
+  requestEval(); // (before drawing, so the review's progress line is current)
   const info = openingInfo();
   applyMode();
   drawBoard(reviews, info);
@@ -1024,7 +1063,6 @@ function refresh() {
   drawTurn();
   drawButtons();
   drawCoach();
-  requestEval();
 }
 
 /** Show the parts of the page that belong to the current mode. */
@@ -1295,6 +1333,101 @@ function openingChoiceNote(ply: number, review: Review | undefined): string | un
   return reviewOpeningChoice(before, game.moves[ply - 1].move, review.loss, best, match.myOpening, book, first);
 }
 
+const RATING_ORDER = ["Brilliant", "Great", "Best", "Excellent", "Good", "Book", "Forced",
+  "Inaccuracy", "Mistake", "Miss", "Missed Win", "Blunder"];
+
+/** Stockfish's score for each position of the game (White's view), where known. */
+function gameScores(): (Score | undefined)[] {
+  return Array.from({ length: game.length + 1 }, (_, ply) => {
+    const position = game.positionAt(ply);
+    if (position.isCheckmate()) return { mate: position.turn === "black" ? 1 : -1 };
+    if (isDrawnPosition(position)) return { cp: 0 };
+    return analyser.evals.get(fenOf(position))?.score;
+  });
+}
+
+/** The game report: each player's accuracy in each phase, coloured like the
+ *  ratings, and how many moves got each rating. */
+function drawGameReport(reviews: (Review | undefined)[], info: OpeningInfo[]) {
+  const report = $("game-report");
+  const body = $("game-report-body");
+  report.hidden = !ratingsOn() || game.length < 4 || !!analysis;
+  if (report.hidden) return;
+  const positions = Array.from({ length: game.length + 1 }, (_, ply) => game.positionAt(ply));
+  const scores = gameScores();
+  const start = positions[0].turn;
+  const overall = gameAccuracy(start, scores);
+  const phases = phaseAccuracy(start, positions, scores);
+  const rated = reviews.filter(Boolean).length;
+
+  const cell = (accuracy: number | undefined) => {
+    const td = document.createElement("td");
+    if (accuracy === undefined || Number.isNaN(accuracy)) {
+      td.textContent = "-";
+    } else {
+      td.textContent = `${Math.round(accuracy)}%`;
+      td.className = `acc ${ratingClass(accuracyRating(accuracy))}`;
+    }
+    return td;
+  };
+  const table = document.createElement("table");
+  const head = table.insertRow();
+  for (const title of ["", "Opening", "Middle", "End", "Overall"]) {
+    const th = document.createElement("th");
+    th.textContent = title;
+    head.append(th);
+  }
+  const names: Record<"white" | "black", string> = {
+    white: gameHeaders.White && gameHeaders.White !== "?" ? gameHeaders.White : "White",
+    black: gameHeaders.Black && gameHeaders.Black !== "?" ? gameHeaders.Black : "Black",
+  };
+  for (const colour of ["white", "black"] as const) {
+    const row = table.insertRow();
+    const name = document.createElement("td");
+    name.textContent = names[colour];
+    name.title = `${names[colour]} (${colour === "white" ? "White" : "Black"})`;
+    row.append(name);
+    for (const phase of ["opening", "middlegame", "endgame"] as Phase[]) row.append(cell(phases[phase][colour]));
+    row.append(cell(overall[colour]));
+  }
+
+  // How many moves of each rating, per player
+  const counts = document.createElement("div");
+  counts.className = "counts";
+  for (const colour of ["white", "black"] as const) {
+    const tally = new Map<string, number>();
+    game.moves.forEach((_, i) => {
+      if (game.moverOf(i + 1) !== colour) return;
+      const rating = info[i]?.book ? "Book" : reviews[i]?.symbol === "#" ? "Best" : reviews[i]?.rating;
+      if (rating) tally.set(rating, (tally.get(rating) ?? 0) + 1);
+    });
+    const line = document.createElement("div");
+    const label = document.createElement("strong");
+    label.textContent = `${names[colour]}: `;
+    line.append(label);
+    RATING_ORDER.filter((r) => tally.has(r)).forEach((rating, i) => {
+      if (i) line.append(" · ");
+      const span = document.createElement("span");
+      span.className = ratingClass(rating);
+      span.textContent = `${rating} ${tally.get(rating)}`;
+      line.append(span);
+    });
+    counts.append(line);
+  }
+
+  const division = divide(positions);
+  const phaseText = document.createElement("p");
+  phaseText.className = "phases";
+  const moveNo = (ply: number) => game.positionAt(ply).fullmoves;
+  phaseText.textContent =
+    (division.middle === undefined
+      ? "The game stayed in the opening phase."
+      : `Middlegame from move ${moveNo(division.middle)}` +
+        (division.end !== undefined ? `, endgame from move ${moveNo(division.end)}.` : "; no endgame.")) +
+    (rated < game.length ? ` (Stockfish has rated ${rated} of ${game.length} moves so far.)` : "");
+  body.replaceChildren(table, counts, phaseText);
+}
+
 /** "Missed Win" -> "r-missed-win", for the rating's colour */
 const ratingClass = (rating: string) => "r-" + rating.toLowerCase().replace(" ", "-");
 
@@ -1344,6 +1477,7 @@ function drawReview(reviews: (Review | undefined)[], info: OpeningInfo[]) {
     }
   }
 
+  drawGameReport(reviews, info);
   const { done, total } = analyser.progress();
   reviewProgress.textContent = reviewing && done < total ? `Stockfish is checking the game: ${done} of ${total} positions` : "";
   reviewProgress.hidden = !reviewProgress.textContent;
@@ -1762,6 +1896,11 @@ function wireButtons() {
 // ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
+
+// For testing in development only (not in the published site)
+if (import.meta.env.DEV) {
+  (window as unknown as { trainer: unknown }).trainer = { analyser, game: () => game, gameScores };
+}
 
 buildMenu();
 wireButtons();
