@@ -10,7 +10,7 @@ import type { Key } from "@lichess-org/chessground/types";
 import { Chess, normalizeMove } from "chessops/chess";
 import { chessgroundDests } from "chessops/compat";
 import { parseFen } from "chessops/fen";
-import { makeSan } from "chessops/san";
+import { makeSan, parseSan } from "chessops/san";
 import type { Color, NormalMove, Role } from "chessops/types";
 import { makeSquare, makeUci, opposite, parseSquare, parseUci } from "chessops/util";
 
@@ -19,6 +19,7 @@ import "@lichess-org/chessground/assets/chessground.base.css";
 import "./style.css";
 import "./themes.css";
 import { Analyser, lineMove, lineScore } from "./analyser";
+import { avatarSvg, moodForRating, type Mood } from "./avatar";
 import { badgeSvg } from "./badge";
 import { afterMove as positionAfter, colourName, isCastling, standardUci, variationSan } from "./coach";
 import { Engine } from "./engine";
@@ -1509,6 +1510,7 @@ function refresh() {
   drawEvalBar();
   drawMoveList(reviews, info);
   drawReview(reviews, info);
+  drawCoachFace(reviews);
   drawTurn();
   drawButtons();
   drawCoach();
@@ -2065,6 +2067,194 @@ function drawReview(reviews: (Review | undefined)[], info: OpeningInfo[]) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// The coach: the review spoken by a cartoon face (a strip above the board on
+// phones; a feed of earlier moves and a speech bubble on desktops)
+// ---------------------------------------------------------------------------
+
+interface CoachAction {
+  label: string;
+  run: () => void;
+  phoneOnly?: boolean;
+}
+
+interface CoachLine {
+  mood: Mood;
+  rating?: string;
+  text: string;
+  actions: CoachAction[];
+}
+
+// Ratings where the coach offers the better move (inaccuracies too)
+const WORTH_SHOWING = new Set(["Inaccuracy", "Mistake", "Miss", "Missed Win", "Blunder"]);
+const faces = new Map<HTMLElement, string>(); // what each face shows, so it's only redrawn on a change
+
+function setFace(element: HTMLElement, mood: Mood, size: number) {
+  const key = `${mood}/${size}`;
+  if (faces.get(element) === key) return;
+  faces.set(element, key);
+  element.innerHTML = avatarSvg(mood, size);
+}
+
+/** "Nf3 - Best move. This is exactly what Stockfish would play." plus, if
+ *  that's short, the first sentence of the explanation. */
+function shortReview(review: Review): string {
+  const [full, ...rest] = review.text.split("\n");
+  // the rating is on the tag, so it isn't repeated: "Qh5?! The problem: ..."
+  const heading = full.replace(new RegExp(` - ${review.rating}( move)?\\.?`, "i"), "");
+  const body = rest.join(" ").replace(/\u2022/g, "").replace(/\s+/g, " ").trim();
+  const first = body.match(/^[^.!?]*[.!?]/)?.[0] ?? "";
+  return heading.length < 80 && first ? `${heading} ${first}` : heading;
+}
+
+/** Stockfish's better move, played as analysis from the position before. */
+function showBetterMove(ply: number, review: Review) {
+  if (!review.bestSan) return;
+  const before = game.positionAt(ply - 1);
+  const move = parseSan(before, review.bestSan) as NormalMove | undefined;
+  if (!move) return;
+  goTo(ply - 1);
+  analysisMove(move);
+}
+
+/** What the coach says about the move on screen. */
+function coachLine(reviews: (Review | undefined)[]): CoachLine {
+  if (busy) return { mood: "think", text: statusMessage || "Stockfish is thinking...", actions: [] };
+  if (analysis) {
+    const review = ratingsOn() ? analysisReview() : undefined;
+    if (!analysis.line.length) return { mood: "talk", text: "Try any move here to see what would have happened.", actions: [{ label: "Back to the game", run: exitAnalysis }] };
+    if (!review) return { mood: "think", text: "Let me check that move...", actions: [] };
+    return { mood: moodForRating(review.rating), rating: review.rating, text: `What if: ${shortReview(review)}`, actions: [{ label: "Back to the game", run: exitAnalysis }] };
+  }
+  const ply = reviewPly();
+  if (!ratingsOn()) return { mood: "talk", text: "Move ratings are switched off.", actions: [] };
+  if (ply === 0) return { mood: "talk", text: "Make a move and I'll tell you what Stockfish thinks of it.", actions: [] };
+  const review = reviews[ply - 1];
+  if (!review) return { mood: "think", text: "Hmm, let me check that move...", actions: [] };
+  const actions: CoachAction[] = [];
+  const live = match !== null && viewPly === null && !preview;
+  const harsh = WORTH_SHOWING.has(review.rating);
+  if (harsh && review.bestSan) actions.push({ label: `Show me ${review.bestSan}`, run: () => showBetterMove(ply, review) });
+  if (harsh && live && match && game.moverOf(ply) === match.user && !thinking) actions.push({ label: "Undo and retry", run: onUndo });
+  if (!replyButton.disabled) actions.push({ label: showReply ? "Back to my move" : "Their reply", run: () => replyButton.click() });
+  if (!harsh && live && !thinking && !game.outcome()) actions.push({ label: "What's their threat?", run: () => void startTask("threat") });
+  // at most three, plus "Tell me more" (phones only: desktops show the full review anyway)
+  const kept = actions.slice(0, 3);
+  kept.push({ label: "Tell me more", run: () => reviewArea.scrollIntoView({ behavior: "smooth", block: "start" }), phoneOnly: true });
+  return { mood: moodForRating(review.rating), rating: review.rating, text: shortReview(review), actions: kept };
+}
+
+function fillBubble(bubble: HTMLElement, line: CoachLine, withActions: boolean) {
+  bubble.replaceChildren();
+  if (line.rating) {
+    const tag = document.createElement("span");
+    tag.className = `coach-tag ${ratingClass(line.rating)}`;
+    tag.textContent = line.rating;
+    bubble.append(tag);
+  }
+  bubble.append(line.text);
+  if (withActions && line.actions.length) {
+    const row = document.createElement("div");
+    row.className = "coach-actions";
+    for (const action of line.actions) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = action.label;
+      if (action.phoneOnly) button.className = "phone-only";
+      button.addEventListener("click", action.run);
+      row.append(button);
+    }
+    bubble.append(row);
+  }
+}
+
+/** The plies the coach comments on: in a match only yours, otherwise every move. */
+function coachPlies(upTo: number): number[] {
+  const plies: number[] = [];
+  for (let ply = 1; ply <= upTo; ply++) if (!match || game.moverOf(ply) === match.user) plies.push(ply);
+  return plies;
+}
+
+const moveLabel = (ply: number) => {
+  const position = game.positionAt(ply - 1);
+  return `${position.fullmoves}${position.turn === "white" ? "." : "..."}${game.moves[ply - 1].san}`;
+};
+
+function drawCoachFace(reviews: (Review | undefined)[]) {
+  const practice = mode === "practice" && !demo;
+  const strip = $("coach-strip");
+  strip.hidden = !practice;
+  setFace($("tools-face"), busy ? "think" : "talk", 30);
+  if (!practice) return;
+  const line = coachLine(reviews);
+  setFace($("strip-face"), line.mood, 52);
+  setFace($("review-face"), line.mood, 44);
+  fillBubble($("strip-bubble"), line, true);
+
+  // Desktop feed: the last few moves before the one on screen
+  const feed = $("coach-feed");
+  feed.replaceChildren();
+  if (!analysis && ratingsOn()) {
+    const plies = coachPlies(reviewPly() - 1).slice(-5);
+    for (const ply of plies) {
+      const review = reviews[ply - 1];
+      const item = document.createElement("li");
+      const face = document.createElement("span");
+      face.className = "coach-face";
+      face.innerHTML = avatarSvg(moodForRating(review?.rating), 26);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.title = review ? shortReview(review) : "";
+      button.textContent = `${moveLabel(ply)}${review ? ` - ${review.rating}` : ""}`;
+      if (review) button.classList.add(ratingClass(review.rating));
+      button.addEventListener("click", () => goTo(ply));
+      item.append(face, button);
+      feed.append(item);
+    }
+  }
+  drawKeyMoments(reviews);
+}
+
+/** After a game: the biggest turning points, and any brilliant moves. */
+function drawKeyMoments(reviews: (Review | undefined)[]) {
+  const box = $("key-moments");
+  const finished = reviewing && match === null && game.length > 0;
+  const { done, total } = analyser.progress();
+  if (!finished || done < total || !ratingsOn()) {
+    box.hidden = true;
+    return;
+  }
+  const side: Color | null = reviewTitle ? null : orientation; // a PGN game: both sides
+  const moments: [number, Review][] = [];
+  reviews.forEach((review, i) => {
+    if (review && (!side || game.moverOf(i + 1) === side)) moments.push([i + 1, review]);
+  });
+  const brilliant = moments.filter(([, r]) => r.rating === "Brilliant" || r.rating === "Great").slice(0, 2);
+  // the costliest moves (inaccuracies count too, ranked below bigger mistakes by what they cost)
+  const turning = moments.filter(([, r]) => WORTH_SHOWING.has(r.rating))
+    .sort((a, b) => b[1].loss - a[1].loss).slice(0, 3);
+  const chosen = [...brilliant, ...turning].sort((a, b) => a[0] - b[0]);
+  const line: CoachLine = chosen.length
+    ? {
+        mood: turning.length ? "talk" : "wow",
+        text: `Game over! ${chosen.length === 1 ? "Here's the key moment" : `Here are the ${chosen.length} key moments`} - tap one to look at it:`,
+        actions: chosen.map(([ply, review]) => ({ label: `${moveLabel(ply)} ${review.rating}`, run: () => goTo(ply) })),
+      }
+    : { mood: "happy", text: "Game over! No big mistakes in this game - nicely played.", actions: [] };
+  box.replaceChildren();
+  const say = document.createElement("div");
+  say.className = "coach-say";
+  const face = document.createElement("div");
+  face.className = "coach-face";
+  face.innerHTML = avatarSvg(line.mood, 44);
+  const bubble = document.createElement("div");
+  bubble.className = "coach-bubble";
+  fillBubble(bubble, line, true);
+  say.append(face, bubble);
+  box.append(say);
+  box.hidden = false;
+}
+
 function drawTurn() {
   if (demo) {
     turnLabel.textContent = `${demo.demo.opening} - ${demo.demo.lines[demo.line].title}`;
@@ -2462,6 +2652,7 @@ function wireButtons() {
   $("demo-next-line").addEventListener("click", () => demo && loadDemoLine(demo.line + 1));
   demoPick.addEventListener("change", () => loadDemoLine(Number(demoPick.value)));
   $("demo-try").addEventListener("click", onDemoTry);
+  $("strip-face").addEventListener("click", () => reviewArea.scrollIntoView({ behavior: "smooth", block: "start" }));
   $("demo-exit").addEventListener("click", onDemoExit);
   $("download-pgn").addEventListener("click", downloadPgn);
   $("pgn-cancel").addEventListener("click", () => pgnDialog.close());

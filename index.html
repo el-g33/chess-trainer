@@ -89,6 +89,11 @@
     <!-- The game screen -->
     <main id="game">
       <section class="board-area">
+        <!-- The coach on phones: a face and a speech bubble above the board -->
+        <div id="coach-strip" class="coach-strip" hidden>
+          <button type="button" id="strip-face" class="coach-face" aria-label="Open the full move review"></button>
+          <div id="strip-bubble" class="coach-bubble" aria-live="polite"></div>
+        </div>
         <!-- Your opponent's bar above the board, yours below (they swap when the board flips) -->
         <div class="player-bar" id="bar-top">
           <span class="pb-name"></span><span class="pb-captured"></span><span class="pb-diff"></span>
@@ -137,7 +142,14 @@
             <summary>Game report</summary>
             <div id="game-report-body"></div>
           </details>
-          <div id="review" aria-live="polite"></div>
+          <!-- The coach on desktops: key moments, a feed of earlier moves, and the
+               review of the move on screen as a speech bubble -->
+          <div id="key-moments" class="key-moments" hidden></div>
+          <ol id="coach-feed" class="coach-feed"></ol>
+          <div class="coach-say">
+            <div id="review-face" class="coach-face" aria-hidden="true"></div>
+            <div id="review" class="coach-bubble" aria-live="polite"></div>
+          </div>
           <button type="button" id="reply-button" class="reply-button" disabled>See Stockfish's reply &rsaquo;</button>
         </div>
       </section>
@@ -175,6 +187,7 @@
         <!-- The strategy coach (Practice mode) -->
         <div id="coach" hidden>
           <div class="coach-header">
+            <span id="tools-face" class="coach-face small" aria-hidden="true"></span>
             <h3>Strategy coach</h3>
             <span id="quiz-score" class="muted"></span>
           </div>
