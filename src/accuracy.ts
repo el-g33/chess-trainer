@@ -158,6 +158,8 @@ export function divide(positions: Chess[]): Division {
 
 export type Phase = "opening" | "middlegame" | "endgame";
 
+const MIN_PHASE_MOVES = 3; // moves a player needs in a phase for it to be scored
+
 /** Accuracy for each phase and side, as lichess does it: each phase's
  *  positions (plus the one before, so its first move counts) on their own. */
 export function phaseAccuracy(
@@ -178,6 +180,13 @@ export function phaseAccuracy(
     const first = plies[0];
     const turn: Color = first % 2 === 0 ? startColor : startColor === "white" ? "black" : "white";
     result[phase] = gameAccuracy(turn, plies.map((ply) => scores[ply]));
+    // A phase only gets a score when the player made a few moves in it:
+    // one good move in a phase reached at the very end isn't "100%"
+    for (const colour of ["white", "black"] as Color[]) {
+      const moves = plies.filter((ply) => ply < scores.length - 1 && phaseOf(ply) === phase &&
+        ((ply % 2 === 0) === (colour === startColor))).length;
+      if (moves < MIN_PHASE_MOVES) delete result[phase][colour];
+    }
   }
   return result;
 }

@@ -2845,6 +2845,15 @@ function drawStats() {
     }
   }
   card.append(table);
+  // Where each phase began, so the scores make sense
+  const division = divide(positions);
+  const moveNumber = (ply: number) => positions[ply].fullmoves;
+  const phasesNote = division.middle === undefined
+    ? "The game stayed in the opening phase."
+    : [`Middlegame from move ${moveNumber(division.middle)}`,
+       division.end !== undefined ? `endgame from move ${moveNumber(division.end)}` : "no endgame"].join(" · ") +
+      ". A phase needs 3 moves from a player to be scored.";
+  card.append(element("p", "stats-note", phasesNote));
   if (reviewing) {
     const start = element("div", "stats-start");
     const button = iconButton({ ico: "play", label: "Start the review", run: startReview, kind: "accent" }, 18);

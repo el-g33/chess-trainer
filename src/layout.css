@@ -21,6 +21,23 @@
   --round-fg: var(--text);
 }
 
+/* What's selected (a mode, a tab, a tile, the current move...): a strong,
+   theme-coloured fill, so it's always clear */
+:root {
+  --sel-bg: var(--round-bg);
+  --sel-fg: var(--round-fg);
+}
+
+:root[data-ui="ember"] {
+  --sel-bg: #ff5a36;
+  --sel-fg: #16181e;
+}
+
+:root[data-ui="violet"] {
+  --sel-bg: #5de0e6;
+  --sel-fg: #1e1b45;
+}
+
 /* -- Round icon buttons -------------------------------------------------------- */
 
 button.round {
@@ -176,9 +193,9 @@ button.round:disabled {
 
 .mode-choice.on,
 .mode-choice.on:hover:not(:disabled) {
-  background: var(--round-bg);
-  color: var(--round-fg);
-  border-color: var(--round-bg);
+  background: var(--sel-bg);
+  color: var(--sel-fg);
+  border-color: var(--sel-bg);
 }
 
 .home-next,
@@ -260,9 +277,9 @@ button.round:disabled {
 .chips button.on,
 .chips button.on:hover:not(:disabled),
 .tabs button.on {
-  background: var(--round-bg);
-  color: var(--round-fg);
-  border-color: var(--round-bg);
+  background: var(--sel-bg);
+  color: var(--sel-fg);
+  border-color: var(--sel-bg);
 }
 
 .chips {
@@ -338,9 +355,9 @@ button.round:disabled {
 
 .tile.on,
 .tile.on:hover:not(:disabled) {
-  background: var(--round-bg);
-  color: var(--round-fg);
-  border-color: var(--round-bg);
+  background: var(--sel-bg);
+  color: var(--sel-fg);
+  border-color: var(--sel-bg);
 }
 
 .screen textarea {
@@ -426,8 +443,8 @@ html body.practice #game {
 
 .view-tabs button.on,
 .view-tabs button.on:hover:not(:disabled) {
-  background: var(--round-bg);
-  color: var(--round-fg);
+  background: var(--sel-bg);
+  color: var(--sel-fg);
 }
 
 .board-area {
@@ -548,8 +565,8 @@ html body .board-area .board-controls {
 
 .move-strip button.cur,
 .move-strip button.cur:hover:not(:disabled) {
-  background: var(--round-bg);
-  color: var(--round-fg);
+  background: var(--sel-bg);
+  color: var(--sel-fg);
   font-weight: 700;
 }
 
@@ -946,8 +963,8 @@ html body .board-area .board-controls {
 
 .history-result.on,
 .history-result.on:hover:not(:disabled) {
-  border-color: var(--round-bg);
-  box-shadow: inset 0 0 0 1px var(--round-bg);
+  border-color: var(--sel-bg);
+  box-shadow: inset 0 0 0 1px var(--sel-bg);
 }
 
 .history-list {
@@ -1232,8 +1249,8 @@ select.dd-native {
 }
 
 .dd-option.on {
-  background: var(--round-bg);
-  color: var(--round-fg);
+  background: var(--sel-bg);
+  color: var(--sel-fg);
 }
 
 .dd-group {

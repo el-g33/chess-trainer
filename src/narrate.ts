@@ -88,7 +88,7 @@ export function narrateMove(before: Chess, move: NormalMove, listener: Color | n
 const PRAISE: Record<string, string[]> = {
   Brilliant: ["Brilliant! A sacrifice that really works.", "Wow, what a move! That sacrifice is spot on."],
   Great: ["Great find! That was the move to play.", "Great move: you found the strong one."],
-  Best: ["That's exactly what Stockfish would play.", "Spot on, the best move.", "Perfect, that's the top choice."],
+  Best: ["That's the best move.", "Spot on, the top engine move.", "Perfect, that's the best move."],
   Excellent: ["Very nice, almost the best move.", "Excellent, that keeps things going your way."],
   Good: ["Good, solid move.", "That's a sensible choice.", "Fine move, nothing wrong with that."],
   Book: ["Straight out of the opening book.", "Good theory: that's a known move.", "Right on track with the opening."],
@@ -109,7 +109,8 @@ export function verdict(review: Review, before: Chess, after: Chess,
   const them = !you ? (mover === "white" ? "Black" : "White") : mine ? "them" : "you";
   if (PRAISE[review.rating]) {
     const line = pick(PRAISE[review.rating], seed);
-    return mine ? line : line.replace("Stockfish would play", "Stockfish wanted").replace(/^Spot on, /, "They found ");
+    if (mine) return line;
+    return review.rating === "Best" ? "They found the best move." : line.replace("you found", "they found");
   }
   if (review.rating === "Missed Win") return mine ? "You had a winning move there!" : "They missed a winning move there.";
   if (review.rating === "Miss") return mine ? "You missed a chance to win material." : "They missed a chance to win material.";
