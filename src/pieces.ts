@@ -1,9 +1,9 @@
-// The Merida pieces, recoloured like the desktop app (theme.py): cream
-// White pieces with a soft shadow, near-black Black pieces - and three more
-// colour sets that go with the page themes (Pieces box). The SVG files in
-// public/pieces are the unchanged originals; the colours are swapped in when
-// they load and handed to the board as CSS. Also the checkmated king toppling
-// over (theme.py falling_king).
+// The pieces (Pieces box): the Merida pieces recoloured like the desktop app
+// (theme.py) - cream White pieces with a soft shadow, near-black Black pieces -
+// plus three more colour sets that go with the page themes, and four other
+// lichess piece sets used as they are (public/pieces/<set>, see CREDITS.txt).
+// The SVG files are unchanged originals; they are handed to the board as CSS
+// when they load. Also the checkmated king toppling over (theme.py falling_king).
 import type { Color } from "chessops/types";
 
 interface Palette {
@@ -20,6 +20,20 @@ export const PALETTES: Record<string, Palette> = {
   violet: { label: "Pearl and indigo", white: ["#FFFFFF", "#D9D6F5", "#26215C"], black: ["#26215C", "#9D97E8", 0.6], rim: "#5DE0E6" },
 };
 
+/** Other piece sets, drawn by their authors (folder in public/pieces). */
+export const PIECE_SETS: Record<string, string> = {
+  chessnut: "Chessnut (flat)",
+  mpchess: "MPChess (modern)",
+  staunty: "Staunty (Staunton)",
+  spatial: "Spatial (glossy)",
+};
+
+/** Every choice for the Pieces box: value -> label. */
+export const PIECE_CHOICES: Record<string, string> = {
+  ...Object.fromEntries(Object.entries(PALETTES).map(([name, palette]) => [name, palette.label])),
+  ...PIECE_SETS,
+};
+
 const ROLES: Record<string, string> = { P: "pawn", N: "knight", B: "bishop", R: "rook", Q: "queen", K: "king" };
 const GRADIENT = 'stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"';
 
@@ -30,12 +44,12 @@ export const FALL_ANGLES = Array.from(
   (_, i) => (90 * (1 - Math.cos((Math.PI * i) / (FALL_FRAMES - 1)))) / 2,
 );
 
-const kings: Record<string, Partial<Record<Color, string>>> = {}; // recoloured king SVGs, by palette
+const kings: Record<string, Partial<Record<Color, string>>> = {}; // the king SVGs, by choice
 let current = "classic";
 
 /** Which colour set the pieces use (the pieces' CSS is already loaded for all). */
 export function setPalette(name: string) {
-  current = PALETTES[name] ? name : "classic";
+  current = PIECE_CHOICES[name] ? name : "classic";
   document.documentElement.dataset.pieces = current;
 }
 
@@ -58,16 +72,27 @@ function recolour(svg: string, white: boolean, palette: Palette): string {
 
 const dataUrl = (svg: string) => `data:image/svg+xml;base64,${btoa(svg)}`;
 
-export async function loadPieces(): Promise<void> {
-  const rules: string[] = [];
-  const originals = await Promise.all(
+/** The 12 SVGs of a set (folder "" = the Merida originals). */
+function fetchSet(folder: string) {
+  return Promise.all(
     ["w", "b"].flatMap((colour) =>
       Object.entries(ROLES).map(async ([letter, role]) => {
-        const response = await fetch(`${import.meta.env.BASE_URL}pieces/${colour}${letter}.svg`);
+        const response = await fetch(`${import.meta.env.BASE_URL}pieces/${folder}${colour}${letter}.svg`);
         return { colour, role, svg: await response.text() };
       }),
     ),
   );
+}
+
+function pieceRule(choice: string, role: string, side: string, svg: string): string {
+  const scope = `:root[data-pieces="${choice}"]`;
+  // on the board, and the small captured pieces on the player bars
+  return `${scope} .cg-wrap piece.${role}.${side}, ${scope} .mini-piece.${role}.${side} { background-image: url("${dataUrl(svg)}"); }`;
+}
+
+export async function loadPieces(): Promise<void> {
+  const rules: string[] = [];
+  const [originals, ...sets] = await Promise.all([fetchSet(""), ...Object.keys(PIECE_SETS).map((name) => fetchSet(`${name}/`))]);
   for (const [name, palette] of Object.entries(PALETTES)) {
     const scope = `:root[data-pieces="${name}"]`;
     kings[name] = {};
@@ -75,14 +100,20 @@ export async function loadPieces(): Promise<void> {
       const recoloured = recolour(svg, colour === "w", palette);
       const side = colour === "w" ? "white" : "black";
       if (role === "king") kings[name][side] = recoloured;
-      const url = dataUrl(recoloured);
-      // on the board, and the small captured pieces on the player bars
-      rules.push(`${scope} .cg-wrap piece.${role}.${side}, ${scope} .mini-piece.${role}.${side} { background-image: url("${url}"); }`);
+      rules.push(pieceRule(name, role, side, recoloured));
     }
     if (palette.rim) {
       rules.push(`${scope} .cg-wrap piece.black { filter: drop-shadow(0 0 1.5px ${palette.rim}); }`);
     }
   }
+  Object.keys(PIECE_SETS).forEach((name, i) => {
+    kings[name] = {};
+    for (const { colour, role, svg } of sets[i]) {
+      const side = colour === "w" ? "white" : "black";
+      if (role === "king") kings[name][side] = svg;
+      rules.push(pieceRule(name, role, side, svg));
+    }
+  });
   const style = document.createElement("style");
   style.textContent = rules.join("\n");
   document.head.append(style);
@@ -96,10 +127,13 @@ export function fallenKing(colour: Color, angle: number): string | undefined {
   if (!svg) return undefined;
   const start = svg.indexOf(">", svg.indexOf("<svg")) + 1;
   const end = svg.lastIndexOf("</svg>");
-  const drop = (7 * angle) / 90;
+  // Turn it round the middle of its drawing (each set has its own size)
+  const box = /viewBox="([^"]+)"/.exec(svg.slice(0, start))?.[1].split(/[\s,]+/).map(Number) ?? [0, 0, 50, 50];
+  const [x, y, width, height] = box;
+  const drop = (0.14 * height * angle) / 90;
   const turned =
     svg.slice(0, start) +
-    `<g transform="translate(0 ${drop.toFixed(1)}) rotate(${angle.toFixed(1)} 25 25)">` +
+    `<g transform="translate(0 ${drop.toFixed(2)}) rotate(${angle.toFixed(1)} ${x + width / 2} ${y + height / 2})">` +
     svg.slice(start, end) +
     "</g></svg>";
   return dataUrl(turned);

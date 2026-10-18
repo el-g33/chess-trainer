@@ -44,7 +44,7 @@ import {
   type OpeningInfo,
 } from "./openings";
 import { openingPlanAhead, reviewOpeningChoice, type OpeningPlan, type PlanMode } from "./openingPlan";
-import { FALL_ANGLES, fallenKing, loadPieces, PALETTES, setPalette } from "./pieces";
+import { FALL_ANGLES, fallenKing, loadPieces, PIECE_CHOICES, setPalette } from "./pieces";
 import { play, setSound, soundForMove, unlockSounds } from "./sounds";
 import { brilliantCandidates, findBrilliant, missedBrilliant, type Brilliant } from "./brilliant";
 import { accuracyRating, divide, gameAccuracy, phaseAccuracy, winPercent, type Phase } from "./accuracy";
@@ -484,8 +484,8 @@ function buildMenu() {
   if (themeBox.selectedIndex < 0) themeBox.selectedIndex = 0;
   if (saved.uiTheme) uiThemeBox.value = saved.uiTheme;
   if (uiThemeBox.selectedIndex < 0) uiThemeBox.selectedIndex = 0;
-  for (const [value, palette] of Object.entries(PALETTES)) piecesBox.add(new Option(palette.label, value));
-  piecesBox.value = saved.pieces && PALETTES[saved.pieces] ? saved.pieces : uiThemeBox.value;
+  for (const [value, label] of Object.entries(PIECE_CHOICES)) piecesBox.add(new Option(label, value));
+  piecesBox.value = saved.pieces && PIECE_CHOICES[saved.pieces] ? saved.pieces : uiThemeBox.value;
   if (piecesBox.selectedIndex < 0) piecesBox.selectedIndex = 0;
   setPalette(piecesBox.value);
   applyUiTheme();
