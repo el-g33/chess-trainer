@@ -147,9 +147,12 @@ any difference. The tests folder isn't part of the built site.
 - **Opening demos** (`src/demos.ts`): "Learn an opening" in the menu, or "Show
   me this opening" while practising it. Stockfish plays the main line and the
   variations, pausing at each note; Back/Next, Resume autoplay, Next
-  variation, Try it yourself. Transpositions are found automatically. London
-  System and Rapport-Jobava so far; every line was checked with full-strength
-  Stockfish.
+  variation, Try it yourself. Transpositions are found automatically. Every
+  opening in the app has one (67 lines in all); every line was checked with
+  full-strength Stockfish, and Black openings are shown from Black's side.
+- **Themes** (`src/themes.css`): Warm stone (default), Classic, Midnight ember,
+  Violet glass, each with a matching board and piece colours; the Pieces box
+  adds four lichess sets (Chessnut, MPChess, Staunty, Spatial - see About).
 - **Feature tour** (`src/tour.ts`): callouts shown the first time each mode is
   used, with Back / Next / No thanks and "Don't show this again"; can be watched
   again from the menu or the panel.
