@@ -777,3 +777,233 @@ html body .board-area .board-controls {
     grid-column: 1;
   }
 }
+
+/* -- Statistics ------------------------------------------------------------------- */
+
+.stats-view,
+.history-view {
+  padding-top: 4px;
+}
+
+.stats-card {
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: var(--card-radius);
+  background: var(--card);
+  border: 1px solid var(--line);
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px 90px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.stats-row:last-child {
+  border-bottom: 0;
+}
+
+.stats-row.head {
+  font-weight: 700;
+}
+
+.stats-cell {
+  text-align: center;
+  font-weight: 600;
+}
+
+.stats-cell.big {
+  font-size: 1.35rem;
+}
+
+.stats-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+
+.stats-more {
+  justify-self: start;
+  min-height: 0;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.stats-more:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
+}
+
+.stats-grade {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.grade-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Counts in their grade's colour, on a dark chip from the theme so they stand out */
+.count-chip {
+  display: inline-block;
+  min-width: 34px;
+  padding: 2px 0;
+  border-radius: 8px;
+  background: var(--chip, #2f2b29);
+  font-weight: 700;
+}
+
+:root { --chip: #1c1c1c; }
+:root[data-ui="stone"] { --chip: #2f2b29; }
+:root[data-ui="ember"] { --chip: #0e0f13; }
+:root[data-ui="violet"] { --chip: #1e1b45; }
+
+.count-chip.r-brilliant, .grade-dot.r-brilliant { color: #3fd9bb; }
+.count-chip.r-great, .grade-dot.r-great { color: #8db8e8; }
+.count-chip.r-best, .grade-dot.r-best { color: #7fd6a0; }
+.count-chip.r-excellent, .grade-dot.r-excellent { color: #8fd05a; }
+.count-chip.r-good, .grade-dot.r-good { color: #a8c48c; }
+.count-chip.r-book, .grade-dot.r-book { color: #e0a46a; }
+.count-chip.r-forced, .grade-dot.r-forced { color: #a5c79a; }
+.count-chip.r-inaccuracy, .grade-dot.r-inaccuracy { color: #f2c94c; }
+.count-chip.r-mistake, .grade-dot.r-mistake { color: #ff9f4a; }
+.count-chip.r-miss, .grade-dot.r-miss { color: #ff7f72; }
+.count-chip.r-missed-win, .grade-dot.r-missed-win { color: #e8c14a; }
+.count-chip.r-blunder, .grade-dot.r-blunder { color: #ff5a4a; }
+
+.rating-block {
+  display: inline-block;
+  min-width: 70px;
+  padding: 6px 0;
+  border-radius: 10px;
+  background: var(--chip);
+  color: #fff;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.stats-note {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.tab-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 30px 16px;
+  text-align: center;
+}
+
+.tab-message p {
+  margin: 0;
+  max-width: 360px;
+  line-height: 1.45;
+}
+
+/* -- Game history ----------------------------------------------------------------- */
+
+.history-colours {
+  margin-bottom: 10px;
+}
+
+.history-record {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.history-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-radius: var(--card-radius);
+  border: 2px solid var(--line);
+  background: var(--card);
+}
+
+.history-result b {
+  font-size: 1.4rem;
+}
+
+.history-result.win b { color: var(--good); }
+.history-result.loss b { color: var(--danger); }
+
+.history-result.on,
+.history-result.on:hover:not(:disabled) {
+  border-color: var(--round-bg);
+  box-shadow: inset 0 0 0 1px var(--round-bg);
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.history-game {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  text-align: left;
+  background: var(--card);
+}
+
+.history-mark {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-weight: 700;
+  background: var(--line);
+}
+
+.history-mark.win { background: #ddefd9; color: #27500a; }
+.history-mark.loss { background: #fcebeb; color: #791f1f; }
+
+.history-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.history-title {
+  font-weight: 600;
+}
+
+.history-meta,
+.history-date {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* In a demo the coach speaks the notes, so the panel keeps just the controls */
+#demo-note,
+#demo-line {
+  display: none;
+}
+
+.demo-panel {
+  margin-top: 8px;
+}

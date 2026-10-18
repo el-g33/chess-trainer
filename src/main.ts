@@ -51,7 +51,7 @@ import { openingPlanAhead, reviewOpeningChoice, type OpeningPlan, type PlanMode 
 import { FALL_ANGLES, fallenKing, loadPieces, PIECE_CHOICES, setPalette } from "./pieces";
 import { play, setSound, soundForMove, unlockSounds } from "./sounds";
 import { brilliantCandidates, findBrilliant, missedBrilliant, type Brilliant } from "./brilliant";
-import { accuracyRating, divide, gameAccuracy, phaseAccuracy, winPercent, type Phase } from "./accuracy";
+import { accuracyRating, divide, estimateRating, gameAccuracy, phaseAccuracy, winPercent, type Phase } from "./accuracy";
 import type { Score } from "./coach";
 import { explainGuess, type GuessExplanation } from "./quizExplain";
 import {
@@ -803,6 +803,7 @@ function onStartGame() {
 /** A fresh game from a position, with nothing else going on. */
 function resetBoard(newGame: Game, headers: Headers = { White: "?", Black: "?", Date: today() }) {
   gameHeaders = { ...headers };
+  currentGameId = null;
   stepper = null;
   closeOverlay(false);
   currentView = "board";
@@ -1025,6 +1026,7 @@ function onFlag(colour: Color) {
 
 /** The match is over: Play games can then be reviewed in Practice mode. */
 function endMatch(text: string) {
+  recordGame();
   clock?.stop();
   void play("gameover");
   match = null;
@@ -1049,7 +1051,7 @@ function onReviewGame() {
 
 async function onResign() {
   if (!match) return;
-  if (!(await message("Resign", "Resign this game? Stockfish will win the match.", true))) return;
+  if (!(await message("Resign?", "Are you sure you want to resign this game?", true))) return;
   result = "You resigned - Stockfish wins";
   gameHeaders.Result = match.user === "white" ? "0-1" : "1-0";
   gameHeaders.Termination = `${match.user === "white" ? "White" : "Black"} resigns`;
@@ -1191,52 +1193,42 @@ const TOUR_KEY = "chess-trainer-tour";
 const BOARD_STEPS: TourStep[] = [
   { target: "#board", title: "The board",
     text: "Drag a piece to move it, or tap it and then tap where it should go." },
+  { target: "#coach-strip", title: "Your coach",
+    text: "I sit up here and say what I think of each move in a line. The rating icon on the board shows which move I mean." },
   { target: "#bar-top", title: "The players",
-    text: "Names, the pieces each side has captured, and who is ahead in material (+3 means three pawns' worth). With a time control, the clocks are here too." },
-];
-
-const STEP_THROUGH: TourStep[] = [
-  { target: ".board-nav", title: "Step through the game",
-    text: "Go back and forward through the moves. You can also click a move in the list, or use the arrow keys." },
-  { target: ".list-nav", title: "Step through the game",
-    text: "Go back and forward through the moves. You can also click a move in the list, or use the arrow keys." },
+    text: "Names, the pieces each side has captured, and who is ahead in material. With a time control, the clocks are here too." },
 ];
 
 const PRACTICE_TOUR: TourStep[] = [
   ...BOARD_STEPS,
+  { target: "#strip-actions", title: "Tell me more, and Strategy",
+    text: "The dots open the full explanation, and what your opponent can do next. The target shows the main idea: your opening's plan or Stockfish's, one move at a time, with a quiz." },
   { target: "#eval-bar", title: "Eval bar",
-    text: "Who is better according to Stockfish: the more white, the better for White. You can switch it off with the Eval bar tick box." },
-  { target: "#review-area", title: "Move review",
-    text: "Every move gets a rating (Best, Good, Mistake...) with what was better and why. The Game report adds accuracy for the opening, middlegame, endgame and the whole game." },
-  { target: "#threat-button", title: "What's the threat?",
-    text: "Shows what your opponent wants to do next." },
-  { target: "#plan-button", title: "Plan ahead",
-    text: "Stockfish's next few moves for both sides, as numbered arrows you can step through. While practising an opening it can follow your opening instead." },
-  { target: "#quiz-button", title: "Spot their idea (quiz)",
-    text: "Guess your opponent's threat by playing it on the board. A wrong guess is explained: why it isn't a threat, and how it would be punished." },
-  { target: "#ideas-button", title: "Explain the ideas",
-    text: "The plans in the position in plain words: weak squares, outposts, pawn structure and more." },
-  { target: "#brilliant-button", title: "Is there a brilliant move?",
-    text: "Checks for a hidden sacrifice or a winning trick in the position." },
-  { target: "#show-demo", title: "Opening demo",
-    text: "Watch Stockfish play the opening you're practising, with the ideas explained." },
-  ...STEP_THROUGH,
-  { target: "#undo", title: "Undo",
-    text: "Take back your move (and Stockfish's reply) to try something else." },
-  { target: ".pgn-row", title: "PGN files",
-    text: "Open a game from lichess, chess.com or a file to review it, or download this game." },
-  { target: "#new-game", title: "New game and the menu",
-    text: "Back to the menu: change the level, your colour, the time control, the opening to practise, or watch an opening demo. The feature tour can be found there and at the bottom of this panel." },
+    text: "Who is better according to Stockfish. You can switch it off in the settings." },
+  { target: ".board-controls", title: "Moving through the game",
+    text: "Step back and forward, take back your move, flip the board, or resign with the white flag." },
+  { target: "#move-strip", title: "The moves",
+    text: "Swipe sideways to see every move; tap one to go to it." },
+  { target: ".moves-area", title: "The moves",
+    text: "Every move of the game, coloured by its rating. Click one to go to it." },
+  { target: ".view-tabs", title: "Statistics and history",
+    text: "See each player's accuracy and an estimated rating for this game, and your record against Stockfish." },
+  { target: ".game-top .gear-button", title: "Settings",
+    text: "Theme, board, pieces, sounds, your name, and more." },
+  { target: "#new-game", title: "New game",
+    text: "Play, practise or analyse a game. The feature tour is in the settings if you'd like to see it again." },
 ];
 
 const PLAY_TOUR: TourStep[] = [
   ...BOARD_STEPS,
-  ...STEP_THROUGH,
-  { target: "#resign", title: "Resign", text: "Give up the game." },
-  { target: ".pgn-row", title: "PGN files",
-    text: "Download this game, or open one to review it." },
-  { target: "#new-game", title: "New game and the menu",
-    text: "Back to the menu for a new game, Practice mode (coach, eval bar and move ratings) or an opening demo. After a game, \"Review this game\" shows how every move rated." },
+  { target: ".board-controls", title: "Moving through the game",
+    text: "Step back to look at earlier moves, flip the board, or resign with the white flag." },
+  { target: ".view-tabs", title: "Statistics and history",
+    text: "After the game: accuracy and an estimated rating, and your record against Stockfish." },
+  { target: ".game-top .gear-button", title: "Settings",
+    text: "Theme, board, pieces, sounds, your name, and more." },
+  { target: "#new-game", title: "New game",
+    text: "Back to the start. After a game I'll offer to go through it with you." },
 ];
 
 function tourSeen(): Record<string, string> {
@@ -2647,16 +2639,289 @@ function applyView() {
   if (currentView === "history") drawHistory();
 }
 
+// -- Statistics: accuracy per phase, every grade counted, an estimated rating ---
+
+const GRADES = ["Brilliant", "Great", "Best", "Excellent", "Good", "Book", "Forced", "Inaccuracy", "Mistake", "Miss", "Missed Win", "Blunder"];
+let statsMore = false;
+
+const element = <K extends keyof HTMLElementTagNameMap>(tag: K, className = "", text = "") => {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text) node.textContent = text;
+  return node;
+};
+
+/** A message from the coach in a tab with nothing to show yet. */
+function tabMessage(box: HTMLElement, text: string, button?: CoachButton) {
+  const say = element("div", "tab-message");
+  const face = element("div", "coach-face big");
+  face.innerHTML = avatarSvg("talk", 64);
+  say.append(face, element("p", "", text));
+  if (button) {
+    const action = iconButton(button, 18);
+    action.classList.add("labelled");
+    action.append(element("span", "", button.label));
+    say.append(action);
+  }
+  box.append(say);
+}
+
 function drawStats() {
-  $("stats").textContent = "";
+  const box = $("stats");
+  box.replaceChildren();
+  if (mode === "play") {
+    if (match) tabMessage(box, "Your statistics appear when the game is over. No peeking during a real game!");
+    else if (canReview) tabMessage(box, "Shall we go through the game? Then your statistics appear here.", { ico: "search", label: "Review the game", run: onReviewGame, kind: "accent" });
+    else tabMessage(box, "Play a game and your statistics appear here.");
+    return;
+  }
+  if (game.length < 4) {
+    tabMessage(box, "Play a few moves and I'll show the statistics here.");
+    return;
+  }
+  const list = reviews();
+  const positions = Array.from({ length: game.length + 1 }, (_, ply) => game.positionAt(ply));
+  const scores = gameScores();
+  const start = positions[0].turn;
+  const overall = gameAccuracy(start, scores);
+  const phases = phaseAccuracy(start, positions, scores);
+  const ratings = estimateRating(start, scores);
+  const { done, total } = analyser.progress();
+
+  // Both players side by side (you first when it's your game)
+  const first: Color = listener() ?? "white";
+  const sides: Color[] = [first, opposite(first)];
+  const name = (colour: Color) => barName(colour);
+
+  const card = element("div", "stats-card");
+  const table = element("div", "stats-table");
+  const row = (label: string | HTMLElement, cells: (HTMLElement | string)[], className = "") => {
+    const line = element("div", `stats-row ${className}`);
+    line.append(typeof label === "string" ? element("span", "stats-label", label) : label);
+    for (const cell of cells) line.append(typeof cell === "string" ? element("span", "stats-cell", cell) : cell);
+    table.append(line);
+  };
+  const percent = (value: number | undefined, big = false) => {
+    const cell = element("span", `stats-cell ${big ? "big" : ""}`);
+    if (value === undefined || Number.isNaN(value)) cell.textContent = "-";
+    else {
+      cell.textContent = `${Math.round(value)}%`;
+      cell.classList.add(ratingClass(accuracyRating(value)));
+    }
+    return cell;
+  };
+  row("", sides.map((c) => element("span", "stats-cell stats-name", name(c))), "head");
+  row("Accuracy", sides.map((c) => percent(overall[c], true)));
+  row("Opening", sides.map((c) => percent(phases.opening[c])));
+  row("Middlegame", sides.map((c) => percent(phases.middlegame[c])));
+  row("Endgame", sides.map((c) => percent(phases.endgame[c])));
+
+  // More: how many moves got each grade
+  const toggle = element("button", "stats-more", statsMore ? "More ▴" : "More ▾");
+  toggle.addEventListener("click", () => {
+    statsMore = !statsMore;
+    drawStats();
+  });
+  row(toggle, ["", ""]);
+  if (statsMore) {
+    const counts: Record<Color, Record<string, number>> = { white: {}, black: {} };
+    list.forEach((review, i) => {
+      if (!review) return;
+      const colour = game.moverOf(i + 1);
+      counts[colour][review.rating] = (counts[colour][review.rating] ?? 0) + 1;
+    });
+    for (const grade of GRADES) {
+      const label = element("span", "stats-label stats-grade");
+      label.append(element("span", `grade-dot ${ratingClass(grade)}`), element("span", "", grade));
+      row(label, sides.map((c) => {
+        const cell = element("span", "stats-cell");
+        cell.append(element("span", `count-chip ${ratingClass(grade)}`, String(counts[c][grade] ?? 0)));
+        return cell;
+      }));
+    }
+  }
+  card.append(table);
+  if (done < total) card.append(element("p", "stats-note", `Stockfish is still checking the game (${done} of ${total}); the numbers will settle.`));
+
+  // The rating, in its own table
+  const rating = element("div", "stats-card rating-card");
+  const line = element("div", "stats-row");
+  line.append(element("span", "stats-label", "Rating"));
+  for (const colour of sides) {
+    const cell = element("span", "stats-cell");
+    cell.append(element("span", "rating-block", ratings[colour] ? String(ratings[colour]) : "-"));
+    line.append(cell);
+  }
+  rating.append(line);
+  box.append(card, rating);
+  updateHistoryAccuracy(overall);
+}
+
+// -- Game history: your games against Stockfish, saved on this device -----------
+
+interface SavedGame {
+  id: string;
+  date: string; // ISO
+  pgn: string;
+  user: Color;
+  level: number;
+  opening: string;
+  timeControl: string;
+  result: "win" | "draw" | "loss";
+  accuracy?: number;
+  mode: Mode;
+}
+
+const HISTORY_KEY = "chess-trainer-history";
+let currentGameId: string | null = null;
+let historyColour: Color | "all" = "all";
+const historyResults = new Set<SavedGame["result"]>();
+
+function loadHistory(): SavedGame[] {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(games: SavedGame[]) {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(games.slice(0, 500)));
+  } catch {
+    // storage full or blocked: the record just isn't kept
+  }
+}
+
+/** The opening's family name, e.g. "Italian Game" from "C50 Italian Game: ...". */
+function openingFamily(): string {
+  if (!book || !isStartPosition(game.positionAt(0))) return "";
+  const named = book.gameOpenings(game.positionAt(0), gameMoves()).map((i) => i.opening).filter(Boolean);
+  const last = named[named.length - 1];
+  return last ? mainFamily([last[1]]) : "";
+}
+
+/** A match has ended: keep it in the game history. */
+function recordGame() {
+  if (!match || game.length === 0) return;
+  const result = gameHeaders.Result;
+  const winner = result === "1-0" ? "white" : result === "0-1" ? "black" : result === "1/2-1/2" ? null : undefined;
+  if (winner === undefined) return;
+  const outcome: SavedGame["result"] = winner === null ? "draw" : winner === match.user ? "win" : "loss";
+  const entry: SavedGame = {
+    id: `${Date.now()}`,
+    date: new Date().toISOString(),
+    pgn: writePgn(game, gameHeaders, clockTimes),
+    user: match.user,
+    level: match.level,
+    opening: openingFamily(),
+    timeControl: gameHeaders.TimeControl ?? "",
+    result: outcome,
+    mode,
+  };
+  currentGameId = entry.id;
+  saveHistory([entry, ...loadHistory()]);
+}
+
+/** Once Stockfish has checked the game, note your accuracy in the history. */
+function updateHistoryAccuracy(overall: Partial<Record<Color, number>>) {
+  if (!currentGameId) return;
+  const { done, total } = analyser.progress();
+  if (done < total) return;
+  const games = loadHistory();
+  const entry = games.find((g) => g.id === currentGameId);
+  if (!entry || entry.accuracy !== undefined) return;
+  const accuracy = overall[entry.user];
+  if (accuracy === undefined) return;
+  entry.accuracy = Math.round(accuracy);
+  saveHistory(games);
+}
+
+function timeControlLabel(value: string): string {
+  if (!value) return "no clock";
+  const [base, inc] = value.split("+").map(Number);
+  return `${Math.round(base / 60 * 10) / 10}+${inc}`;
+}
+
+function shortDate(iso: string): string {
+  const date = new Date(iso);
+  const today = new Date();
+  if (date.toDateString() === today.toDateString()) return "Today";
+  const yesterday = new Date(today.getTime() - 86_400_000);
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
 function drawHistory() {
-  $("history").textContent = "";
+  const box = $("history");
+  box.replaceChildren();
+  const games = loadHistory();
+  if (!games.length) {
+    tabMessage(box, "No games yet. Play against Stockfish and your record builds up here.");
+    return;
+  }
+  // Colour: all, White or Black
+  const colours = element("div", "seg history-colours");
+  for (const [value, label] of [["all", "All"], ["white", "White"], ["black", "Black"]] as const) {
+    const button = element("button", value === historyColour ? "on" : "", label);
+    button.addEventListener("click", () => {
+      historyColour = value;
+      drawHistory();
+    });
+    colours.append(button);
+  }
+  // Results: wins, draws and losses, as filters that combine with the colour
+  const ofColour = games.filter((g) => historyColour === "all" || g.user === historyColour);
+  const record = element("div", "history-record");
+  for (const [value, label] of [["win", "Wins"], ["draw", "Draws"], ["loss", "Losses"]] as const) {
+    const button = element("button", `history-result ${value} ${historyResults.has(value) ? "on" : ""}`);
+    button.append(element("b", "", String(ofColour.filter((g) => g.result === value).length)), element("span", "", label));
+    button.setAttribute("aria-pressed", String(historyResults.has(value)));
+    button.addEventListener("click", () => {
+      if (historyResults.has(value)) historyResults.delete(value);
+      else historyResults.add(value);
+      drawHistory();
+    });
+    record.append(button);
+  }
+  const shown = ofColour.filter((g) => !historyResults.size || historyResults.has(g.result));
+  const list = element("div", "history-list");
+  for (const saved of shown) {
+    const item = element("button", "history-game");
+    const mark = element("span", `history-mark ${saved.result}`, saved.result === "win" ? "W" : saved.result === "loss" ? "L" : "D");
+    const text = element("span", "history-text");
+    text.append(
+      element("span", "history-title", `vs Stockfish · ${shortName(LEVELS[saved.level] ?? LEVELS[0])}`),
+      element("span", "history-meta", [saved.opening || "Game", saved.user === "white" ? "White" : "Black",
+        timeControlLabel(saved.timeControl), saved.accuracy !== undefined ? `${saved.accuracy}%` : ""].filter(Boolean).join(" · ")),
+    );
+    item.append(mark, text, element("span", "history-date", shortDate(saved.date)));
+    item.addEventListener("click", () => openSavedGame(saved));
+    list.append(item);
+  }
+  if (!shown.length) list.append(element("p", "stats-note", "No games match these filters."));
+  box.append(colours, record, list);
+}
+
+/** Replay a saved game with the coach. */
+function openSavedGame(saved: SavedGame) {
+  const [parsed] = readPgn(saved.pgn);
+  if (!parsed) return;
+  const { game: loaded } = parsed.load();
+  mode = "practice";
+  resetBoard(loaded, parsed.headers);
+  currentGameId = saved.id;
+  canReview = false;
+  reviewing = true;
+  reviewTitle = "";
+  orientation = saved.user;
+  viewPly = loaded.length ? 0 : null;
+  currentView = "board";
+  refresh();
 }
 
 async function onNewGame() {
-  if (match && game.length && !game.outcome() && !(await message("New game?", "This game will end.", true))) return;
+  if (match && game.length && !game.outcome() && !(await message("New game?", "Are you sure? This game will end.", true))) return;
   showMenu();
 }
 

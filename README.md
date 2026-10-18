@@ -164,6 +164,16 @@ any difference. The tests folder isn't part of the built site.
   Alien Gambit (which uses the Italian against anything but 1...c6; systems of a
   White opening are chosen by both first moves). Stockfish plays a gambit's book
   moves at every level (GAMBIT_TOLERANCE).
+- **Streamlined screens** (2026-10-19): the coach welcomes you and explains
+  each mode; Play / Practice (Learn an opening tiles or an untimed practice
+  match) / Game analysis setup screens. In the game: a fixed-size coach bubble
+  with natural one-line verdicts (`src/narrate.ts`) and icon buttons (`src/icons.ts`);
+  Tell me more dims the screen for the full review and "What can they do
+  now?"; lines are talked through one move at a time (the stepper); Strategy
+  goes straight to the opening's main line or Stockfish's plan, with Quiz me.
+  Tabs for Statistics (accuracy, every grade counted, an estimated rating from
+  average centipawn loss) and Game history (saved on this device, filtered by
+  colour and result). Settings sit behind the gear.
 - **Feature tour** (`src/tour.ts`): callouts shown the first time each mode is
   used, with Back / Next / No thanks and "Don't show this again"; can be watched
   again from the menu or the panel.

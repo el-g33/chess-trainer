@@ -3,7 +3,7 @@
 
 const PATHS: Record<string, string> = {
   gear:
-    '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/><circle cx="12" cy="12" r="6.5"/>',
+    '<circle cx="12" cy="12" r="8.2" stroke-width="3.4" stroke-dasharray="3.2 3.24" stroke-linecap="butt"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2.4"/>',
   back: '<path d="M15 5l-7 7 7 7"/>',
   next: '<path d="M9 5l7 7-7 7"/>',
   first: '<path d="M18 5l-7 7 7 7M11 5l-7 7 7 7"/>',
