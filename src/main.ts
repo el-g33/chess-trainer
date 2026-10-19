@@ -1490,7 +1490,10 @@ let puzzle: PuzzleState | null = null;
 interface ExploreState {
   user: Color;
   band: Band;
+  auto: boolean; // they reply by themselves after your move (pause to move for them)
 }
+
+const AUTO_REPLY_DELAY = 1800; // ms: time to see your move's rating first
 let explore: ExploreState | null = null;
 let exploreBand: Band = "club";
 
@@ -1934,7 +1937,7 @@ function startExplore(fen: string, user: Color) {
   const opponent = `Opponent · ${BANDS[exploreBand].name}`;
   resetBoard(new Game(fen), { White: user === "white" ? playerName() : opponent, Black: user === "black" ? playerName() : opponent, Date: today() });
   gameOrigin = "train";
-  explore = { user, band: exploreBand };
+  explore = { user, band: exploreBand, auto: true };
   orientation = user;
   refresh();
   void showIdeas();
@@ -1944,11 +1947,35 @@ function startExplore(fen: string, user: Color) {
 function exploreMove(move: NormalMove) {
   const from = currentPly();
   while (game.length > from) game.undo();
+  const yours = game.position.turn === explore?.user;
   game.play(move);
   afterMove();
+  if (yours) autoReply();
 }
 
-const SIMULATE: CoachButton = { ico: "play", label: "Simulate: play it out", kind: "accent", run: () => closeStepper() };
+/** After your move they reply by themselves, unless auto-reply is paused or
+ *  you've moved on (stepped back, opened something) in the meantime. */
+function autoReply() {
+  if (!explore?.auto) return;
+  const length = game.length;
+  const state = explore;
+  setTimeout(() => {
+    if (explore !== state || !explore.auto || game.length !== length || viewPly !== null || stepper || busy) return;
+    if (game.position.turn === explore.user || game.position.isEnd()) return;
+    void letThemReply();
+  }, AUTO_REPLY_DELAY);
+}
+
+const SIMULATE: CoachButton = {
+  ico: "play", label: "Simulate: play it out", kind: "accent",
+  run: () => {
+    closeStepper();
+    // if it's their move to start with, they make it
+    if (explore && game.position.turn !== explore.user && viewPly === null) {
+      if (explore.auto) void letThemReply();
+    }
+  },
+};
 
 /** The best move for your side, the replies an opponent of the chosen
  *  strength would likely play, and (when the best line is forcing) how it
@@ -2058,18 +2085,36 @@ function exploreSays(reviews: (Review | undefined)[]): CoachSay {
   const position = game.positionAt(ply);
   const theirs = position.turn !== user;
   const over = position.isEnd();
+  const auto = explore!.auto;
   const buttons: CoachButton[] = [];
-  if (theirs && !over) buttons.push({ ico: "play", label: `Let them reply (${BANDS[band].name})`, kind: "accent", run: () => void letThemReply() });
+  // Their move waits for you when auto-reply is paused (or you've stepped back)
+  const waiting = theirs && !over && (!auto || viewPly !== null);
+  if (waiting) buttons.push({ ico: "play", label: `Let them reply (${BANDS[band].name})`, kind: "accent", run: () => void letThemReply() });
   if (!over) buttons.push({ ico: "bulb", label: theirs ? "Their likely moves" : "Best move and their replies", run: () => void showIdeas() });
+  buttons.push(auto
+    ? { ico: "pause", label: "Pause auto-reply, to move for them yourself", run: () => { explore!.auto = false; refresh(); } }
+    : { ico: "replay", label: "Turn auto-reply back on", run: () => {
+      explore!.auto = true;
+      refresh();
+      if (game.position.turn !== user && viewPly === null) void letThemReply();
+    } });
   if (ply === 0) {
-    const text = theirs ? "It's their move. Move for them on the board, or let them reply." : "Your move. Follow my idea or play your instinct, and I'll rate it.";
+    const text = theirs ? (auto ? "It's their move. Simulate, and they'll make it." : "It's their move. Move for them on the board, or let them reply.")
+      : auto ? "Your move. They'll reply by themselves (pause to move for them)." : "Your move. Follow my idea or play your instinct, and I'll rate it.";
     return { mood: "talk", text, buttons };
   }
   const review = reviews[ply - 1];
   if (!review) return { mood: "think", text: "Let me check that move...", buttons };
   const said = verdict(review, game.positionAt(ply - 1), position, analyser.evals.get(fenOf(position)), user, ply);
-  // what comes next: their move (yours to make, or theirs to choose), or yours
-  const text = over ? said : theirs ? `${said} Now their move: play it, or let them reply.` : `${said} Your move.`;
+  let text: string;
+  if (over) text = said;
+  else if (theirs) text = waiting ? `${said} Now their move: play it, or let them reply.` : `${said} They're replying...`;
+  else {
+    // after their reply, your own move's rating too, so it isn't missed
+    const yours = ply >= 2 ? reviews[ply - 2] : undefined;
+    const mine = yours ? `Your ${game.moves[ply - 2].san}: ${yours.rating.toLowerCase()}. ` : "";
+    text = `${mine}${said} Your move.`;
+  }
   return { mood: moodForRating(review.rating), text, buttons: [...buttons, TELL_MORE] };
 }
 
