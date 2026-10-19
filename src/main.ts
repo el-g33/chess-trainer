@@ -2107,15 +2107,25 @@ function exploreSays(reviews: (Review | undefined)[]): CoachSay {
   const buttons: CoachButton[] = [];
   // Their move waits for you when auto-reply is paused (or you've stepped back)
   const waiting = theirs && !over && (!auto || viewPly !== null);
-  if (waiting && !thinking) buttons.push({ ico: "play", label: `Let them reply (${BANDS[band].name})`, kind: "accent", run: () => void letThemReply() });
+  const stepped = viewPly !== null;
+  if (waiting && !thinking) {
+    buttons.push({ ico: "play", label: stepped ? `Let them play from here (${BANDS[band].name})` : `Let them reply (${BANDS[band].name})`, kind: "accent", run: () => void letThemReply() });
+  }
   if (!over) buttons.push({ ico: "bulb", label: theirs ? "Their likely moves" : "Best move and their replies", run: () => void showIdeas() });
   buttons.push(auto
     ? { ico: "pause", label: "Pause auto-reply, to move for them yourself", run: () => { explore!.auto = false; refresh(); } }
     : { ico: "replay", label: "Turn auto-reply back on", run: () => {
       explore!.auto = true;
       refresh();
-      if (game.position.turn !== user && viewPly === null) void letThemReply();
+      // they carry on from the position on the board, with fresh moves
+      if (position.turn !== user && !over) void letThemReply();
     } });
+  // Stepped back: say how to carry on from here (the moves after it get replaced)
+  if (stepped && !over && !thinking) {
+    const text = theirs ? "You've stepped back to their move. Move for them, or let them play from here with fresh moves."
+      : "You've stepped back. Play a move from here and they'll carry on from it.";
+    return { mood: "talk", text, buttons };
+  }
   if (ply === 0) {
     const text = theirs ? (auto ? "It's their move. Simulate, and they'll make it." : "It's their move. Move for them on the board, or let them reply.")
       : auto ? "Your move. They'll reply by themselves (pause to move for them)." : "Your move. Follow my idea or play your instinct, and I'll rate it.";
