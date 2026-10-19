@@ -318,6 +318,14 @@ const ground: Api = Chessground($("board"), {
   movable: { free: false, showDests: true, events: { after: (from, to) => onBoardMove(from, to) } },
 });
 // The coach's arrow colours, next to the board's own
+// Chessground remembers where the board is on the page. When the layout moves
+// the board (a card opens or closes, the editor goes away) without a resize or
+// scroll, that memory goes stale and touches land on the wrong squares - so
+// forget it at the start of every touch or click, before chessground reads it.
+for (const kind of ["mousedown", "touchstart"]) {
+  $("board").addEventListener(kind, () => ground.state.dom.bounds.clear(), { capture: true, passive: true });
+}
+
 Object.assign(ground.state.drawable.brushes, {
   you: { key: "you", color: YOUR_ARROW, opacity: 0.85, lineWidth: 10 },
   them: { key: "them", color: OPPONENT_ARROW, opacity: 0.85, lineWidth: 10 },
@@ -1239,6 +1247,7 @@ function goTo(ply: number) {
   analysis = null; // moving through the game leaves any analysis line
   viewPly = ply === game.length ? null : ply;
   refresh();
+  if (explore && viewPly === null) autoReply(); // back at the end: they carry on
 }
 
 function onUndo() {
@@ -1491,6 +1500,7 @@ interface ExploreState {
   user: Color;
   band: Band;
   auto: boolean; // they reply by themselves after your move (pause to move for them)
+  thinking: boolean; // their reply is being chosen (the board stays free meanwhile)
 }
 
 const AUTO_REPLY_DELAY = 1800; // ms: time to see your move's rating first
@@ -1937,7 +1947,7 @@ function startExplore(fen: string, user: Color) {
   const opponent = `Opponent · ${BANDS[exploreBand].name}`;
   resetBoard(new Game(fen), { White: user === "white" ? playerName() : opponent, Black: user === "black" ? playerName() : opponent, Date: today() });
   gameOrigin = "train";
-  explore = { user, band: exploreBand, auto: true };
+  explore = { user, band: exploreBand, auto: true, thinking: false };
   orientation = user;
   refresh();
   void showIdeas();
@@ -1947,21 +1957,21 @@ function startExplore(fen: string, user: Color) {
 function exploreMove(move: NormalMove) {
   const from = currentPly();
   while (game.length > from) game.undo();
-  const yours = game.position.turn === explore?.user;
   game.play(move);
   afterMove();
-  if (yours) autoReply();
+  autoReply();
 }
 
-/** After your move they reply by themselves, unless auto-reply is paused or
- *  you've moved on (stepped back, opened something) in the meantime. */
+/** When it's their move at the end of the line, they reply by themselves
+ *  after a moment - unless auto-reply is paused or you've moved on (stepped
+ *  back, played something, opened the coach's card) in the meantime. */
 function autoReply() {
-  if (!explore?.auto) return;
+  if (!explore?.auto || viewPly !== null) return;
+  if (game.position.turn === explore.user || game.position.isEnd()) return;
   const length = game.length;
   const state = explore;
   setTimeout(() => {
-    if (explore !== state || !explore.auto || game.length !== length || viewPly !== null || stepper || busy) return;
-    if (game.position.turn === explore.user || game.position.isEnd()) return;
+    if (explore !== state || !explore.auto || game.length !== length || viewPly !== null || stepper) return;
     void letThemReply();
   }, AUTO_REPLY_DELAY);
 }
@@ -2062,18 +2072,26 @@ function forcingStart(position: Chess, line: NormalMove[]): NormalMove[] {
 
 /** Their move, chosen the way a player of the chosen strength might. */
 async function letThemReply() {
-  if (!explore || busy) return;
+  if (!explore || explore.thinking) return;
+  const state = explore;
+  const length = game.length;
+  const ply = currentPly();
   const position = base();
-  setBusy(true, "They're thinking...");
+  if (position.turn === state.user || position.isEnd()) return;
+  // No busy lock: you can keep stepping through or moving while they think
+  state.thinking = true;
+  refresh();
   try {
-    const odds = await likelyMoves(coachAnalysis, position, explore.band);
-    setBusy(false);
+    const odds = await likelyMoves(coachAnalysis, position, state.band);
+    state.thinking = false;
+    // You've moved on meanwhile: their reply no longer fits
+    if (explore !== state || game.length !== length || currentPly() !== ply) return refresh();
     const choice = pickLikely(odds);
-    if (choice && explore) exploreMove(choice.move);
+    if (choice) exploreMove(choice.move);
     else refresh();
   } catch (error) {
+    state.thinking = false;
     errorText = `Something went wrong: ${error}`;
-    setBusy(false);
     refresh();
   }
 }
@@ -2085,11 +2103,11 @@ function exploreSays(reviews: (Review | undefined)[]): CoachSay {
   const position = game.positionAt(ply);
   const theirs = position.turn !== user;
   const over = position.isEnd();
-  const auto = explore!.auto;
+  const { auto, thinking } = explore!;
   const buttons: CoachButton[] = [];
   // Their move waits for you when auto-reply is paused (or you've stepped back)
   const waiting = theirs && !over && (!auto || viewPly !== null);
-  if (waiting) buttons.push({ ico: "play", label: `Let them reply (${BANDS[band].name})`, kind: "accent", run: () => void letThemReply() });
+  if (waiting && !thinking) buttons.push({ ico: "play", label: `Let them reply (${BANDS[band].name})`, kind: "accent", run: () => void letThemReply() });
   if (!over) buttons.push({ ico: "bulb", label: theirs ? "Their likely moves" : "Best move and their replies", run: () => void showIdeas() });
   buttons.push(auto
     ? { ico: "pause", label: "Pause auto-reply, to move for them yourself", run: () => { explore!.auto = false; refresh(); } }
@@ -2108,7 +2126,7 @@ function exploreSays(reviews: (Review | undefined)[]): CoachSay {
   const said = verdict(review, game.positionAt(ply - 1), position, analyser.evals.get(fenOf(position)), user, ply);
   let text: string;
   if (over) text = said;
-  else if (theirs) text = waiting ? `${said} Now their move: play it, or let them reply.` : `${said} They're replying...`;
+  else if (theirs) text = thinking ? `${said} They're thinking...` : waiting ? `${said} Now their move: play it, or let them reply.` : `${said} They're replying...`;
   else {
     // after their reply, your own move's rating too, so it isn't missed
     const yours = ply >= 2 ? reviews[ply - 2] : undefined;
