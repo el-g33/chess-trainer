@@ -1417,3 +1417,38 @@ body {
     width: 32px;
   }
 }
+
+/* What if: a blue bar in place of the top player bar, so nothing moves */
+.whatif-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 34px;
+  padding: 0 4px 0 12px;
+  border-radius: var(--radius);
+  background: #2c6bb3;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.whatif-bar[hidden],
+.board-area.whatif #bar-top {
+  display: none;
+}
+
+#whatif-exit {
+  min-height: 0;
+  padding: 3px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: #2c6bb3;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+#whatif-exit:hover:not(:disabled) {
+  background: #e8f0fa;
+}

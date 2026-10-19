@@ -178,6 +178,7 @@ interface Match {
 interface Analysis {
   fromPly: number;
   line: Game; // starts at the game position, holds the analysis moves
+  ahead: NormalMove[]; // moves stepped back over (forward replays them)
 }
 
 interface Insight {
@@ -1118,10 +1119,11 @@ function onBoardMove(from: Key, to: Key) {
 
 function analysisMove(move: NormalMove) {
   if (!analysis) {
-    analysis = { fromPly: currentPly(), line: new Game(fenOf(base())) };
+    analysis = { fromPly: currentPly(), line: new Game(fenOf(base())), ahead: [] };
     quiz = null;
   }
   const played = analysis.line.play(move);
+  analysis.ahead = []; // a new move replaces the ones stepped back over
   void play(soundForMove(played.san));
   preview = null;
   refresh();
@@ -1135,13 +1137,45 @@ function analysisLineText(): string {
 
 /** Take back the last analysis move; with none left, leave analysis. */
 function analysisTakeBack() {
-  if (analysis && analysis.line.length) {
-    analysis.line.undo();
-    if (!analysis.line.length) analysis = null;
-    refresh();
-  } else {
-    exitAnalysis();
+  if (!analysis || !analysis.line.length) return;
+  const undone = analysis.line.moves[analysis.line.length - 1].move;
+  analysis.line.undo();
+  analysis.ahead.unshift(undone);
+  preview = null;
+  refresh();
+}
+
+function analysisForward() {
+  if (!analysis || !analysis.ahead.length) return;
+  const played = analysis.line.play(analysis.ahead.shift()!);
+  void play(soundForMove(played.san));
+  preview = null;
+  refresh();
+}
+
+/** The step buttons and arrow keys: in a What-if they move through the
+ *  What-if moves, never the game. */
+function navigate(where: "first" | "back" | "forward" | "last") {
+  if (analysis) {
+    if (where === "back") analysisTakeBack();
+    else if (where === "forward") analysisForward();
+    else if (where === "first") while (analysis.line.length) analysisTakeBack();
+    else while (analysis.ahead.length) analysisForward();
+    return;
   }
+  if (where === "first") goTo(0);
+  else if (where === "back") goTo(currentPly() - 1);
+  else if (where === "forward") goTo(currentPly() + 1);
+  else goTo(game.length);
+}
+
+function drawWhatIf() {
+  const bar = $("whatif-bar");
+  bar.hidden = !analysis;
+  document.querySelector(".board-area")!.classList.toggle("whatif", analysis !== null);
+  if (!analysis) return;
+  const n = analysis.line.length;
+  $("whatif-text").textContent = n ? `What if: ${n} move${n === 1 ? "" : "s"} deep` : "What if: make a move";
 }
 
 function exitAnalysis() {
@@ -1812,6 +1846,7 @@ function refresh() {
   drawMoveList(reviews, info);
   drawReview(reviews, info);
   drawCoachFace(reviews);
+  drawWhatIf();
   drawMoveStrip(reviews);
   syncDropdowns();
   applyView();
@@ -2175,7 +2210,10 @@ function drawMoveList(reviews: (Review | undefined)[], info: OpeningInfo[]) {
   const total = game.length;
   viewLabel.textContent =
     viewPly === null ? (total ? "Showing the current position" : "No moves yet") : `Viewing move ${viewPly} of ${total}`;
-  const enabled = [current > 0, current > 0, current < total, current < total];
+  // In a What-if the buttons step through its moves
+  const back = analysis ? analysis.line.length > 0 : current > 0;
+  const forward = analysis ? analysis.ahead.length > 0 : current < total;
+  const enabled = [back, back, forward, forward];
   const order = ["first", "back", "forward", "last"];
   for (const button of navButtons) button.disabled = !enabled[order.indexOf(button.dataset.nav!)];
 
@@ -3489,13 +3527,8 @@ function wireButtons() {
     closeDialog(false);
   });
 
-  const steps: Record<string, () => void> = {
-    first: () => goTo(0),
-    back: () => goTo(currentPly() - 1),
-    forward: () => goTo(currentPly() + 1),
-    last: () => goTo(game.length),
-  };
-  for (const button of navButtons) button.addEventListener("click", () => steps[button.dataset.nav!]());
+  for (const button of navButtons) button.addEventListener("click", () => navigate(button.dataset.nav as "first" | "back" | "forward" | "last"));
+  $("whatif-exit").addEventListener("click", exitAnalysis);
   piecesBox.addEventListener("change", () => {
     setPalette(piecesBox.value);
     saveSettings();
@@ -3648,10 +3681,10 @@ function wireButtons() {
       return;
     }
     const keys: Record<string, () => void> = {
-      ArrowLeft: () => (preview ? stepPreview(-1) : analysis ? analysisTakeBack() : goTo(currentPly() - 1)),
-      ArrowRight: () => (preview ? stepPreview(1) : goTo(currentPly() + 1)),
-      Home: () => goTo(0),
-      End: () => goTo(game.length),
+      ArrowLeft: () => (preview ? stepPreview(-1) : navigate("back")),
+      ArrowRight: () => (preview ? stepPreview(1) : navigate("forward")),
+      Home: () => navigate("first"),
+      End: () => navigate("last"),
       Escape: exitAnalysis,
       " ": () => demo && onDemoPlay(),
     };
