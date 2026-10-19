@@ -1134,6 +1134,7 @@ function movableColour(): Color | undefined {
 }
 
 function onBoardMove(from: Key, to: Key) {
+  if (editor) return; // setting up a position: editorSync keeps track
   const position = clickPosition();
   const given: NormalMove = { from: parseSquare(from)!, to: parseSquare(to)! };
   // Pawns reaching the last rank always become queens (as in the desktop app)
@@ -1527,7 +1528,7 @@ function setupTrain() {
   $("train-position").addEventListener("click", () => startEditor());
   $("train-principles").addEventListener("click", showLessonList);
   // The editor
-  ground.set({ events: { select: (key) => editorTap(key) } });
+  ground.set({ events: { select: (key) => editorTap(key), change: editorSync } });
   $("editor-empty").addEventListener("click", () => editorLoad("8/8/8/8/8/8/8/8 w - - 0 1"));
   $("editor-start").addEventListener("click", () => editorLoad(makeFen(defaultSetup())));
   $("editor-paste").addEventListener("click", openPaste);
@@ -1732,7 +1733,7 @@ function startEditor(fen = "4k3/8/8/8/8/8/8/4K3 w - - 0 1") {
   resetBoard(new Game());
   gameOrigin = "train";
   currentView = "board";
-  editor = { board: Board.empty(), turn: "white", pick: { role: "pawn", color: "white" } };
+  editor = { board: Board.empty(), turn: "white", pick: null };
   editorLoad(fen);
   orientation = "white";
   if (menuOpen) hideMenu();
@@ -1763,6 +1764,16 @@ function editorTap(key: Key) {
   refresh();
 }
 
+/** After a piece was moved (or dragged off) on the board itself. */
+function editorSync() {
+  if (!editor || editor.pick) return;
+  const board = Board.empty();
+  for (const [key, piece] of ground.state.pieces) board.set(parseSquare(key)!, { role: piece.role, color: piece.color });
+  if (makeBoardFen(board) === makeBoardFen(editor.board)) return;
+  editor.board = board;
+  refresh();
+}
+
 function drawPalette() {
   for (const colour of ["white", "black"] as Color[]) {
     const row = $(`palette-${colour}`);
@@ -1776,8 +1787,9 @@ function drawPalette() {
       button.classList.toggle("on", !!on);
       button.addEventListener("click", () => {
         if (!editor) return;
-        editor.pick = { role, color: colour };
+        editor.pick = on ? null : { role, color: colour };
         drawPalette();
+        refresh();
       });
       return button;
     }));
@@ -1790,8 +1802,9 @@ function drawPalette() {
       erase.classList.toggle("on", editor?.pick === "erase");
       erase.addEventListener("click", () => {
         if (!editor) return;
-        editor.pick = "erase";
+        editor.pick = editor.pick === "erase" ? null : "erase";
         drawPalette();
+        refresh();
       });
       row.append(erase);
     }
@@ -2608,7 +2621,10 @@ function drawBoard(reviews: (Review | undefined)[], info: OpeningInfo[]) {
     turnColor: quizWaiting() ? quiz!.threat!.them : position.turn,
     lastMove: last,
     check: quizWaiting() ? false : position.isCheck(),
-    movable: { color: colour, dests: colour ? chessgroundDests(movesFrom) : new Map() },
+    movable: editor && !editor.pick
+      ? { color: "both", free: true, showDests: false }
+      : { color: colour, free: false, showDests: true, dests: colour ? chessgroundDests(movesFrom) : new Map() },
+    draggable: { deleteOnDropOff: !!editor && !editor.pick },
   });
   // In analysis the board gets a blue frame, so it's clear the moves aren't the game
   $("board").classList.toggle("analysis", analysis !== null);
@@ -3079,7 +3095,9 @@ const STRATEGY: CoachButton = { ico: "target", label: "Strategy", run: () => voi
 /** What the coach says about the position on screen. */
 function coachSays(reviews: (Review | undefined)[]): CoachSay {
   if (busy) return { mood: "think", text: statusMessage || "Hmm, let me think...", buttons: [] };
-  if (editor) return { mood: "talk", text: "Tap a piece below, then tap squares. Tap again to remove it. Done when you're ready.", buttons: [] };
+  if (editor) return { mood: "talk", text: editor.pick
+    ? "Tap squares to place it, or tap it again to put it away. Done when you're ready."
+    : "Drag pieces to move them (off the board to remove), or pick a piece below to add. Done when you're ready.", buttons: [] };
   if (puzzle) return puzzleSays();
   if (lesson) return { mood: "talk", text: LESSONS[lesson.phase][lesson.index].title, buttons: [] };
   if (demo) {
