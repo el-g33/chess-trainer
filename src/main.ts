@@ -492,6 +492,7 @@ function buildMenu() {
   if (saved.sfOpening) sfOpeningBox.value = saved.sfOpening;
   if (saved.myOpening) myOpeningBox.value = saved.myOpening;
   for (const box of [colourBox, sfOpeningBox, myOpeningBox]) if (box.selectedIndex < 0) box.selectedIndex = 0;
+  matchColour = REPERTOIRE.find((o) => menuName(o) === myOpeningBox.value)?.colour ?? (saved.colour === "Black" ? "black" : "white");
   if (saved.rateMoves !== undefined) rateMovesBox.checked = saved.rateMoves;
   if (saved.evalBar !== undefined) evalCheck.checked = saved.evalBar;
   if (saved.boardTheme) themeBox.value = saved.boardTheme;
@@ -580,6 +581,7 @@ let homeChoice: HomeChoice | null = null;
 let greeting = "";
 let practiceTab: "learn" | "match" = "learn";
 let learnColour: Color = "white";
+let matchColour: Color = "white"; // your side in a practice match
 let learnOpening: string | null = null;
 // Where the game on screen came from, so New game goes back to that setup
 let gameOrigin: HomeChoice | "learn" | null = null;
@@ -699,13 +701,17 @@ function drawHome() {
     });
     return tile;
   }));
-  // Your opening decides your colour; Stockfish's choices are the other colour's
-  const mine = REPERTOIRE.find((o) => menuName(o) === myOpeningBox.value);
-  for (const option of sfOpeningBox.querySelectorAll("option")) {
-    const theirs = REPERTOIRE.find((o) => menuName(o) === option.value);
-    option.hidden = !!(mine && theirs && theirs.colour === mine.colour);
+  // Your side decides the openings on offer: yours for your side, Stockfish's for the other
+  for (const button of menu.querySelectorAll<HTMLButtonElement>("#match-colour button")) {
+    button.classList.toggle("on", button.dataset.colour === matchColour);
   }
-  if (sfOpeningBox.selectedOptions[0]?.hidden) sfOpeningBox.value = STOCKFISH_DECIDES;
+  for (const [box, side] of [[myOpeningBox, matchColour], [sfOpeningBox, opposite(matchColour)]] as const) {
+    for (const option of box.querySelectorAll("option")) {
+      const opening = REPERTOIRE.find((o) => menuName(o) === option.value);
+      option.hidden = !!opening && opening.colour !== side;
+    }
+    if (box.selectedOptions[0]?.hidden) box.selectedIndex = 0;
+  }
   $("practice-note").textContent = stickinessNote();
   const practiceReady = practiceTab === "learn" ? learnOpening !== null : myOpeningBox.value !== NO_OPENING;
   menu.querySelector<HTMLButtonElement>('[data-start="practice"]')!.disabled = !practiceReady;
@@ -751,6 +757,13 @@ function setupHome() {
       drawHome();
     });
   }
+  for (const button of menu.querySelectorAll<HTMLButtonElement>("#match-colour button")) {
+    button.addEventListener("click", () => {
+      matchColour = button.dataset.colour as Color;
+      drawHome();
+      saveSettings();
+    });
+  }
   for (const button of menu.querySelectorAll<HTMLButtonElement>("#learn-colour button")) {
     button.addEventListener("click", () => {
       learnColour = button.dataset.colour as Color;
@@ -794,9 +807,7 @@ function startFromHome(kind: "play" | "practice") {
   setMode(kind);
   opponentBox.selectedIndex = 0;
   if (kind === "practice") {
-    // Your colour follows the opening you practise
-    const mine = REPERTOIRE.find((o) => menuName(o) === myOpeningBox.value);
-    colourBox.value = mine ? (mine.colour === "white" ? "White" : "Black") : "Random";
+    colourBox.value = matchColour === "white" ? "White" : "Black";
   }
   saveSettings();
   onStartGame();
@@ -1996,7 +2007,8 @@ function startLesson(phase: TrainPhase, index: number) {
   if (menuOpen) hideMenu();
   const frames = item.steps.map((step) => {
     const position = Chess.fromSetup(parseFen(step.fen).unwrap()).unwrap();
-    const brush = (kind?: string) => (kind === "bad" ? "threat" : kind === "plan" ? "them" : "you");
+    // green: good, red: weaknesses and threats, blue: plans
+    const brush = (kind?: string) => (kind === "bad" ? "them" : kind === "plan" ? "guess" : "you");
     const shapes: DrawShape[] = [
       ...(step.arrows ?? []).map(([from, to, kind]) => ({ orig: from as Key, dest: to as Key, brush: brush(kind) })),
       ...(step.squares ?? []).map(([square, kind]) => ({ orig: square as Key, brush: brush(kind) })),
@@ -2133,6 +2145,7 @@ function onDemoTry() {
   opponentBox.selectedIndex = 0;
   if (opening) {
     colourBox.value = opening.colour === "white" ? "White" : "Black";
+    matchColour = opening.colour;
     myOpeningBox.value = menuName(opening);
   }
   refresh();

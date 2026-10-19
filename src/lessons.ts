@@ -737,5 +737,496 @@ export const LESSONS: Record<TrainPhase, Lesson[]> = {
       ]
     }
   ],
-  endgame: [],
+  endgame: [
+    {
+      "title": "The active king",
+      "summary": "In the endgame, the king becomes a fighting piece.",
+      "themes": [
+        "pawnEndgame"
+      ],
+      "steps": [
+        {
+          "fen": "8/pp3kpp/8/3K4/8/8/PP4PP/8 w - - 0 1",
+          "text": "With the queens gone, the king is safe to come out, and it becomes a strong piece. Here the pawns are equal, but White's king is in the centre and Black's is not.",
+          "squares": [
+            [
+              "d5",
+              "good"
+            ],
+            [
+              "f7",
+              "bad"
+            ]
+          ]
+        },
+        {
+          "fen": "8/pp3kpp/8/3K4/8/8/PP4PP/8 w - - 0 1",
+          "text": "White's king walks in via d6 and c7 to attack Black's queenside pawns. Black's king is too far away to defend them.",
+          "arrows": [
+            [
+              "d5",
+              "d6",
+              "good"
+            ],
+            [
+              "d6",
+              "c7",
+              "good"
+            ]
+          ],
+          "squares": [
+            [
+              "b7",
+              "bad"
+            ],
+            [
+              "a7",
+              "bad"
+            ]
+          ]
+        },
+        {
+          "fen": "8/pp3kpp/8/3K4/8/8/PP4PP/8 w - - 0 1",
+          "text": "So in the endgame, bring your king towards the centre early, and towards the pawns you want to win or stop."
+        }
+      ]
+    },
+    {
+      "title": "The opposition",
+      "summary": "The key to king and pawn endgames.",
+      "themes": [
+        "pawnEndgame",
+        "zugzwang"
+      ],
+      "steps": [
+        {
+          "fen": "8/3k4/8/3K4/3P4/8/8/8 b - - 0 1",
+          "text": "The kings face each other with one square between them: this is called the opposition. It's Black's move, and Black has to step aside.",
+          "squares": [
+            [
+              "d5",
+              "good"
+            ],
+            [
+              "d7",
+              "bad"
+            ],
+            [
+              "d6",
+              "plan"
+            ]
+          ]
+        },
+        {
+          "fen": "8/2k5/4K3/8/3P4/8/8/8 b - - 2 2",
+          "text": "After ...Kc7, Ke6 puts White's king in front of the pawn on the sixth rank. From there the pawn walks through to queen.",
+          "arrows": [
+            [
+              "d4",
+              "d8",
+              "good"
+            ]
+          ]
+        },
+        {
+          "fen": "8/3k4/8/3K4/3P4/8/8/8 w - - 0 1",
+          "text": "The same position with White to move is only a draw. White's king has to give way, and Black's king stays in front of the pawn.",
+          "squares": [
+            [
+              "d5",
+              "bad"
+            ],
+            [
+              "d7",
+              "good"
+            ]
+          ]
+        },
+        {
+          "fen": "8/3k4/8/3K4/3P4/8/8/8 w - - 0 1",
+          "text": "So the side that doesn't have to move \"has the opposition\". With a pawn, take it to get your king in front. Without one, take it to block the way."
+        }
+      ]
+    },
+    {
+      "title": "The rule of the square",
+      "summary": "Can the king catch the pawn? Count without counting.",
+      "themes": [
+        "promotion",
+        "advancedPawn"
+      ],
+      "steps": [
+        {
+          "fen": "8/8/8/5k2/P7/8/8/K7 b - - 0 1",
+          "text": "Can Black's king catch the a-pawn? Draw a square from the pawn to its queening square. If the king can step inside, it catches the pawn.",
+          "arrows": [
+            [
+              "a4",
+              "e4",
+              "plan"
+            ],
+            [
+              "e4",
+              "e8",
+              "plan"
+            ],
+            [
+              "a8",
+              "e8",
+              "plan"
+            ]
+          ]
+        },
+        {
+          "fen": "8/8/8/5k2/P7/8/8/K7 b - - 0 1",
+          "text": "Black to move: ...Ke5 steps into the square, so the pawn is caught.",
+          "arrows": [
+            [
+              "f5",
+              "e5",
+              "good"
+            ]
+          ]
+        },
+        {
+          "fen": "8/8/8/P4k2/8/8/8/K7 b - - 0 1",
+          "text": "With White to move, a5 makes the square smaller, and Black's king can't get in. The pawn queens.",
+          "arrows": [
+            [
+              "a5",
+              "d5",
+              "plan"
+            ],
+            [
+              "d5",
+              "d8",
+              "plan"
+            ],
+            [
+              "a8",
+              "d8",
+              "plan"
+            ]
+          ],
+          "squares": [
+            [
+              "f5",
+              "bad"
+            ]
+          ]
+        },
+        {
+          "fen": "8/8/8/P4k2/8/8/8/K7 b - - 0 1",
+          "text": "One catch: a pawn on its starting square can move two squares at once, so draw its square from the square in front of it."
+        }
+      ]
+    },
+    {
+      "title": "Passed pawns",
+      "summary": "Push them, and use them to pull the enemy king away.",
+      "themes": [
+        "advancedPawn",
+        "promotion"
+      ],
+      "steps": [
+        {
+          "fen": "8/5kpp/8/8/P7/8/5KPP/8 w - - 0 1",
+          "text": "A passed pawn has no enemy pawns in front of it or on the files beside it. White's a-pawn is passed, and it's far from the other pawns: an outside passed pawn.",
+          "arrows": [
+            [
+              "a4",
+              "a8",
+              "good"
+            ]
+          ],
+          "squares": [
+            [
+              "a4",
+              "good"
+            ]
+          ]
+        },
+        {
+          "fen": "8/5kpp/8/8/P7/8/5KPP/8 w - - 0 1",
+          "text": "Black's king has to go and stop it. While it does, White's king walks over and eats Black's kingside pawns.",
+          "arrows": [
+            [
+              "f7",
+              "b6",
+              "bad"
+            ],
+            [
+              "f2",
+              "f4",
+              "good"
+            ],
+            [
+              "f4",
+              "g5",
+              "good"
+            ]
+          ]
+        },
+        {
+          "fen": "8/5kpp/8/8/P7/8/5KPP/8 w - - 0 1",
+          "text": "Passed pawns must be pushed: the further they go, the more of the enemy army they tie down."
+        }
+      ]
+    },
+    {
+      "title": "Rooks behind passed pawns",
+      "summary": "The rook belongs behind the pawn, yours or theirs.",
+      "themes": [
+        "rookEndgame"
+      ],
+      "steps": [
+        {
+          "fen": "r5k1/5ppp/8/P7/8/8/5PPP/R5K1 w - - 0 1",
+          "text": "White's rook is behind the passed a-pawn. Black's rook is in front of it, where its only job is to stop the pawn.",
+          "arrows": [
+            [
+              "a1",
+              "a5",
+              "good"
+            ]
+          ],
+          "squares": [
+            [
+              "a8",
+              "bad"
+            ]
+          ]
+        },
+        {
+          "fen": "r5k1/5ppp/8/P7/8/8/5PPP/R5K1 w - - 0 1",
+          "text": "Each time the pawn moves, White's rook gets more room and Black's gets less. Black's rook is stuck on the a-file, while White's king is free to come forward.",
+          "arrows": [
+            [
+              "g1",
+              "f2",
+              "good"
+            ],
+            [
+              "f2",
+              "e3",
+              "good"
+            ]
+          ]
+        },
+        {
+          "fen": "r5k1/5ppp/8/P7/8/8/5PPP/R5K1 w - - 0 1",
+          "text": "The rule works for defending too: if your opponent has the passed pawn, put your rook behind it and keep it busy."
+        }
+      ]
+    },
+    {
+      "title": "The Lucena position",
+      "summary": "How to win with rook and pawn against rook.",
+      "themes": [
+        "rookEndgame",
+        "promotion"
+      ],
+      "steps": [
+        {
+          "fen": "1K6/1P1k4/8/8/8/8/r7/2R5 w - - 0 1",
+          "text": "This is the Lucena position. White's pawn is on the seventh, the king is in front of it, and the rook keeps Black's king cut off on the c-file. But Black's rook will check White's king if it comes out.",
+          "arrows": [
+            [
+              "c1",
+              "c8",
+              "good"
+            ]
+          ],
+          "squares": [
+            [
+              "b8",
+              "good"
+            ],
+            [
+              "d7",
+              "bad"
+            ]
+          ]
+        },
+        {
+          "fen": "1K6/1P2k3/8/8/8/8/r7/3R4 w - - 2 2",
+          "text": "First, a check pushes Black's king one more file away.",
+          "arrows": [
+            [
+              "c1",
+              "d1",
+              "good"
+            ]
+          ]
+        },
+        {
+          "fen": "1K6/1P2k3/8/8/3R4/8/r7/8 b - - 3 2",
+          "text": "Then the rook goes to the fourth rank. This is called building a bridge.",
+          "arrows": [
+            [
+              "d4",
+              "b4",
+              "plan"
+            ]
+          ]
+        },
+        {
+          "fen": "8/1P2k3/8/1K6/1R6/8/8/1r6 b - - 13 7",
+          "text": "Now White's king comes out. When the checks run out, the rook blocks the last one on b4, and the pawn queens.",
+          "squares": [
+            [
+              "b4",
+              "good"
+            ],
+            [
+              "b7",
+              "good"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "title": "The Philidor defence",
+      "summary": "How to draw a rook and pawn against rook.",
+      "themes": [
+        "rookEndgame",
+        "defensiveMove"
+      ],
+      "steps": [
+        {
+          "fen": "4k3/1R6/r7/4PK2/8/8/8/8 b - - 0 1",
+          "text": "To draw a rook endgame a pawn down, keep your king in front of the pawn and your rook on your third rank (here the sixth). White's king can't come forward.",
+          "arrows": [
+            [
+              "a6",
+              "h6",
+              "good"
+            ]
+          ],
+          "squares": [
+            [
+              "e8",
+              "good"
+            ]
+          ]
+        },
+        {
+          "fen": "4k3/1R6/2r1P3/5K2/8/8/8/8 b - - 0 2",
+          "text": "Black's rook just waits on the sixth. Once the pawn steps to e6, White's king has lost its shelter from checks.",
+          "squares": [
+            [
+              "e6",
+              "plan"
+            ]
+          ]
+        },
+        {
+          "fen": "4k3/1R6/4P3/5K2/8/8/8/2r5 w - - 1 3",
+          "text": "Now the rook goes to the far end and checks from behind. The king can't escape the checks, and the game is drawn.",
+          "arrows": [
+            [
+              "c1",
+              "f1",
+              "good"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "title": "When to trade",
+      "summary": "Trade pieces when you're ahead, pawns when you're behind.",
+      "themes": [
+        "pawnEndgame",
+        "advantage"
+      ],
+      "steps": [
+        {
+          "fen": "3r4/4kppp/8/8/8/8/P4PPP/3R2K1 w - - 0 1",
+          "text": "White is a pawn up, and the extra pawn is an outside a-pawn. Swapping the rooks makes the win much easier.",
+          "arrows": [
+            [
+              "d1",
+              "d8",
+              "good"
+            ]
+          ],
+          "squares": [
+            [
+              "a2",
+              "good"
+            ]
+          ]
+        },
+        {
+          "fen": "3k4/5ppp/8/8/8/8/P4PPP/6K1 w - - 0 2",
+          "text": "In the pawn endgame Black's king must deal with the a-pawn, and White's king gets to the kingside pawns.",
+          "arrows": [
+            [
+              "a2",
+              "a8",
+              "good"
+            ],
+            [
+              "g1",
+              "f2",
+              "good"
+            ]
+          ]
+        },
+        {
+          "fen": "3k4/5ppp/8/8/8/8/P4PPP/6K1 w - - 0 2",
+          "text": "So: when you're ahead, trade pieces but keep pawns. When you're behind, trade pawns and keep pieces. Bishops of opposite colours often draw even two pawns down."
+        }
+      ]
+    },
+    {
+      "title": "Mate with king and rook",
+      "summary": "Shrink the box, then mate on the edge.",
+      "themes": [
+        "mate",
+        "mateIn2"
+      ],
+      "steps": [
+        {
+          "fen": "8/8/8/3k4/8/8/8/4K2R w - - 0 1",
+          "text": "The rook cuts the enemy king off. Rh4 keeps Black's king in the top half of the board.",
+          "arrows": [
+            [
+              "h1",
+              "h4",
+              "good"
+            ]
+          ]
+        },
+        {
+          "fen": "8/8/8/4k3/7R/8/4K3/8 b - - 3 2",
+          "text": "Then the king comes up to help. Each time the black king steps back, the rook takes away another rank.",
+          "arrows": [
+            [
+              "e2",
+              "e3",
+              "plan"
+            ]
+          ]
+        },
+        {
+          "fen": "3k4/8/3K4/8/8/8/8/7R w - - 0 1",
+          "text": "In the end the kings face each other on the edge, and the rook checks along the back rank: Rh8 is mate.",
+          "arrows": [
+            [
+              "h1",
+              "h8",
+              "good"
+            ]
+          ]
+        },
+        {
+          "fen": "3k4/8/3K4/8/8/8/8/7R w - - 0 1",
+          "text": "With a queen it's quicker: use the queen to shrink the box a knight's move away from the king, then bring your king to help. Take care not to give stalemate."
+        }
+      ]
+    }
+  ],
 };

@@ -28,6 +28,19 @@ repository.
 | 5 | Practice mode: eval bar, live ratings, undo, FEN, free board, "what if" analysis, strategy coach | done |
 | 6 | Polish: board themes, marker font, falling king, installable + offline (PWA) | done |
 | 7 | Put online (GitHub Pages), publish source | done |
+| 8 | Training: middlegame and endgame lessons, puzzles, your own positions with the coach | done |
+
+### Training
+
+- **Lessons** (`src/lessons.ts`): 8 middlegame and 9 endgame lessons, each a
+  few positions with arrows (green good, red weaknesses and threats, blue
+  plans). Every position was checked with Stockfish when written.
+- **Puzzles** (`public/puzzles/*.json`): 150 per level (beginner to master)
+  for each phase, picked from the lichess puzzle database (CC0) by a script
+  that keeps well-tested puzzles and spreads them over themes. "Try it" at the
+  end of a lesson gives puzzles on that lesson's themes.
+- **Your position**: set up or paste a position (FEN or PGN), the coach takes
+  a side and explains the best move, the plan and its threats.
 
 ## Installing it and playing offline
 

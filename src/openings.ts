@@ -194,6 +194,7 @@ export interface Opening {
   colour: Color;
   tier: number;
   gambit?: boolean; // unsound but tricky: listed under "Gambits & traps", never suggested
+  menu?: string; // a shorter name for the drop-down menus
   plan: string;
   systems: OpeningSystem[];
 }
@@ -253,7 +254,7 @@ export const REPERTOIRE: Opening[] = [
         "castled"] }],
   },
   {
-    name: "Caro-Kann / Slav (...c6 and ...d5)", colour: "black", tier: 2,
+    name: "Caro-Kann / Slav (...c6 and ...d5)", menu: "Caro-Kann / Slav", colour: "black", tier: 2,
     plan: "Support ...d5 with ...c6 so you can recapture with a pawn. Get the " +
       "light-squared bishop out (to f5 or g4) BEFORE ...e6 so it isn't locked in, " +
       "then ...e6, ...Nd7 and castle: a very solid structure.",
@@ -339,7 +340,7 @@ export const REPERTOIRE: Opening[] = [
     ],
   },
   {
-    name: "Alien Gambit (vs the Caro-Kann)", colour: "white", tier: 1, gambit: true,
+    name: "Alien Gambit (vs the Caro-Kann)", menu: "Alien Gambit (vs Caro-Kann)", colour: "white", tier: 1, gambit: true,
     plan: "Against the Caro-Kann (1...c6) with 4...Nf6: 5.Ng5 and, after ...h6, the " +
       "knight sacrifice Nxf7 to drag Black's king out. It's unsound (Black is clearly " +
       "better with correct play), but dangerous in practice. Against anything else, " +
@@ -667,10 +668,10 @@ export function systemFor(opening: Opening, firstMove: string | null): OpeningSy
   return opening.systems[opening.systems.length - 1];
 }
 
-/** How the opening is listed in the start menu, e.g. "Italian Game (White, levels 1-3)" */
+/** How the opening is listed in the practice match menus (the side is chosen
+ *  separately, so just the name) */
 export function menuName(opening: Opening): string {
-  const colour = opening.colour === "white" ? "White" : "Black";
-  return `${opening.name} (${colour}, ${opening.gambit ? "trap practice" : TIER_NAMES[opening.tier]})`;
+  return opening.menu ?? opening.name;
 }
 
 // ---------------------------------------------------------------------------
