@@ -156,13 +156,12 @@
     <main id="game">
       <header class="game-top">
         <button type="button" id="home-button" class="icon-button home-button" aria-label="Home" title="Home"><span data-ico="home"></span></button>
-        <button type="button" id="new-game" class="new-game accent"><span data-ico="plus" data-ico-size="18"></span>New game</button>
+        <button type="button" id="new-game" class="new-game accent"><span data-ico="plus" data-ico-size="18"></span>New<span class="ng-long">&nbsp;game</span></button>
         <nav class="view-tabs" aria-label="Views">
           <button type="button" data-view="board" class="on" aria-label="Board" title="Board"><span data-ico="board"></span></button>
           <button type="button" data-view="stats" aria-label="Statistics" title="Statistics"><span data-ico="chart"></span></button>
           <button type="button" data-view="history" aria-label="Game history" title="Game history"><span data-ico="history"></span></button>
         </nav>
-        <button type="button" id="save-button" class="icon-button" aria-label="Save the game (PGN)" title="Save the game (PGN)" hidden><span data-ico="download"></span></button>
         <button type="button" class="icon-button help-button" aria-label="Help" title="Help"><span data-ico="quiz"></span></button>
         <button type="button" class="icon-button gear-button" aria-label="Settings" title="Settings"><span data-ico="gear"></span></button>
       </header>
@@ -347,6 +346,7 @@
           <label class="check wide"><input type="checkbox" id="clock-tick" checked /> Tick in your last 10 seconds</label>
           <label class="check wide"><input type="checkbox" id="eval-check" checked /> Eval bar (practice)</label>
           <label class="check wide"><input type="checkbox" id="rate-moves" checked /> Rate moves (practice)</label>
+          <button type="button" id="settings-save" class="wide settings-save"><span data-ico="download" data-ico-size="18"></span> Save this game (PGN)</button>
           <label for="plan-mode">Strategy follows</label>
           <select id="plan-mode">
             <option value="best">Stockfish's best moves</option>

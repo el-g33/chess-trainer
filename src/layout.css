@@ -1353,3 +1353,67 @@ select.dd-native {
 #save-button[hidden] {
   display: none;
 }
+
+/* The page never scrolls sideways */
+html,
+body {
+  overflow-x: hidden;
+}
+
+.game-top {
+  min-width: 0;
+}
+
+.settings-save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.settings-save[hidden] {
+  display: none;
+}
+
+/* Phones: a compact top bar, so everything fits */
+@media (max-width: 480px) {
+  .game-top {
+    gap: 4px;
+  }
+
+  .game-top .icon-button {
+    width: 34px;
+    height: 34px;
+  }
+
+  .game-top .new-game {
+    padding: 6px 12px 6px 8px;
+    font-size: 0.92rem;
+  }
+
+  .view-tabs {
+    padding: 2px;
+  }
+
+  .view-tabs button {
+    width: 36px;
+    height: 30px;
+  }
+}
+
+/* Very narrow phones: "+ New" and slightly smaller icons */
+@media (max-width: 360px) {
+  .ng-long {
+    display: none;
+  }
+
+  .game-top .icon-button {
+    width: 32px;
+    height: 32px;
+  }
+
+  .view-tabs button {
+    width: 32px;
+  }
+}

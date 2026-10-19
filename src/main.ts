@@ -2762,7 +2762,7 @@ function drawMoveStrip(list: (Review | undefined)[]) {
 }
 
 function applyView() {
-  $("save-button").hidden = currentView === "history" ? !loadHistory().length : !game.length || menuOpen;
+
   for (const tab of document.querySelectorAll<HTMLButtonElement>(".view-tabs button")) {
     tab.classList.toggle("on", tab.dataset.view === currentView);
   }
@@ -3535,7 +3535,10 @@ function wireButtons() {
     readFen();
     drawHome();
   });
-  $("save-button").addEventListener("click", openSave);
+  $("settings-save").addEventListener("click", () => {
+    settingsDialog.close();
+    openSave();
+  });
   $("save-copy").addEventListener("click", () => void saveCopy());
   $("save-file").addEventListener("click", saveDownload);
   window.setInterval(clockTick, 100);
@@ -3550,7 +3553,16 @@ function wireButtons() {
   document.addEventListener("pointerdown", unlockSounds, { once: true });
   document.addEventListener("keydown", unlockSounds, { once: true });
   $("open-pgn").addEventListener("click", openPgnDialog);
-  for (const gear of document.querySelectorAll(".gear-button")) gear.addEventListener("click", () => settingsDialog.showModal());
+  for (const gear of document.querySelectorAll(".gear-button")) {
+    gear.addEventListener("click", () => {
+      // Saving the game is only offered in a game with something to save
+      const target = menuOpen ? null : saveTarget();
+      const save = $("settings-save");
+      save.hidden = !target;
+      save.lastChild!.textContent = currentView === "history" ? " Save all your games (PGN)" : " Save this game (PGN)";
+      settingsDialog.showModal();
+    });
+  }
   settingsDialog.addEventListener("close", () => refresh());
   playerNameBox.addEventListener("change", () => {
     saveSettings();
