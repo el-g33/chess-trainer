@@ -95,6 +95,17 @@ const PRAISE: Record<string, string[]> = {
   Forced: ["That was the only move.", "No choice there, and you found it."],
 };
 
+// The same, said about your opponent's move
+const THEIR_PRAISE: Record<string, string> = {
+  Brilliant: "A brilliant sacrifice from them.",
+  Great: "A great move by them.",
+  Best: "They found the best move.",
+  Excellent: "A strong move: almost their best.",
+  Good: "A solid move from them.",
+  Book: "A known opening move.",
+  Forced: "That was their only move.",
+};
+
 /** Pick one of the phrasings, the same one each time for the same move. */
 function pick(options: string[], seed: number): string {
   return options[Math.abs(seed) % options.length];
@@ -110,7 +121,7 @@ export function verdict(review: Review, before: Chess, after: Chess,
   if (PRAISE[review.rating]) {
     const line = pick(PRAISE[review.rating], seed);
     if (mine) return line;
-    return review.rating === "Best" ? "They found the best move." : line.replace("you found", "they found");
+    return you ? THEIR_PRAISE[review.rating] : line.replace("you found", "they found");
   }
   if (review.rating === "Missed Win") return mine ? "You had a winning move there!" : "They missed a winning move there.";
   if (review.rating === "Miss") return mine ? "You missed a chance to win material." : "They missed a chance to win material.";
@@ -179,6 +190,14 @@ export function whyMove(before: Chess, move: NormalMove, listener: Color | null)
   const castles = piece.role === "king" && (Math.abs((move.to & 7) - (move.from & 7)) > 1 || victim?.color === piece.color);
   if (castles) return "it gets the king safe and brings the rook into play";
   const parts: string[] = [];
+  // Taking something smaller where it can be taken back is a sacrifice
+  const sacrifice = victim && victim.color !== piece.color && PIECE_VALUES[victim.role] < PIECE_VALUES[piece.role]
+    && after.kingAttackers(move.to, opposite(piece.color), after.board.occupied).nonEmpty();
+  if (sacrifice) {
+    const king = after.board.kingOf(opposite(piece.color));
+    const near = king !== undefined && Math.abs((king & 7) - (move.to & 7)) <= 2 && Math.abs((king >> 3) - (move.to >> 3)) <= 2;
+    return `it gives up ${yours} ${name} for a ${NAMES[victim.role]}${near ? " to break open the king" : ""}`;
+  }
   if (victim && victim.color !== piece.color) parts.push(`it wins ${theirs} ${NAMES[victim.role]}`);
   else if (after.isCheck()) parts.push("it gives check");
   else if (piece.role !== "pawn" && (piece.color === "white" ? move.from >> 3 === 0 : move.from >> 3 === 7)) parts.push(`it develops ${yours} ${name}`);
@@ -187,9 +206,75 @@ export function whyMove(before: Chess, move: NormalMove, listener: Color | null)
   const hits = targets(after, move.to);
   if (hits.length && !victim) parts.push(`attacks ${theirs} ${NAMES[hits[0]]}`);
   else if (centre.length && !(piece.role === "pawn" && CENTRE.includes(move.to))) parts.push("controls the centre");
-  if (!parts.length) return "it puts the piece on its most useful square";
+  if (!parts.length) return quietIdea(before, move, listener)?.clause ?? "it's a useful waiting move";
   if (parts.length === 1 && !parts[0].startsWith("it ")) return `it ${parts[0]}`;
   return parts.join(" and ");
+}
+
+const SQUARE_NAME = (square: number) => makeSquare(square);
+
+/** What a quiet move is for, with the squares worth highlighting: it takes a
+ *  square from an enemy piece, builds a pawn chain, makes room for the king,
+ *  puts a rook on an open file, or gives a piece more scope. */
+export function quietIdea(before: Chess, move: NormalMove, listener: Color | null): { clause: string; squares: number[] } | null {
+  const piece = before.board.get(move.from);
+  if (!piece) return null;
+  const after = before.clone();
+  after.play(move);
+  const them = opposite(piece.color);
+  const theirs = owner(them, listener);
+  const forward = piece.color === "white" ? 8 : -8;
+  // A square it now covers that an enemy piece wanted (e.g. h3 stops ...Ng4 and ...Bg4)
+  const was = attacks(piece, move.from, before.board.occupied);
+  const now = attacks(piece, move.to, after.board.occupied);
+  let best: { square: number; roles: Role[] } | null = null;
+  for (const square of now) {
+    if (was.has(square) || after.board.get(square)) continue;
+    const roles: Role[] = [];
+    for (const from of after.board[them]) {
+      const enemy = after.board.get(from)!;
+      if (enemy.role === "pawn" || enemy.role === "king") continue;
+      if (attacks(enemy, from, after.board.occupied).has(square) && PIECE_VALUES[enemy.role] >= PIECE_VALUES[piece.role]) roles.push(enemy.role);
+    }
+    // only squares on their opponent's half, where a piece would be annoying
+    const rank = square >> 3;
+    const advanced = piece.color === "white" ? rank >= 2 && rank <= 4 : rank >= 3 && rank <= 5;
+    if (roles.length && advanced && (!best || roles.length > best.roles.length)) best = { square, roles };
+  }
+  if (piece.role === "pawn") {
+    // A pawn chain: a pawn of yours diagonally behind it
+    const behind = [move.to - forward - 1, move.to - forward + 1].filter((sq) => sq >= 0 && sq < 64 && Math.abs((sq & 7) - (move.to & 7)) === 1);
+    const chain = behind.filter((sq) => {
+      const other = after.board.get(sq);
+      return other?.role === "pawn" && other.color === piece.color;
+    });
+    if (best) {
+      const names = [...new Set(best.roles)].map((r) => NAMES[r]);
+      return { clause: `it takes the ${SQUARE_NAME(best.square)} square away from ${theirs} ${names.join(" and ")}`, squares: [best.square] };
+    }
+    if (chain.length) return { clause: "it builds a pawn chain, each pawn guarding the next", squares: [chain[0], move.to] };
+    // Room for the king: a pawn in front of your castled king
+    const king = after.board.kingOf(piece.color);
+    if (king !== undefined && Math.abs((king & 7) - (move.from & 7)) <= 1 && Math.abs((king >> 3) - (move.from >> 3)) === 1) {
+      return { clause: "it gives your king an escape square", squares: [move.from] };
+    }
+    return null;
+  }
+  if (best) {
+    const names = [...new Set(best.roles)].map((r) => NAMES[r]);
+    return { clause: `it controls ${SQUARE_NAME(best.square)}, keeping ${theirs} ${names.join(" and ")} out`, squares: [best.square] };
+  }
+  if (piece.role === "rook" && (move.to & 7) !== (move.from & 7)) {
+    const file = move.to & 7;
+    let ownPawns = 0;
+    for (let rank = 0; rank < 8; rank++) {
+      const other = after.board.get(rank * 8 + file);
+      if (other?.role === "pawn" && other.color === piece.color) ownPawns++;
+    }
+    if (!ownPawns) return { clause: `it puts the ${NAMES.rook} on an open file`, squares: [] };
+  }
+  if (now.size() > was.size() + 1) return { clause: `it gives the ${NAMES[piece.role]} more room to work`, squares: [] };
+  return null;
 }
 
 /** How dangerous a move was, judged by what Stockfish's reply can win:

@@ -575,7 +575,7 @@ html body .board-area .board-controls {
   position: relative;
   display: grid;
   grid-template-columns: auto 1fr;
-  grid-template-areas: "face text" "face actions";
+  grid-template-areas: "face text" "face odds" "face actions";
   gap: 4px 10px;
   margin-top: 6px;
   padding: 10px 12px;
@@ -1611,4 +1611,51 @@ body.editing #bar-bottom {
 
 #whatif-text {
   font-style: italic;
+}
+
+/* Your position: the opponent's likely moves, with their chances */
+.step-odds {
+  grid-area: odds;
+  display: grid;
+  gap: 4px;
+  margin: 2px 0 4px;
+}
+.step-odds[hidden] {
+  display: none;
+}
+.odds-row {
+  display: grid;
+  grid-template-columns: 4.2em minmax(0, 1fr) 2.6em;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.85rem;
+}
+.odds-row b {
+  font-weight: 600;
+}
+.odds-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, currentColor 15%, transparent);
+  overflow: hidden;
+}
+.odds-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: #1565c0;
+}
+.odds-row span:last-child {
+  text-align: right;
+  opacity: 0.8;
+}
+.odds-row.others {
+  opacity: 0.7;
+}
+.odds-row.others b {
+  font-weight: 400;
+  white-space: nowrap;
+}
+.odds-row.others .odds-bar i {
+  background: currentColor;
 }

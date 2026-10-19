@@ -28,7 +28,7 @@ import { afterMove as positionAfter, colourName, isCastling, standardUci, variat
 import { Engine } from "./engine";
 import { Game, type Outcome } from "./game";
 import { explainIdeas } from "./ideas";
-import { controlledSquares, dangerAfter, narrateMove, targetsOf, verdict, whyMove, type Danger } from "./narrate";
+import { controlledSquares, dangerAfter, narrateMove, quietIdea, targetsOf, verdict, whyMove, type Danger } from "./narrate";
 import { middlegameNotes } from "./middlegame";
 import { DEFAULT_LEVEL, LEVELS, OPPONENT_MIN_DELAY, shortName } from "./levels";
 import {
@@ -60,9 +60,10 @@ import {
 } from "./clock";
 import { DEMOS, demoFor, demoSteps, type Demo, type DemoStep } from "./demos";
 import { LESSONS, type Lesson, type TrainPhase } from "./lessons";
+import { BANDS, likelyMoves, pickLikely, type Band, type LikelyMove } from "./explore";
 import { runTour, tourOpen, type TourStep } from "./tour";
 import { readPgn, saveFile, today, writePgn, type Headers, type PgnGame } from "./pgn";
-import { addMisses, fenOf, formatScore, isDrawnPosition, isSacrifice, reviewMove, type Review } from "./review";
+import { addMisses, fenOf, formatScore, isDrawnPosition, isSacrifice, reviewMove, verdictWords, type Review } from "./review";
 import { gradeGuess, planAhead, threatCheck, type CoachEngine, type Plan, type Threat } from "./strategy";
 import { Board } from "chessops/board";
 import { defaultSetup } from "chessops/setup";
@@ -846,7 +847,7 @@ function resetBoard(newGame: Game, headers: Headers = { White: "?", Black: "?", 
   puzzle = null;
   editor = null;
   lesson = null;
-  positionTraining = false;
+  explore = null;
   stepper = null;
   closeOverlay(false);
   currentView = "board";
@@ -1144,6 +1145,8 @@ function onBoardMove(from: Key, to: Key) {
     puzzleMove(move);
   } else if (quizWaiting()) {
     answerQuiz(move);
+  } else if (explore) {
+    exploreMove(given);
   } else if (analysing()) {
     analysisMove(given);
   } else {
@@ -1482,7 +1485,14 @@ interface PuzzleState {
 }
 
 let puzzle: PuzzleState | null = null;
-let positionTraining = false; // a match from your own position, the coach plays a side
+// Your position: the coach helps you analyse it. You play your side, and the
+// other side is played by you or by "an opponent" of the chosen strength.
+interface ExploreState {
+  user: Color;
+  band: Band;
+}
+let explore: ExploreState | null = null;
+let exploreBand: Band = "club";
 
 function loadPuzzles(phase: TrainPhase) {
   if (!puzzleFiles.has(phase)) {
@@ -1850,6 +1860,7 @@ async function editorDone() {
     return;
   }
   const ask = $<HTMLDialogElement>("side-dialog");
+  drawBandChips();
   ask.showModal();
   const choice = await new Promise<string>((resolve) => {
     const buttons = [...ask.querySelectorAll<HTMLButtonElement>("button[value]")];
@@ -1863,7 +1874,26 @@ async function editorDone() {
     ask.oncancel = (event) => { event.preventDefault(); done("cancel"); };
   });
   if (choice !== "white" && choice !== "black") return;
-  startPositionMatch(fenOf(position.value), choice as Color);
+  startExplore(fenOf(position.value), choice as Color);
+}
+
+/** The opponent's strength: the puzzle bands, each with its ratings. */
+function drawBandChips() {
+  const chips = $("band-chips");
+  chips.replaceChildren(...(Object.keys(BANDS) as Band[]).map((band) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.textContent = BANDS[band].name;
+    chip.classList.toggle("on", band === exploreBand);
+    chip.addEventListener("click", (event) => {
+      event.preventDefault();
+      exploreBand = band;
+      drawBandChips();
+    });
+    return chip;
+  }));
+  const info = BANDS[exploreBand];
+  $("band-note").textContent = `${info.name}: rated ${info.ratings}, like ${info.stockfish}.`;
 }
 
 function openPaste() {
@@ -1898,73 +1928,149 @@ function openPaste() {
   }
 }
 
-/** Play from your position: the coach takes one side at full strength. */
-function startPositionMatch(fen: string, user: Color) {
+/** Analyse your position: the coach shows the best moves and the likely replies. */
+function startExplore(fen: string, user: Color) {
   mode = "practice";
-  resetBoard(new Game(fen), { White: user === "white" ? playerName() : "Coach", Black: user === "black" ? playerName() : "Coach", Date: today() });
+  const opponent = `Opponent · ${BANDS[exploreBand].name}`;
+  resetBoard(new Game(fen), { White: user === "white" ? playerName() : opponent, Black: user === "black" ? playerName() : opponent, Date: today() });
   gameOrigin = "train";
-  positionTraining = true;
-  match = {
-    id: ++matchCounter, user, level: LEVELS.length - 1,
-    sfOpening: null, sfActive: false, sfMisses: 0, myOpening: null, myActive: false,
-  };
+  explore = { user, band: exploreBand };
   orientation = user;
-  void engine.newGame();
   refresh();
-  void maybeOpponentMove();
+  void showIdeas();
 }
 
-/** The coach's buttons in your own position: best move, the plan, its threats. */
-function positionButtons(): CoachButton[] {
-  return [
-    { ico: "target", label: "Best move", run: () => void showBestMove(), kind: "accent" },
-    { ico: "bulb", label: "The plan", run: () => void openStrategy() },
-    { ico: "hazard", label: "What are you threatening?", run: () => void showCoachThreat(), kind: "hazard" },
-  ];
+/** Playing a move from an earlier point replaces the moves after it. */
+function exploreMove(move: NormalMove) {
+  const from = currentPly();
+  while (game.length > from) game.undo();
+  game.play(move);
+  afterMove();
 }
 
-/** Best move: the move, illustrated, with why. */
-async function showBestMove() {
-  if (busy) return;
+const SIMULATE: CoachButton = { ico: "play", label: "Simulate: play it out", kind: "accent", run: () => closeStepper() };
+
+/** The best move for your side, the replies an opponent of the chosen
+ *  strength would likely play, and (when the best line is forcing) how it
+ *  goes on, ending with who stands better. */
+async function showIdeas() {
+  if (!explore || busy) return;
+  const { user, band } = explore;
   const position = base();
-  setBusy(true, "Let me find the best move...");
+  setBusy(true, "Let me look at the position...");
   try {
-    const plan = await planAhead(coachAnalysis, position);
-    setBusy(false);
-    const move = plan.steps[0]?.move;
-    if (!move) return;
-    const san = makeSan(position, move);
-    const text = `Best is ${san}: ${whyMove(position, move, listener())}.`;
-    startStepper([position, positionAfter(position, move)], [move], [text], "talk", undefined, true);
-  } catch (error) {
-    errorText = `Something went wrong: ${error}`;
-    setBusy(false);
-    refresh();
-  }
-}
-
-/** What the coach threatens: its best move if you did nothing. */
-async function showCoachThreat() {
-  if (busy) return;
-  const position = base();
-  setBusy(true, "Let me look at my threats...");
-  try {
-    const threat = await threatCheck(coachAnalysis, position);
-    setBusy(false);
-    if (!threat.threatMove || !threat.passed) {
-      startStepper([position, position], [], [], "talk");
-      void message("No threats", "I'm not threatening anything serious right now. Use the time to improve your worst piece.");
-      return;
+    const frames: StepFrame[] = [];
+    const texts: string[] = [];
+    const moveFrame = (before: Chess, move: NormalMove, text: string, illustrate: boolean) => {
+      const next = positionAfter(before, move);
+      const shapes: DrawShape[] = [{ orig: makeSquare(move.from) as Key, dest: arrowEnd(before, move), brush: before.turn === user ? "you" : "them" }];
+      // one move on its own: show what the piece does from its new square
+      if (illustrate && !isCastling(before, move)) {
+        for (const square of controlledSquares(next, move.to)) shapes.push({ orig: makeSquare(move.to) as Key, dest: makeSquare(square) as Key, brush: "control" });
+        for (const square of quietIdea(before, move, user)?.squares ?? []) shapes.push({ orig: makeSquare(square) as Key, brush: "you" });
+      }
+      frames.push({ position: next, shapes });
+      texts.push(text);
+    };
+    let line: NormalMove[] = [];
+    let score: Score | undefined;
+    if (position.turn === user) {
+      const plan = await planAhead(coachAnalysis, position);
+      line = forcingStart(position, plan.steps.map((step) => step.move));
+      score = plan.score;
+      if (line.length) moveFrame(position, line[0], `Best for you is ${makeSan(position, line[0])}: ${whyMove(position, line[0], user)}.`, line.length === 1);
     }
-    const after = positionAfter(threat.passed, threat.threatMove);
-    const said = narrateMove(threat.passed, threat.threatMove, listener());
-    const text = `If you did nothing: ${said.charAt(0).toLowerCase()}${said.slice(1)}`;
-    startStepper([threat.passed, after], [threat.threatMove], [text], "worried");
+    // Their likely replies (to your best move, or now if it's their turn)
+    const after = line.length ? positionAfter(position, line[0]) : position;
+    if (!after.isEnd()) {
+      const odds = (await likelyMoves(coachAnalysis, after, band)).filter((o) => o.chance >= 5).slice(0, 3);
+      const shapes: DrawShape[] = odds.map((o) => ({
+        orig: makeSquare(o.move.from) as Key, dest: arrowEnd(after, o.move), brush: "guess",
+        modifiers: { lineWidth: Math.round(4 + o.weight * 10) },
+      }));
+      const who = BANDS[band].who.replace(/^./, (c) => c.toUpperCase());
+      texts.push(line.length ? `${who} would most likely answer:` : `It's their move. ${who} would most likely play:`);
+      const others = 100 - odds.reduce((sum, o) => sum + o.chance, 0);
+      frames.push({ position: after, shapes, odds, others: others >= 10 ? others : undefined });
+    }
+    // The rest of a forcing line, move by move
+    let walk = after;
+    line.slice(1).forEach((move, i) => {
+      const san = `${walk.turn === "black" ? "..." : ""}${makeSan(walk, move)}`;
+      const mine = walk.turn === user;
+      const text = i === 0 && !mine ? `Their best defence is ${san}. ${narrateMove(walk, move, user)}`
+        : mine ? `Then ${san}: ${whyMove(walk, move, user)}.` : narrateMove(walk, move, user);
+      moveFrame(walk, move, text, false);
+      walk = positionAfter(walk, move);
+    });
+    if (line.length > 1 && score) texts[texts.length - 1] += ` In the end, ${verdictWords(score)}.`;
+    setBusy(false);
+    if (!frames.length || !explore) return refresh();
+    stepper = { positions: frames.map((f) => f.position), moves: [], texts, step: 1, mood: "talk", extra: SIMULATE, frames };
+    refresh();
   } catch (error) {
     errorText = `Something went wrong: ${error}`;
     setBusy(false);
     refresh();
   }
+}
+
+/** The start of the best line: your first move, then on while your moves are
+ *  forcing (checks and captures), with their replies in between. */
+function forcingStart(position: Chess, line: NormalMove[]): NormalMove[] {
+  const user = position.turn;
+  const shown: NormalMove[] = [];
+  let walk = position;
+  for (const move of line.slice(0, 6)) {
+    const next = positionAfter(walk, move);
+    const mine = walk.turn === user;
+    const forcing = next.isCheck() || walk.board.get(move.to) !== undefined;
+    if (mine && shown.length && !forcing) break;
+    shown.push(move);
+    if (mine && !forcing) break;
+    walk = next;
+  }
+  return shown;
+}
+
+/** Their move, chosen the way a player of the chosen strength might. */
+async function letThemReply() {
+  if (!explore || busy) return;
+  const position = base();
+  setBusy(true, "They're thinking...");
+  try {
+    const odds = await likelyMoves(coachAnalysis, position, explore.band);
+    setBusy(false);
+    const choice = pickLikely(odds);
+    if (choice && explore) exploreMove(choice.move);
+    else refresh();
+  } catch (error) {
+    errorText = `Something went wrong: ${error}`;
+    setBusy(false);
+    refresh();
+  }
+}
+
+/** What the coach says in your position, and the buttons it offers. */
+function exploreSays(reviews: (Review | undefined)[]): CoachSay {
+  const { user, band } = explore!;
+  const ply = currentPly();
+  const position = game.positionAt(ply);
+  const theirs = position.turn !== user;
+  const over = position.isEnd();
+  const buttons: CoachButton[] = [];
+  if (theirs && !over) buttons.push({ ico: "play", label: `Let them reply (${BANDS[band].name})`, kind: "accent", run: () => void letThemReply() });
+  if (!over) buttons.push({ ico: "bulb", label: theirs ? "Their likely moves" : "Best move and their replies", run: () => void showIdeas() });
+  if (ply === 0) {
+    const text = theirs ? "It's their move. Move for them on the board, or let them reply." : "Your move. Follow my idea or play your instinct, and I'll rate it.";
+    return { mood: "talk", text, buttons };
+  }
+  const review = reviews[ply - 1];
+  if (!review) return { mood: "think", text: "Let me check that move...", buttons };
+  const said = verdict(review, game.positionAt(ply - 1), position, analyser.evals.get(fenOf(position)), user, ply);
+  // what comes next: their move (yours to make, or theirs to choose), or yours
+  const text = over ? said : theirs ? `${said} Now their move: play it, or let them reply.` : `${said} Your move.`;
+  return { mood: moodForRating(review.rating), text, buttons: [...buttons, TELL_MORE] };
 }
 
 // -- Lessons ----------------------------------------------------------------------
@@ -3084,6 +3190,7 @@ function setFace(element: HTMLElement, mood: Mood, size: number) {
 
 /** Who the coach is talking to: you in a match, otherwise nobody in particular. */
 function listener(): Color | null {
+  if (explore) return explore.user;
   if (match) return match.user;
   if (reviewing && !reviewTitle) return orientation; // your own finished game
   return null;
@@ -3134,19 +3241,15 @@ function coachSays(reviews: (Review | undefined)[]): CoachSay {
     const after = line.positionAt(line.length);
     return { mood: moodForRating(review.rating), text: verdict(review, before, after, analyser.evals.get(fenOf(after)), before.turn, line.length), buttons: [] };
   }
+  if (explore) return exploreSays(reviews);
   const ply = reviewPly();
   if (!ratingsOn()) return { mood: "talk", text: "Move ratings are off.", buttons: [STRATEGY] };
-  if (ply === 0 && positionTraining) {
-    const coach = match ? opposite(match.user) : "black";
-    return { mood: "talk", text: `I'm ${colourName(coach)}. Your move, or ask me something.`, buttons: positionButtons() };
-  }
   if (ply === 0) return { mood: "talk", text: game.length ? "The starting position." : "Make a move and I'll tell you what I think.", buttons: [STRATEGY] };
   const review = reviews[ply - 1];
   if (!review) return { mood: "think", text: "Hmm, let me check that move...", buttons: [STRATEGY] };
   const before = game.positionAt(ply - 1);
   const after = game.positionAt(ply);
   const text = verdict(review, before, after, analyser.evals.get(fenOf(after)), listener(), ply);
-  if (positionTraining) return { mood: moodForRating(review.rating), text, buttons: positionButtons() };
   return { mood: moodForRating(review.rating), text, buttons: [TELL_MORE, STRATEGY] };
 }
 
@@ -3280,7 +3383,14 @@ interface Stepper {
   mood: Mood;
   extra?: CoachButton;
   illustration?: boolean; // one move, with what the piece controls
-  frames?: { position: Chess; shapes: DrawShape[] }[]; // lesson pages instead of moves
+  frames?: StepFrame[]; // lesson pages (or illustrations) instead of moves
+}
+
+interface StepFrame {
+  position: Chess;
+  shapes: DrawShape[];
+  odds?: LikelyMove[]; // their likely moves, with chances
+  others?: number; // the chance of anything else
 }
 
 let stepper: Stepper | null = null;
@@ -3326,6 +3436,22 @@ function drawStepper() {
   $("step-count").textContent = stepCount() > 1 ? `${stepper.step}/${stepCount()}` : "";
   for (const id of ["step-back", "step-next"]) $(id).hidden = stepCount() < 2;
   $("step-text").textContent = stepper.texts[stepper.step - 1] ?? "";
+  const frame = stepper.frames?.[stepper.step - 1];
+  const odds = $("step-odds");
+  odds.hidden = !frame?.odds?.length;
+  odds.replaceChildren(...(frame?.odds ?? []).map((o) => {
+    const row = document.createElement("div");
+    row.className = "odds-row";
+    row.innerHTML = `<b></b><span class="odds-bar"><i style="width:${o.chance}%"></i></span><span>${o.chance}%</span>`;
+    row.querySelector("b")!.textContent = `${frame!.position.turn === "black" ? "..." : ""}${o.san}`;
+    return row;
+  }));
+  if (frame?.odds?.length && frame.others) {
+    const row = document.createElement("div");
+    row.className = "odds-row others";
+    row.innerHTML = `<b>Others</b><span class="odds-bar"><i style="width:${frame.others}%"></i></span><span>${frame.others}%</span>`;
+    odds.append(row);
+  }
   setFace($("step-face"), stepper.mood, 34);
   $<HTMLButtonElement>("step-back").disabled = stepper.step <= 1;
   $<HTMLButtonElement>("step-next").disabled = stepper.step >= stepCount();
@@ -3667,7 +3793,7 @@ function openingFamily(): string {
 
 /** A match has ended: keep it in the game history. */
 function recordGame() {
-  if (!match || game.length === 0 || positionTraining) return;
+  if (!match || game.length === 0) return;
   const result = gameHeaders.Result;
   const winner = result === "1-0" ? "white" : result === "0-1" ? "black" : result === "1/2-1/2" ? null : undefined;
   if (winner === undefined) return;

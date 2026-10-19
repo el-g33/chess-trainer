@@ -251,6 +251,7 @@
           <span id="step-count" class="step-count"></span>
           <div id="step-face" class="coach-face small" aria-hidden="true"></div>
           <p id="step-text" aria-live="polite"></p>
+          <div id="step-odds" class="step-odds" hidden></div>
           <div class="step-actions">
             <button type="button" id="step-back" class="round" aria-label="Back one move"><span data-ico="back"></span></button>
             <span id="step-extra" class="step-extra"></span>
@@ -415,11 +416,14 @@
     <!-- Your position: which side the coach plays -->
     <dialog id="side-dialog" class="settings-dialog">
       <form method="dialog">
-        <h3>Which side shall I play?</h3>
-        <p class="setup-note">I'll play it at full strength. You play the other side and can ask me for help any time.</p>
+        <h3>Analyse your position</h3>
+        <p class="setup-note">I'll show you the best moves for your side, and what an opponent of this strength would likely play.</p>
+        <label class="setup-label">Opponent's strength</label>
+        <div class="chips" id="band-chips"></div>
+        <p id="band-note" class="setup-note"></p>
         <div class="save-choices">
-          <button value="white">I play White</button>
-          <button value="black">I play Black</button>
+          <button value="white">I'm White</button>
+          <button value="black">I'm Black</button>
           <button value="cancel">Back to the board setup</button>
         </div>
       </form>
