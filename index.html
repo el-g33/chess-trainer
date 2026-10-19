@@ -63,6 +63,7 @@
             <button type="button" class="mode-choice" data-choice="play" role="radio" aria-checked="false"><span class="mc-icon" data-ico="knight" data-ico-size="22"></span>Play against the computer</button>
             <button type="button" class="mode-choice" data-choice="practice" role="radio" aria-checked="false"><span class="mc-icon" data-ico="school" data-ico-size="22"></span>Practice mode</button>
             <button type="button" class="mode-choice" data-choice="analysis" role="radio" aria-checked="false"><span class="mc-icon" data-ico="search" data-ico-size="22"></span>Game analysis</button>
+            <button type="button" class="mode-choice" data-choice="train" role="radio" aria-checked="false"><span class="mc-icon" data-ico="puzzle" data-ico-size="22"></span>Train: middlegame and endgame</button>
           </div>
           <button type="button" id="home-next" class="home-next accent" disabled>Next</button>
           <p id="engine-status" class="engine-status">Loading Stockfish...</p>
@@ -149,6 +150,36 @@
           <p id="fen-status" class="pgn-status"></p>
           <p class="setup-note"><button type="button" class="link-button" id="empty-board">Or explore on an empty board</button></p>
         </section>
+        <!-- 2d. Train: principles, puzzles and your own positions -->
+        <section class="screen" data-screen="train" hidden>
+          <div class="setup-head">
+            <button type="button" class="home-link setup-back"><span data-ico="home" data-ico-size="18"></span> Home</button>
+            <h2>Train</h2>
+            <span></span>
+          </div>
+          <div class="tabs" role="tablist">
+            <button type="button" role="tab" data-train-tab="middlegame">Middlegame</button>
+            <button type="button" role="tab" data-train-tab="endgame">Endgame</button>
+          </div>
+          <div id="train-cards" class="train-cards">
+            <button type="button" class="train-card" id="train-principles">
+              <span class="tc-ico" data-ico="book" data-ico-size="24"></span>
+              <span><b>Principles</b><small id="principles-note"></small></span>
+            </button>
+            <div class="train-card puzzles-card">
+              <span class="tc-ico" data-ico="puzzle" data-ico-size="24"></span>
+              <span class="pc-body"><b>Puzzles</b><small>Choose a level, then solve as many as you like.</small>
+                <span class="chips" id="puzzle-levels"></span>
+                <button type="button" id="start-puzzles" class="accent start-puzzles">Start puzzles</button>
+              </span>
+            </div>
+            <button type="button" class="train-card" id="train-position">
+              <span class="tc-ico" data-ico="board" data-ico-size="24"></span>
+              <span><b>Your position</b><small>Set up or paste a position. I'll take a side and explain the best moves and plans.</small></span>
+            </button>
+          </div>
+          <div id="lesson-list" class="lesson-list" hidden></div>
+        </section>
       </form>
     </div>
 
@@ -195,6 +226,21 @@
         <div class="player-bar" id="bar-bottom">
           <span class="pb-name"></span><span class="pb-captured"></span><span class="pb-diff"></span>
           <span class="pb-clock" hidden></span>
+        </div>
+        <!-- Setting up a position: the pieces to place -->
+        <div id="editor-panel" class="editor-panel" hidden>
+          <div class="palette" id="palette-white"></div>
+          <div class="palette" id="palette-black"></div>
+          <div class="seg" id="editor-turn">
+            <button type="button" data-turn="white">White to move</button>
+            <button type="button" data-turn="black">Black to move</button>
+          </div>
+          <div class="editor-row">
+            <button type="button" id="editor-empty">Empty</button>
+            <button type="button" id="editor-start">Start</button>
+            <button type="button" id="editor-paste">Paste FEN / PGN</button>
+            <button type="button" id="editor-done" class="accent">Done</button>
+          </div>
         </div>
         <!-- One move at a time: a line the coach talks through -->
         <div id="stepper" class="stepper" hidden>
@@ -358,6 +404,33 @@
             <option value="stick">My opening - stick to it</option>
             <option value="chances">My opening - take chances</option>
           </select>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Your position: which side the coach plays -->
+    <dialog id="side-dialog" class="settings-dialog">
+      <form method="dialog">
+        <h3>Which side shall I play?</h3>
+        <p class="setup-note">I'll play it at full strength. You play the other side and can ask me for help any time.</p>
+        <div class="save-choices">
+          <button value="white">I play White</button>
+          <button value="black">I play Black</button>
+          <button value="cancel">Back to the board setup</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Your position: paste a FEN or a PGN -->
+    <dialog id="paste-dialog" class="settings-dialog">
+      <form method="dialog">
+        <h3>Paste a position or a game</h3>
+        <p class="setup-note">A FEN, or a PGN (the position at the end of the game is used).</p>
+        <textarea id="paste-text" rows="5" spellcheck="false"></textarea>
+        <p id="paste-status" class="pgn-status"></p>
+        <div class="dialog-buttons">
+          <button value="cancel">Cancel</button>
+          <button value="load" class="accent">Load</button>
         </div>
       </form>
     </dialog>

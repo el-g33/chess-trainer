@@ -9,7 +9,7 @@ import type { DrawShape } from "@lichess-org/chessground/draw";
 import type { Key } from "@lichess-org/chessground/types";
 import { Chess, normalizeMove } from "chessops/chess";
 import { chessgroundDests } from "chessops/compat";
-import { parseFen } from "chessops/fen";
+import { makeBoardFen, makeFen, parseFen } from "chessops/fen";
 import { makeSan, parseSan } from "chessops/san";
 import type { Color, NormalMove, Role } from "chessops/types";
 import { makeSquare, makeUci, opposite, parseSquare, parseUci } from "chessops/util";
@@ -59,10 +59,14 @@ import {
   Clock, formatClock, parseTimeControl, PRESETS, thinkTime, timeControlTag, type TimeControl, type Times,
 } from "./clock";
 import { DEMOS, demoFor, demoSteps, type Demo, type DemoStep } from "./demos";
+import { LESSONS, type Lesson, type TrainPhase } from "./lessons";
 import { runTour, tourOpen, type TourStep } from "./tour";
 import { readPgn, saveFile, today, writePgn, type Headers, type PgnGame } from "./pgn";
 import { addMisses, fenOf, formatScore, isDrawnPosition, isSacrifice, reviewMove, type Review } from "./review";
 import { gradeGuess, planAhead, threatCheck, type CoachEngine, type Plan, type Threat } from "./strategy";
+import { Board } from "chessops/board";
+import { defaultSetup } from "chessops/setup";
+import type { Piece, Role as PieceRole } from "chessops/types";
 
 // Opening choices in the start menu (the openings themselves are in openings.ts)
 const STOCKFISH_DECIDES = "None (plays normally for its level)";
@@ -329,7 +333,7 @@ Object.assign(ground.state.drawable.brushes, {
 // ---------------------------------------------------------------------------
 
 const ratingsOn = () => mode === "practice" && rateMovesBox.checked;
-const evalOn = () => mode === "practice" && evalCheck.checked;
+const evalOn = () => mode === "practice" && evalCheck.checked && !editor;
 const currentPly = () => viewPly ?? game.length;
 const gameMoves = () => game.moves.map((m) => m.move);
 
@@ -340,6 +344,14 @@ function base(): Chess {
 
 /** What the board draws: a position of Stockfish's line during a preview. */
 function shown(): Chess {
+  if (editor) {
+    // the setup may not be legal yet (no kings...), but it still has to be drawn
+    const drawn = Chess.default();
+    drawn.board = editor.board.clone();
+    drawn.turn = editor.turn;
+    return drawn;
+  }
+  if (stepper?.frames) return stepper.frames[stepper.step - 1].position;
   if (stepper) return stepper.positions[stepper.step];
   const line = quizLinePositions();
   if (line && quiz?.lineStep) return line[quiz.lineStep];
@@ -561,8 +573,8 @@ function showMenu() {
 // The start screens: the coach's welcome, then the setup for each mode
 // ---------------------------------------------------------------------------
 
-type HomeScreen = "welcome" | "play" | "practice" | "analysis";
-type HomeChoice = "play" | "practice" | "analysis";
+type HomeScreen = "welcome" | "play" | "practice" | "analysis" | "train";
+type HomeChoice = "play" | "practice" | "analysis" | "train";
 
 let homeChoice: HomeChoice | null = null;
 let greeting = "";
@@ -590,6 +602,7 @@ const MODE_LINES: Record<HomeChoice, string> = {
   play: "A real game against Stockfish. No hints until it's over, then I'll go through it with you.",
   practice: "Learn an opening, or play a game with me helping along the way.",
   analysis: "Got a game from lichess or chess.com? Let's look at it together.",
+  train: "Sharpen your middlegame and endgame: principles, puzzles, and positions to explore with me.",
 };
 
 // The time controls under each icon (values as in the clock's PRESETS)
@@ -699,6 +712,9 @@ function drawHome() {
 
   // Analysis
   menu.querySelector<HTMLButtonElement>('[data-start="analysis"]')!.disabled = !pgnGames.length && !fenPosition;
+
+  // Train
+  drawTrainScreen();
 }
 
 function setupHome() {
@@ -710,6 +726,7 @@ function setupHome() {
     });
   }
   $("home-next").addEventListener("click", () => homeChoice && showScreen(homeChoice));
+  setupTrain();
   for (const button of menu.querySelectorAll<HTMLButtonElement>(".setup-back")) {
     button.addEventListener("click", () => showScreen("welcome"));
   }
@@ -815,6 +832,10 @@ function onStartGame() {
 function resetBoard(newGame: Game, headers: Headers = { White: "?", Black: "?", Date: today() }) {
   gameHeaders = { ...headers };
   currentGameId = null;
+  puzzle = null;
+  editor = null;
+  lesson = null;
+  positionTraining = false;
   stepper = null;
   closeOverlay(false);
   currentView = "board";
@@ -1090,7 +1111,10 @@ function clickPosition(): Chess {
 
 /** Can pieces be moved right now, and which side's? */
 function movableColour(): Color | undefined {
-  if (busy || thinking || preview || menuOpen || quiz?.lineStep || demo || stepper || overlayOpen()) return undefined;
+  if (busy || thinking || preview || menuOpen || quiz?.lineStep || demo || stepper || overlayOpen() || editor) return undefined;
+  if (puzzle) {
+    return puzzle.state === "solving" && viewPly === null && game.length > 0 && game.position.turn === puzzle.side ? puzzle.side : undefined;
+  }
   if (quizWaiting()) return quiz!.threat!.them;
   if (analysing()) return base().turn;
   if (viewPly !== null) return undefined; // looking back in Play mode
@@ -1104,7 +1128,9 @@ function onBoardMove(from: Key, to: Key) {
   // Pawns reaching the last rank always become queens (as in the desktop app)
   if (position.board.get(given.from)?.role === "pawn" && (to[1] === "8" || to[1] === "1")) given.promotion = "queen";
   const move = normalizeMove(position, given) as NormalMove;
-  if (quizWaiting()) {
+  if (puzzle) {
+    puzzleMove(move);
+  } else if (quizWaiting()) {
     answerQuiz(move);
   } else if (analysing()) {
     analysisMove(given);
@@ -1174,8 +1200,7 @@ function drawWhatIf() {
   bar.hidden = !analysis;
   document.querySelector(".board-area")!.classList.toggle("whatif", analysis !== null);
   if (!analysis) return;
-  const n = analysis.line.length;
-  $("whatif-text").textContent = n ? `What if: ${n} move${n === 1 ? "" : "s"} deep` : "What if: make a move";
+  $("whatif-text").textContent = "Analysis board";
 }
 
 function exitAnalysis() {
@@ -1415,6 +1440,580 @@ function toggleHelp(anchor: HTMLElement) {
   box.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`;
 }
 
+
+// ---------------------------------------------------------------------------
+// Train: principles, puzzles and your own positions
+// ---------------------------------------------------------------------------
+
+type PuzzleLevel = "beginner" | "club" | "advanced" | "expert" | "master";
+const PUZZLE_LEVELS: [PuzzleLevel, string][] = [["beginner", "Beginner"], ["club", "Club"], ["advanced", "Advanced"], ["expert", "Expert"], ["master", "Master"]];
+type PuzzleRow = [id: string, fen: string, moves: string, rating: number, themes: string];
+
+let trainPhase: TrainPhase = "middlegame";
+let puzzleLevel: PuzzleLevel = "club";
+const puzzleFiles = new Map<TrainPhase, Promise<Record<PuzzleLevel, PuzzleRow[]>>>();
+
+interface PuzzleState {
+  phase: TrainPhase;
+  level: PuzzleLevel;
+  list: PuzzleRow[];
+  index: number;
+  side: Color; // you solve for this side
+  solution: NormalMove[]; // your moves and the replies, after the opening move
+  step: number; // the next solution move expected
+  state: "solving" | "solved" | "shown";
+  missed: boolean; // a wrong try (the streak is lost)
+  hints: number;
+  themes: string[];
+  streak: number;
+  note: string; // what the coach says now
+}
+
+let puzzle: PuzzleState | null = null;
+let positionTraining = false; // a match from your own position, the coach plays a side
+
+function loadPuzzles(phase: TrainPhase) {
+  if (!puzzleFiles.has(phase)) {
+    puzzleFiles.set(phase, fetch(`${import.meta.env.BASE_URL}puzzles/${phase}.json`).then((r) => r.json()));
+  }
+  return puzzleFiles.get(phase)!;
+}
+
+function drawTrainScreen() {
+  for (const tab of menu.querySelectorAll<HTMLButtonElement>("[data-train-tab]")) {
+    const on = tab.dataset.trainTab === trainPhase;
+    tab.classList.toggle("on", on);
+    tab.setAttribute("aria-selected", String(on));
+  }
+  const lessons = LESSONS[trainPhase];
+  $("principles-note").textContent = lessons.length
+    ? `${lessons.length} short lessons on how to play the ${trainPhase}.`
+    : `The ${trainPhase} lessons are being written.`;
+  const chips = $("puzzle-levels");
+  chips.replaceChildren(...PUZZLE_LEVELS.map(([value, label]) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.textContent = label;
+    chip.classList.toggle("on", value === puzzleLevel);
+    chip.addEventListener("click", () => {
+      puzzleLevel = value;
+      drawTrainScreen();
+    });
+    return chip;
+  }));
+}
+
+function setupTrain() {
+  for (const tab of menu.querySelectorAll<HTMLButtonElement>("[data-train-tab]")) {
+    tab.addEventListener("click", () => {
+      trainPhase = tab.dataset.trainTab as TrainPhase;
+      $("lesson-list").hidden = true;
+      $("train-cards").hidden = false;
+      drawTrainScreen();
+    });
+  }
+  $("start-puzzles").addEventListener("click", () => void startPuzzles(trainPhase, puzzleLevel));
+  $("train-position").addEventListener("click", () => startEditor());
+  $("train-principles").addEventListener("click", showLessonList);
+  // The editor
+  ground.set({ events: { select: (key) => editorTap(key) } });
+  $("editor-empty").addEventListener("click", () => editorLoad("8/8/8/8/8/8/8/8 w - - 0 1"));
+  $("editor-start").addEventListener("click", () => editorLoad(makeFen(defaultSetup())));
+  $("editor-paste").addEventListener("click", openPaste);
+  $("editor-done").addEventListener("click", () => void editorDone());
+  for (const button of document.querySelectorAll<HTMLButtonElement>("#editor-turn button")) {
+    button.addEventListener("click", () => {
+      if (!editor) return;
+      editor.turn = button.dataset.turn as Color;
+      refresh();
+    });
+  }
+}
+
+// -- Puzzles -------------------------------------------------------------------
+
+const THEME_HINTS: [string, string][] = [
+  ["mateIn1", "There's a checkmate in one."],
+  ["mateIn2", "There's a checkmate in two moves. Start with a forcing move."],
+  ["mateIn3", "There's a forced mate. Checks first!"],
+  ["fork", "Look for a fork: one piece attacking two things at once."],
+  ["pin", "Look for a pin: a piece that can't move without exposing something bigger."],
+  ["skewer", "Look for a skewer: attack a big piece so it moves and uncovers another."],
+  ["discoveredAttack", "Move one piece out of the way to uncover an attack by another."],
+  ["doubleCheck", "A double check: the king has to move."],
+  ["hangingPiece", "Something is left undefended. Find it."],
+  ["trappedPiece", "One of their pieces has nowhere to go."],
+  ["deflection", "Pull a defender away from what it's guarding."],
+  ["attraction", "Lure a piece (or the king) onto a bad square."],
+  ["sacrifice", "Don't be afraid to give up material for a bigger gain."],
+  ["promotion", "A pawn wants to become a queen."],
+  ["advancedPawn", "An advanced pawn is the key."],
+  ["zugzwang", "They'd love to pass. Find a waiting move that leaves them stuck."],
+  ["quietMove", "It's not a check or a capture: a quiet move wins."],
+  ["defensiveMove", "First stop their threat."],
+  ["intermezzo", "Before recapturing, is there something stronger in between?"],
+  ["kingsideAttack", "Go for the king."],
+  ["rookEndgame", "Activate your rook: it belongs behind passed pawns."],
+  ["pawnEndgame", "Count the moves: king activity and the opposition decide pawn endgames."],
+];
+
+function puzzleHint(themes: string[]): string {
+  return THEME_HINTS.find(([theme]) => themes.includes(theme))?.[1] ?? "Look at checks, captures and threats first.";
+}
+
+async function startPuzzles(phase: TrainPhase, level: PuzzleLevel, themes: string[] = []) {
+  const all = await loadPuzzles(phase);
+  let list = all[level];
+  if (themes.length) {
+    const wanted = Object.values(all).flat().filter((row) => themes.some((t) => row[4].split(" ").includes(t)));
+    if (wanted.length) list = wanted;
+  }
+  // a different order each time
+  list = [...list].sort(() => Math.random() - 0.5);
+  const streak = puzzle?.streak ?? 0;
+  puzzle = { phase, level, list, index: -1, side: "white", solution: [], step: 0, state: "solving", missed: false, hints: 0, themes: [], streak, note: "" };
+  showPuzzle(0);
+}
+
+function showPuzzle(index: number) {
+  if (!puzzle) return;
+  const keep = puzzle;
+  const row = keep.list[index % keep.list.length];
+  const [, fen, moves] = row;
+  const all = moves.split(" ").map((uci) => parseUci(uci) as NormalMove);
+  mode = "play"; // no eval bar or ratings to give it away
+  resetBoard(new Game(fen), { White: "?", Black: "?", Event: "Puzzle" });
+  puzzle = keep;
+  gameOrigin = "train";
+  currentView = "board";
+  const start = game.position.clone();
+  start.play(all[0]);
+  Object.assign(puzzle, {
+    index, side: start.turn, solution: all.slice(1), step: 0, state: "solving", missed: false, hints: 0,
+    themes: row[4].split(" "), note: `${colourName(start.turn)} to move. Find the best move.`,
+  });
+  orientation = start.turn;
+  if (menuOpen) hideMenu();
+  refresh();
+  // Their move first, then it's your turn
+  setTimeout(() => {
+    if (!puzzle || puzzle.index !== index) return;
+    const played = game.play(all[0]);
+    void play(soundForMove(played.san));
+    refresh();
+  }, 600);
+}
+
+function puzzleMove(move: NormalMove) {
+  if (!puzzle || puzzle.state !== "solving") return;
+  const expected = puzzle.solution[puzzle.step];
+  const after = game.position.clone();
+  after.play(move);
+  const right = makeUci(move) === makeUci(expected) || after.isCheckmate();
+  if (!right) {
+    // Show the try, then take it back
+    const played = game.play(move);
+    void play(soundForMove(played.san));
+    puzzle.missed = true;
+    puzzle.streak = 0;
+    puzzle.note = "Not quite. Try again, or tap the bulb for a hint.";
+    refresh();
+    setTimeout(() => {
+      game.undo();
+      void play("wrong");
+      refresh();
+    }, 700);
+    return;
+  }
+  const played = game.play(move);
+  void play(soundForMove(played.san));
+  puzzle.step++;
+  if (puzzle.step >= puzzle.solution.length || after.isCheckmate()) {
+    puzzleSolved();
+    return;
+  }
+  puzzle.note = "Good! Keep going.";
+  refresh();
+  // Their reply
+  const reply = puzzle.solution[puzzle.step];
+  setTimeout(() => {
+    if (!puzzle || puzzle.state !== "solving") return;
+    const answered = game.play(reply);
+    void play(soundForMove(answered.san));
+    puzzle.step++;
+    if (puzzle.step >= puzzle.solution.length) puzzleSolved();
+    else refresh();
+  }, 500);
+}
+
+function puzzleSolved() {
+  if (!puzzle) return;
+  puzzle.state = "solved";
+  if (!puzzle.missed) puzzle.streak++;
+  puzzle.note = puzzle.missed ? "Solved! Next one?" : puzzle.streak > 1 ? `Solved! That's ${puzzle.streak} in a row.` : "Solved! Well done.";
+  void play("right");
+  refresh();
+}
+
+function puzzleHintStep() {
+  if (!puzzle || puzzle.state !== "solving") return;
+  puzzle.hints++;
+  puzzle.missed = true;
+  puzzle.note = puzzle.hints === 1 ? puzzleHint(puzzle.themes) : "This piece moves.";
+  refresh();
+}
+
+/** Show the rest of the solution, one move at a time. */
+function puzzleShowSolution() {
+  if (!puzzle) return;
+  const rest = puzzle.solution.slice(puzzle.step);
+  if (!rest.length) return;
+  puzzle.state = "shown";
+  puzzle.missed = true;
+  puzzle.streak = 0;
+  puzzle.note = "Here's the solution. Next one when you're ready.";
+  const positions = [game.position.clone()];
+  for (const move of rest) positions.push(positionAfter(positions[positions.length - 1], move));
+  // your moves: the move and why; their replies: what they do
+  const texts = rest.map((move, i) => positions[i].turn === puzzle!.side
+    ? `${makeSan(positions[i], move)}: ${whyMove(positions[i], move, puzzle!.side)}.`
+    : narrateMove(positions[i], move, puzzle!.side));
+  startStepper(positions, rest, texts, "talk", { ico: "skipNext", label: "Next puzzle", run: () => { closeStepper(); nextPuzzle(); }, kind: "accent" });
+}
+
+function nextPuzzle() {
+  if (!puzzle) return;
+  showPuzzle(puzzle.index + 1);
+}
+
+function puzzleSays(): CoachSay {
+  const p = puzzle!;
+  const level = PUZZLE_LEVELS.find(([v]) => v === p.level)?.[1] ?? "";
+  const hint: CoachButton = { ico: "bulb", label: "Hint", run: puzzleHintStep };
+  const show: CoachButton = { ico: "eye", label: "Show the solution", run: puzzleShowSolution, kind: "soft" };
+  const next: CoachButton = { ico: "skipNext", label: "Next puzzle", run: nextPuzzle, kind: "accent" };
+  void level;
+  if (p.state === "solving") return { mood: p.missed ? "think" : "talk", text: p.note, buttons: [hint, show] };
+  return { mood: p.state === "solved" ? "wow" : "talk", text: p.note, buttons: [next] };
+}
+
+/** A circle on the piece to move, after the second hint. */
+function puzzleShapes(): DrawShape[] {
+  if (!puzzle || puzzle.state !== "solving" || puzzle.hints < 2) return [];
+  const move = puzzle.solution[puzzle.step];
+  return move ? [{ orig: makeSquare(move.from) as Key, brush: "you" }] : [];
+}
+
+// -- Your position: set it up, then the coach takes a side ---------------------
+
+interface EditorState {
+  board: Board;
+  turn: Color;
+  pick: Piece | "erase" | null;
+}
+
+let editor: EditorState | null = null;
+
+const PIECE_LETTERS: [PieceRole, string][] = [["king", "K"], ["queen", "Q"], ["rook", "R"], ["bishop", "B"], ["knight", "N"], ["pawn", "P"]];
+
+function startEditor(fen = "4k3/8/8/8/8/8/8/4K3 w - - 0 1") {
+  mode = "practice";
+  resetBoard(new Game());
+  gameOrigin = "train";
+  currentView = "board";
+  editor = { board: Board.empty(), turn: "white", pick: { role: "pawn", color: "white" } };
+  editorLoad(fen);
+  orientation = "white";
+  if (menuOpen) hideMenu();
+  drawPalette();
+  refresh();
+}
+
+function editorLoad(fen: string) {
+  if (!editor) return;
+  const setup = parseFen(fen);
+  if (setup.isErr) return;
+  editor.board = setup.value.board.clone();
+  editor.turn = setup.value.turn;
+  refresh();
+}
+
+function editorTap(key: Key) {
+  if (!editor || !editor.pick) return;
+  const square = parseSquare(key)!;
+  const current = editor.board.get(square);
+  const pick = editor.pick;
+  if (pick === "erase" || (current && current.role === pick.role && current.color === pick.color)) editor.board.take(square);
+  else {
+    // only one king of each colour
+    if (pick.role === "king") for (const sq of editor.board.pieces(pick.color, "king")) editor.board.take(sq);
+    editor.board.set(square, pick);
+  }
+  refresh();
+}
+
+function drawPalette() {
+  for (const colour of ["white", "black"] as Color[]) {
+    const row = $(`palette-${colour}`);
+    row.replaceChildren(...PIECE_LETTERS.map(([role]) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "palette-piece";
+      button.innerHTML = `<span class="mini-piece ${role} ${colour}"></span>`;
+      button.setAttribute("aria-label", `${colour} ${role}`);
+      const on = editor?.pick !== "erase" && editor?.pick?.role === role && editor?.pick?.color === colour;
+      button.classList.toggle("on", !!on);
+      button.addEventListener("click", () => {
+        if (!editor) return;
+        editor.pick = { role, color: colour };
+        drawPalette();
+      });
+      return button;
+    }));
+    if (colour === "black") {
+      const erase = document.createElement("button");
+      erase.type = "button";
+      erase.className = "palette-piece";
+      erase.innerHTML = icon("eraser", 20);
+      erase.setAttribute("aria-label", "Remove pieces");
+      erase.classList.toggle("on", editor?.pick === "erase");
+      erase.addEventListener("click", () => {
+        if (!editor) return;
+        editor.pick = "erase";
+        drawPalette();
+      });
+      row.append(erase);
+    }
+  }
+}
+
+function drawEditor() {
+  const panel = $("editor-panel");
+  panel.hidden = !editor;
+  document.body.classList.toggle("editing", editor !== null);
+  if (!editor) return;
+  for (const button of document.querySelectorAll<HTMLButtonElement>("#editor-turn button")) {
+    button.classList.toggle("on", button.dataset.turn === editor.turn);
+  }
+}
+
+/** Castling rights where king and rook still stand on their home squares. */
+function castlingFen(board: Board): string {
+  const has = (sq: string, role: PieceRole, color: Color) => {
+    const piece = board.get(parseSquare(sq)!);
+    return piece?.role === role && piece.color === color;
+  };
+  let rights = "";
+  if (has("e1", "king", "white")) rights += (has("h1", "rook", "white") ? "K" : "") + (has("a1", "rook", "white") ? "Q" : "");
+  if (has("e8", "king", "black")) rights += (has("h8", "rook", "black") ? "k" : "") + (has("a8", "rook", "black") ? "q" : "");
+  return rights || "-";
+}
+
+async function editorDone() {
+  if (!editor) return;
+  const fen = `${makeBoardFen(editor.board)} ${editor.turn === "white" ? "w" : "b"} ${castlingFen(editor.board)} - 0 1`;
+  const setup = parseFen(fen);
+  const position = setup.isOk ? Chess.fromSetup(setup.value) : undefined;
+  if (!position || position.isErr) {
+    const kings = (["white", "black"] as Color[]).every((c) => editor!.board.pieces(c, "king").size() === 1);
+    await message("Not a legal position", kings
+      ? "That position can't happen in a game (for example, the side not to move is in check, or pawns are on the first or last rank)."
+      : "Each side needs exactly one king.");
+    return;
+  }
+  if (position.value.isEnd()) {
+    await message("Game over", "That position is already checkmate or stalemate. Change it a little first.");
+    return;
+  }
+  const ask = $<HTMLDialogElement>("side-dialog");
+  ask.showModal();
+  const choice = await new Promise<string>((resolve) => {
+    const buttons = [...ask.querySelectorAll<HTMLButtonElement>("button[value]")];
+    const done = (value: string) => {
+      for (const button of buttons) button.onclick = null;
+      ask.oncancel = null;
+      ask.close();
+      resolve(value);
+    };
+    for (const button of buttons) button.onclick = (event) => { event.preventDefault(); done(button.value); };
+    ask.oncancel = (event) => { event.preventDefault(); done("cancel"); };
+  });
+  if (choice !== "white" && choice !== "black") return;
+  startPositionMatch(fenOf(position.value), choice as Color);
+}
+
+function openPaste() {
+  const dialogBox = $<HTMLDialogElement>("paste-dialog");
+  const text = $<HTMLTextAreaElement>("paste-text");
+  text.value = "";
+  $("paste-status").textContent = "";
+  dialogBox.showModal();
+  const buttons = [...dialogBox.querySelectorAll<HTMLButtonElement>("button[value]")];
+  const done = () => {
+    for (const button of buttons) button.onclick = null;
+    dialogBox.close();
+  };
+  for (const button of buttons) {
+    button.onclick = (event) => {
+      event.preventDefault();
+      if (button.value !== "load") return done();
+      const raw = text.value.trim();
+      const asFen = parseFen(raw);
+      if (asFen.isOk && raw.split("/").length === 8) {
+        editorLoad(raw);
+        return done();
+      }
+      const [parsed] = readPgn(raw);
+      const loaded = parsed?.load().game;
+      if (loaded && (loaded.length || parsed.headers.FEN)) {
+        editorLoad(fenOf(loaded.position));
+        return done();
+      }
+      $("paste-status").textContent = "That isn't a FEN or a PGN game I can read.";
+    };
+  }
+}
+
+/** Play from your position: the coach takes one side at full strength. */
+function startPositionMatch(fen: string, user: Color) {
+  mode = "practice";
+  resetBoard(new Game(fen), { White: user === "white" ? playerName() : "Coach", Black: user === "black" ? playerName() : "Coach", Date: today() });
+  gameOrigin = "train";
+  positionTraining = true;
+  match = {
+    id: ++matchCounter, user, level: LEVELS.length - 1,
+    sfOpening: null, sfActive: false, sfMisses: 0, myOpening: null, myActive: false,
+  };
+  orientation = user;
+  void engine.newGame();
+  refresh();
+  void maybeOpponentMove();
+}
+
+/** The coach's buttons in your own position: best move, the plan, its threats. */
+function positionButtons(): CoachButton[] {
+  return [
+    { ico: "target", label: "Best move", run: () => void showBestMove(), kind: "accent" },
+    { ico: "bulb", label: "The plan", run: () => void openStrategy() },
+    { ico: "hazard", label: "What are you threatening?", run: () => void showCoachThreat(), kind: "hazard" },
+  ];
+}
+
+/** Best move: the move, illustrated, with why. */
+async function showBestMove() {
+  if (busy) return;
+  const position = base();
+  setBusy(true, "Let me find the best move...");
+  try {
+    const plan = await planAhead(coachAnalysis, position);
+    setBusy(false);
+    const move = plan.steps[0]?.move;
+    if (!move) return;
+    const san = makeSan(position, move);
+    const text = `Best is ${san}: ${whyMove(position, move, listener())}.`;
+    startStepper([position, positionAfter(position, move)], [move], [text], "talk", undefined, true);
+  } catch (error) {
+    errorText = `Something went wrong: ${error}`;
+    setBusy(false);
+    refresh();
+  }
+}
+
+/** What the coach threatens: its best move if you did nothing. */
+async function showCoachThreat() {
+  if (busy) return;
+  const position = base();
+  setBusy(true, "Let me look at my threats...");
+  try {
+    const threat = await threatCheck(coachAnalysis, position);
+    setBusy(false);
+    if (!threat.threatMove || !threat.passed) {
+      startStepper([position, position], [], [], "talk");
+      void message("No threats", "I'm not threatening anything serious right now. Use the time to improve your worst piece.");
+      return;
+    }
+    const after = positionAfter(threat.passed, threat.threatMove);
+    const said = narrateMove(threat.passed, threat.threatMove, listener());
+    const text = `If you did nothing: ${said.charAt(0).toLowerCase()}${said.slice(1)}`;
+    startStepper([threat.passed, after], [threat.threatMove], [text], "worried");
+  } catch (error) {
+    errorText = `Something went wrong: ${error}`;
+    setBusy(false);
+    refresh();
+  }
+}
+
+// -- Lessons ----------------------------------------------------------------------
+
+interface LessonState {
+  phase: TrainPhase;
+  index: number;
+}
+
+let lesson: LessonState | null = null;
+
+function showLessonList() {
+  const list = $("lesson-list");
+  const lessons = LESSONS[trainPhase];
+  list.replaceChildren();
+  const back = document.createElement("button");
+  back.type = "button";
+  back.className = "home-link";
+  back.innerHTML = `${icon("back", 16)} ${trainPhase === "middlegame" ? "Middlegame" : "Endgame"}`;
+  back.addEventListener("click", () => {
+    list.hidden = true;
+    $("train-cards").hidden = false;
+  });
+  list.append(back);
+  if (!lessons.length) {
+    const note = document.createElement("p");
+    note.className = "setup-note";
+    note.textContent = "These lessons are being written. Try the puzzles in the meantime!";
+    list.append(note);
+  }
+  lessons.forEach((item, i) => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "train-card lesson-card";
+    card.innerHTML = `<span class="lesson-number">${i + 1}</span><span><b></b><small></small></span>`;
+    card.querySelector("b")!.textContent = item.title;
+    card.querySelector("small")!.textContent = item.summary;
+    card.addEventListener("click", () => startLesson(trainPhase, i));
+    list.append(card);
+  });
+  $("train-cards").hidden = true;
+  list.hidden = false;
+}
+
+function startLesson(phase: TrainPhase, index: number) {
+  const item: Lesson | undefined = LESSONS[phase][index];
+  if (!item) return;
+  mode = "play";
+  resetBoard(new Game(item.steps[0].fen), { White: "?", Black: "?", Event: item.title });
+  gameOrigin = "train";
+  lesson = { phase, index };
+  currentView = "board";
+  if (menuOpen) hideMenu();
+  const frames = item.steps.map((step) => {
+    const position = Chess.fromSetup(parseFen(step.fen).unwrap()).unwrap();
+    const brush = (kind?: string) => (kind === "bad" ? "threat" : kind === "plan" ? "them" : "you");
+    const shapes: DrawShape[] = [
+      ...(step.arrows ?? []).map(([from, to, kind]) => ({ orig: from as Key, dest: to as Key, brush: brush(kind) })),
+      ...(step.squares ?? []).map(([square, kind]) => ({ orig: square as Key, brush: brush(kind) })),
+    ];
+    return { position, shapes };
+  });
+  const tryIt: CoachButton = {
+    ico: "puzzle", label: "Try it: puzzles on this idea", kind: "accent",
+    run: () => { closeStepper(); lesson = null; void startPuzzles(phase, puzzleLevel, item.themes); },
+  };
+  stepper = {
+    positions: frames.map((f) => f.position), moves: [], texts: item.steps.map((s) => s.text),
+    step: 1, mood: "talk", extra: tryIt, frames,
+  };
+  orientation = frames[0].position.turn;
+  refresh();
+}
 
 // ---------------------------------------------------------------------------
 // Opening demos
@@ -1846,6 +2445,7 @@ function refresh() {
   drawMoveList(reviews, info);
   drawReview(reviews, info);
   drawCoachFace(reviews);
+  drawEditor();
   drawWhatIf();
   drawMoveStrip(reviews);
   syncDropdowns();
@@ -1985,7 +2585,8 @@ function drawBoard(reviews: (Review | undefined)[], info: OpeningInfo[]) {
   }
   const colour = movableColour();
   const movesFrom = quizWaiting() ? quiz!.threat!.passed! : position;
-  ground.setAutoShapes(stepper ? stepperShapes() : [...badgeShapes(reviews, info), ...arrowShapes()]);
+  ground.setAutoShapes(stepper ? stepperShapes() : puzzle ? puzzleShapes() : editor ? [] : [...badgeShapes(reviews, info), ...arrowShapes()]);
+  if (editor) last = undefined;
   ground.set({
     fen: fenOf(position),
     orientation,
@@ -2071,7 +2672,6 @@ function drawEvalBar() {
 // ---------------------------------------------------------------------------
 
 const VALUES: Record<Role, number> = { pawn: 1, knight: 3, bishop: 3, rook: 5, queen: 9, king: 0 };
-const START_COUNT: Record<Role, number> = { pawn: 8, knight: 2, bishop: 2, rook: 2, queen: 1, king: 1 };
 const CAPTURE_ORDER: Role[] = ["pawn", "knight", "bishop", "rook", "queen"];
 
 /** Your name from the start menu ("You" if none is set). */
@@ -2090,6 +2690,9 @@ function barName(colour: Color): string {
 
 function drawPlayerBars() {
   const board = shown().board;
+  // Captures count from where this game started (a puzzle or set-up position
+  // isn't the usual starting position); while setting up, there are none
+  const startBoard = editor ? board : game.positionAt(0).board;
   const material = { white: 0, black: 0 };
   for (const colour of ["white", "black"] as const) {
     for (const role of CAPTURE_ORDER) material[colour] += VALUES[role] * board.pieces(colour, role).size();
@@ -2100,14 +2703,18 @@ function drawPlayerBars() {
   ];
   for (const [bar, colour] of bars) {
     const name = bar.querySelector<HTMLElement>(".pb-name")!;
-    name.textContent = demo && bar.id === "bar-top" ? demoTitle() : barName(colour);
+    name.textContent = demo && bar.id === "bar-top" ? demoTitle()
+      : puzzle && bar.id === "bar-top" ? `Puzzle · ${PUZZLE_LEVELS.find(([v]) => v === puzzle!.level)?.[1]}${puzzle.streak ? ` · ${puzzle.streak} in a row` : ""}`
+      : editor && bar.id === "bar-top" ? "Set up a position"
+      : lesson && bar.id === "bar-top" ? `Lesson ${lesson.index + 1}: ${LESSONS[lesson.phase][lesson.index].title}`
+      : barName(colour);
     name.title = `${name.textContent} - ${colour === "white" ? "White" : "Black"}`;
     // The pieces this side has taken (the other side's missing pieces)
     const taken = opposite(colour);
     const captured = bar.querySelector<HTMLElement>(".pb-captured")!;
     captured.replaceChildren();
     for (const role of CAPTURE_ORDER) {
-      const missing = Math.max(0, START_COUNT[role] - board.pieces(taken, role).size());
+      const missing = Math.max(0, startBoard.pieces(taken, role).size() - board.pieces(taken, role).size());
       for (let i = 0; i < missing; i++) {
         const icon = document.createElement("span");
         icon.className = `mini-piece ${role} ${taken}${i === 0 && captured.childElementCount ? " gap" : ""}`;
@@ -2457,6 +3064,9 @@ const STRATEGY: CoachButton = { ico: "target", label: "Strategy", run: () => voi
 /** What the coach says about the position on screen. */
 function coachSays(reviews: (Review | undefined)[]): CoachSay {
   if (busy) return { mood: "think", text: statusMessage || "Hmm, let me think...", buttons: [] };
+  if (editor) return { mood: "talk", text: "Tap a piece below, then tap squares. Tap again to remove it. Done when you're ready.", buttons: [] };
+  if (puzzle) return puzzleSays();
+  if (lesson) return { mood: "talk", text: LESSONS[lesson.phase][lesson.index].title, buttons: [] };
   if (demo) {
     const ply = currentPly();
     const step = ply ? demo.steps[ply - 1] : undefined;
@@ -2484,22 +3094,26 @@ function coachSays(reviews: (Review | undefined)[]): CoachSay {
   }
   if (analysis) {
     const review = ratingsOn() ? analysisReview() : undefined;
-    const exit: CoachButton = { ico: "close", label: "Back to the game", run: exitAnalysis, kind: "soft" };
-    if (!analysis.line.length) return { mood: "talk", text: "Try any move to see what would have happened.", buttons: [exit] };
-    if (!review) return { mood: "think", text: "Let me check that move...", buttons: [exit] };
+    if (!analysis.line.length) return { mood: "talk", text: "Try any move to see what would have happened.", buttons: [] };
+    if (!review) return { mood: "think", text: "Let me check that move...", buttons: [] };
     const line = analysis.line;
     const before = line.positionAt(line.length - 1);
     const after = line.positionAt(line.length);
-    return { mood: moodForRating(review.rating), text: `What if: ${verdict(review, before, after, analyser.evals.get(fenOf(after)), before.turn, line.length)}`, buttons: [exit] };
+    return { mood: moodForRating(review.rating), text: verdict(review, before, after, analyser.evals.get(fenOf(after)), before.turn, line.length), buttons: [] };
   }
   const ply = reviewPly();
   if (!ratingsOn()) return { mood: "talk", text: "Move ratings are off.", buttons: [STRATEGY] };
+  if (ply === 0 && positionTraining) {
+    const coach = match ? opposite(match.user) : "black";
+    return { mood: "talk", text: `I'm ${colourName(coach)}. Your move, or ask me something.`, buttons: positionButtons() };
+  }
   if (ply === 0) return { mood: "talk", text: game.length ? "The starting position." : "Make a move and I'll tell you what I think.", buttons: [STRATEGY] };
   const review = reviews[ply - 1];
   if (!review) return { mood: "think", text: "Hmm, let me check that move...", buttons: [STRATEGY] };
   const before = game.positionAt(ply - 1);
   const after = game.positionAt(ply);
   const text = verdict(review, before, after, analyser.evals.get(fenOf(after)), listener(), ply);
+  if (positionTraining) return { mood: moodForRating(review.rating), text, buttons: positionButtons() };
   return { mood: moodForRating(review.rating), text, buttons: [TELL_MORE, STRATEGY] };
 }
 
@@ -2633,6 +3247,7 @@ interface Stepper {
   mood: Mood;
   extra?: CoachButton;
   illustration?: boolean; // one move, with what the piece controls
+  frames?: { position: Chess; shapes: DrawShape[] }[]; // lesson pages instead of moves
 }
 
 let stepper: Stepper | null = null;
@@ -2645,16 +3260,27 @@ function startStepper(positions: Chess[], moves: NormalMove[], texts: string[], 
   refresh();
 }
 
+const stepCount = () => (stepper?.frames ? stepper.frames.length : stepper?.moves.length ?? 0);
+
 function stepTo(step: number) {
   if (!stepper) return;
-  const next = Math.max(1, Math.min(step, stepper.moves.length));
-  if (next > stepper.step) void play(soundForMove(makeSan(stepper.positions[next - 1], stepper.moves[next - 1])));
+  const next = Math.max(1, Math.min(step, stepCount()));
+  if (next > stepper.step && !stepper.frames) void play(soundForMove(makeSan(stepper.positions[next - 1], stepper.moves[next - 1])));
   stepper.step = next;
   refresh();
 }
 
 function closeStepper() {
   stepper = null;
+  if (lesson) {
+    // leaving a lesson goes back to the list
+    lesson = null;
+    showMenu();
+    homeChoice = "train";
+    showScreen("train");
+    showLessonList();
+    return;
+  }
   refresh();
 }
 
@@ -2664,17 +3290,20 @@ function drawStepper() {
   area.classList.toggle("stepping", stepper !== null);
   box.hidden = !stepper;
   if (!stepper) return;
-  $("step-count").textContent = stepper.moves.length > 1 ? `${stepper.step}/${stepper.moves.length}` : "";
-  for (const id of ["step-back", "step-next"]) $(id).hidden = stepper.moves.length < 2;
+  $("step-count").textContent = stepCount() > 1 ? `${stepper.step}/${stepCount()}` : "";
+  for (const id of ["step-back", "step-next"]) $(id).hidden = stepCount() < 2;
   $("step-text").textContent = stepper.texts[stepper.step - 1] ?? "";
   setFace($("step-face"), stepper.mood, 34);
   $<HTMLButtonElement>("step-back").disabled = stepper.step <= 1;
-  $<HTMLButtonElement>("step-next").disabled = stepper.step >= stepper.moves.length;
-  $("step-extra").replaceChildren(...(stepper.extra ? [iconButton(stepper.extra)] : []));
+  $<HTMLButtonElement>("step-next").disabled = stepper.step >= stepCount();
+  // the extra button (e.g. "Try it") only on the last page of a lesson
+  const extra = stepper.extra && (!stepper.frames || stepper.step >= stepCount()) ? [iconButton(stepper.extra)] : [];
+  $("step-extra").replaceChildren(...extra);
 }
 
 /** On the board while stepping: the move just played, and what it hits. */
 function stepperShapes(): DrawShape[] {
+  if (stepper?.frames) return stepper.frames[stepper.step - 1].shapes;
   if (!stepper || stepper.step < 1) return [];
   const before = stepper.positions[stepper.step - 1];
   const after = stepper.positions[stepper.step];
@@ -3005,7 +3634,7 @@ function openingFamily(): string {
 
 /** A match has ended: keep it in the game history. */
 function recordGame() {
-  if (!match || game.length === 0) return;
+  if (!match || game.length === 0 || positionTraining) return;
   const result = gameHeaders.Result;
   const winner = result === "1-0" ? "white" : result === "0-1" ? "black" : result === "1/2-1/2" ? null : undefined;
   if (winner === undefined) return;
@@ -3130,6 +3759,7 @@ async function onNewGame() {
   if (inProgress() && !(await message("New game?", "Are you sure? This game will end.", true))) return;
   const learning = demo ? demo.demo.opening : null;
   const screen: HomeChoice | null = gameOrigin === "learn" ? "practice" : gameOrigin;
+  if (screen === "train") $("lesson-list").hidden = true;
   showMenu();
   if (!screen) return;
   homeChoice = screen;
@@ -3708,6 +4338,7 @@ if (import.meta.env.DEV) {
     analyser, game: () => game, gameScores, answerQuiz, startTask, quiz: () => quiz, parseUci, normalizeMove, base,
     boardMove: onBoardMove, clock: () => clock, clockTimes: () => clockTimes, onUndo,
     demo: () => demo, startDemo, DEMOS, demoSteps, showTour,
+    puzzle: () => puzzle, editor: () => editor, startPuzzles, startEditor, startLesson, editorTap,
   };
 }
 

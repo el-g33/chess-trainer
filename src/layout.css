@@ -1452,3 +1452,163 @@ body {
 #whatif-exit:hover:not(:disabled) {
   background: #e8f0fa;
 }
+
+/* -- Train ------------------------------------------------------------------------ */
+
+.train-cards,
+.lesson-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.train-cards[hidden],
+.lesson-list[hidden] {
+  display: none;
+}
+
+.train-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-radius: var(--card-radius);
+  border: 1px solid var(--line);
+  background: var(--button);
+  color: var(--text);
+  text-align: left;
+}
+
+.train-card b {
+  display: block;
+  font-size: 1rem;
+}
+
+.train-card small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.tc-ico {
+  flex: none;
+  margin-top: 2px;
+}
+
+.pc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.pc-body .chips {
+  margin-top: 2px;
+}
+
+.start-puzzles {
+  align-self: flex-start;
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-weight: 700;
+}
+
+.lesson-number {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--sel-bg);
+  color: var(--sel-fg);
+  font-weight: 700;
+}
+
+/* The position editor */
+.editor-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.editor-panel[hidden] {
+  display: none;
+}
+
+.palette {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+#palette-white {
+  grid-template-columns: repeat(6, 1fr) 1fr;
+}
+
+.palette-piece {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  min-height: 0;
+  padding: 0;
+  border-radius: var(--radius);
+}
+
+.palette-piece .mini-piece {
+  width: 32px;
+  height: 32px;
+  margin: 0;
+}
+
+.palette-piece.on,
+.palette-piece.on:hover:not(:disabled) {
+  background: var(--sel-bg);
+  border-color: var(--sel-bg);
+  color: var(--sel-fg);
+}
+
+.editor-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.6fr 1fr;
+  gap: 6px;
+}
+
+.editor-row button {
+  min-height: 34px;
+  padding: 4px 6px;
+  font-size: 0.85rem;
+}
+
+#editor-turn button {
+  flex-direction: row;
+  padding: 6px;
+}
+
+body.editing .board-controls,
+body.editing .move-strip,
+body.editing #bar-bottom {
+  display: none !important;
+}
+
+#paste-text {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 8px 0;
+  padding: 8px;
+  font: 0.85rem/1.4 Consolas, monospace;
+  color: inherit;
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+#whatif-text {
+  font-style: italic;
+}
