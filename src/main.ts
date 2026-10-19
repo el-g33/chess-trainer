@@ -602,7 +602,7 @@ const MODE_LINES: Record<HomeChoice, string> = {
   play: "A real game against Stockfish. No hints until it's over, then I'll go through it with you.",
   practice: "Learn an opening, or play a game with me helping along the way.",
   analysis: "Got a game from lichess or chess.com? Let's look at it together.",
-  train: "Sharpen your middlegame and endgame: principles, puzzles, and positions to explore with me.",
+  train: "Middlegame and endgame: short lessons, puzzles for every level, and your own positions to play out with me.",
 };
 
 // The time controls under each icon (values as in the clock's PRESETS)
@@ -2567,7 +2567,9 @@ function drawBoard(reviews: (Review | undefined)[], info: OpeningInfo[]) {
   let last: [Key, Key] | undefined;
   const plan = previewPlan();
   const quizLine = quizLinePositions();
-  if (stepper && stepper.step > 0) {
+  if (stepper?.frames) {
+    last = undefined;
+  } else if (stepper && stepper.step > 0) {
     const move = stepper.moves[stepper.step - 1];
     last = [makeSquare(move.from) as Key, arrowEnd(stepper.positions[stepper.step - 1], move)];
   } else if (quizLine && quiz?.lineStep) {
