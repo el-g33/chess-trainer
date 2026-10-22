@@ -10,7 +10,8 @@ import { parseSan } from "chessops/san";
 import type { NormalMove } from "chessops/types";
 
 export interface DemoLine {
-  title: string;
+  title: string; // "Main", or the variation's name, e.g. "Nf3 variation"
+  about?: string; // a variation: how it differs, said first
   moves: string; // the line in SAN, e.g. "d4 d5 Bf4 Nf6"
   notes: Record<string, string>;
 }
@@ -24,10 +25,10 @@ export interface Demo {
 export const DEMOS: Demo[] = [
   {
     opening: "London System",
-    intro: "White sets up the same way against almost anything: pawn to d4, the bishop to f4 BEFORE e3, then e3, Nf3, c3, Bd3, Nbd2 and castling.",
+    intro: "White sets up the same way against almost anything.",
     lines: [
       {
-        title: "Main line: against ...d5, ...e6 and ...c5",
+        title: "Main",
         moves: "d4 d5 Bf4 Nf6 e3 e6 Nf3 c5 c3 Nc6 Nbd2 Bd6 Bg3 O-O Bd3",
         notes: {
           "1.d4": "A pawn in the centre.",
@@ -42,7 +43,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Move order: Nf3 before Bf4",
+        title: "Nf3 variation",
+        about: "In this variation the move order changes: the knight comes out before the bishop.",
         moves: "d4 d5 Nf3 Nf6 Bf4 c5 e3 Nc6 Nbd2 e6 c3",
         notes: {
           "2.Nf3": "The older order: knight first, bishop next move.",
@@ -50,7 +52,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "...Qb6, attacking b2 (and the trap)",
+        title: "...Qb6 variation",
+        about: "Here Black's queen goes after b2, the pawn the bishop left behind. Watch the trap.",
         moves: "d4 d5 Bf4 Nf6 e3 c5 Nf3 Qb6 Nc3 Qxb2 Nb5 Na6 a3",
         notes: {
           "4...Qb6": "With the bishop gone from c1, nothing guards b2, and Black's queen attacks it.",
@@ -61,7 +64,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Against a King's Indian setup (...g6, ...Bg7, ...d6)",
+        title: "King's Indian variation",
+        about: "Black fianchettoes with ...g6 and ...Bg7 instead of ...d5. White keeps the same setup.",
         moves: "d4 Nf6 Bf4 g6 e3 Bg7 Nf3 d6 h3 O-O Be2",
         notes: {
           "4...d6": "Black is preparing ...e5.",
@@ -70,7 +74,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "When Black copies with ...Bf5",
+        title: "...Bf5 variation",
+        about: "Black copies the London idea with ...Bf5. White hits back with an early c4.",
         moves: "d4 d5 Bf4 Bf5 e3 e6 c4",
         notes: {
           "4.c4": "Black's bishop has left c8, so b7 is weak. c4 followed by Qb3 attacks it.",
@@ -80,10 +85,10 @@ export const DEMOS: Demo[] = [
   },
   {
     opening: "Rapport-Jobava System",
-    intro: "Like the London, but the queen's knight comes to c3 first (before any c4), and the bishop goes to f4. It's sharper: the key idea is Nb5, attacking c7.",
+    intro: "Like the London, but the knight comes to c3 first, aiming for Nb5.",
     lines: [
       {
-        title: "Main line",
+        title: "Main",
         moves: "d4 d5 Nc3 Nf6 Bf4 e6 Nb5 Na6 e3 Be7 Nf3 O-O Be2",
         notes: {
           "2.Nc3": "Nc3 blocks the c-pawn, which is unusual in a d4 opening, but it develops fast and eyes b5.",
@@ -94,19 +99,22 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Move order: 1...Nf6 first",
+        title: "...Nf6 variation",
+        about: "Black starts with ...Nf6. The moves come in a different order but reach the same setup.",
         moves: "d4 Nf6 Nc3 d5 Bf4 e6",
         notes: {},
       },
       {
-        title: "Move order: from the London",
+        title: "Bf4 variation",
+        about: "White starts like the London with Bf4, then switches to Nc3.",
         moves: "d4 d5 Bf4 Nf6 Nc3 e6",
         notes: {
           "3...e6": "A London move order that turns into the Jobava.",
         },
       },
       {
-        title: "...c5, striking back",
+        title: "...c5 variation",
+        about: "Black strikes back at d4 with ...c5 straight away.",
         moves: "d4 d5 Nc3 Nf6 Bf4 c5 e3 cxd4 exd4",
         notes: {
           "4.e3": "e3 keeps d4 defended.",
@@ -114,7 +122,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "The trap: 4...Nc6?",
+        title: "...Nc6 trap",
+        about: "Here Black plays the natural ...Nc6, and Nb5 punishes it.",
         moves: "d4 d5 Nc3 Nf6 Bf4 c5 e3 Nc6 Nb5",
         notes: {
           "4...Nc6": "A natural move, but a mistake (+1.9).",
@@ -122,14 +131,16 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Black copies with ...Bf5",
+        title: "...Bf5 variation",
+        about: "Black copies with ...Bf5. White carries on with e3 and Nf3.",
         moves: "d4 d5 Nc3 Nf6 Bf4 Bf5 e3 e6 Nf3",
         notes: {
           "5.Nf3": "Just keep developing: Bd3 comes next, offering to swap Black's active bishop. Nb5 ideas stay in the air.",
         },
       },
       {
-        title: "...a6, stopping Nb5",
+        title: "...a6 variation",
+        about: "Black stops Nb5 with ...a6, so White changes plans.",
         moves: "d4 d5 Nc3 Nf6 Bf4 a6 e3 e6 Nf3 c5 dxc5 Bxc5 Bd3",
         notes: {
           "3...a6": "Black spends a move to stop Nb5.",
@@ -141,10 +152,10 @@ export const DEMOS: Demo[] = [
   },
   {
     opening: "Italian Game",
-    intro: "Pawn to e4, knight to f3 and the bishop to c4, aiming at f7 - the square only Black's king defends. Then castle, d3 and c3, and build slowly before d4.",
+    intro: "White aims the bishop at f7, then builds up slowly before striking in the centre.",
     lines: [
       {
-        title: "Main line: the quiet Giuoco Pianissimo",
+        title: "Main",
         moves: "e4 e5 Nf3 Nc6 Bc4 Bc5 c3 Nf6 d3 d6 O-O O-O Re1 a6 Bb3 Ba7 h3",
         notes: {
           "3.Bc4": "The Italian bishop aims at f7, the weakest point in Black's camp: only the king guards it.",
@@ -157,7 +168,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Two Knights: 3...Nf6 and the calm 4.d3",
+        title: "Two Knights variation",
+        about: "Black answers with ...Nf6 instead of ...Bc5. White keeps it calm with d3.",
         moves: "e4 e5 Nf3 Nc6 Bc4 Nf6 d3 Be7 O-O O-O Re1 d6 c3",
         notes: {
           "3...Nf6": "Black attacks e4 at once (the Two Knights Defence).",
@@ -166,7 +178,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Two Knights: the sharp 4.Ng5",
+        title: "Ng5 variation",
+        about: "Against ...Nf6, White attacks f7 at once with Ng5. Sharp play follows.",
         moves: "e4 e5 Nf3 Nc6 Bc4 Nf6 Ng5 d5 exd5 Na5 Bb5+ c6 dxc6 bxc6 Be2 h6 Nf3 e4 Ne5",
         notes: {
           "4.Ng5": "The sharp way: the knight and bishop both hit f7.",
@@ -177,7 +190,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "The Fried Liver: punishing 5...Nxd5?",
+        title: "Fried Liver",
+        about: "If Black takes back with ...Nxd5, a knight sacrifice on f7 punishes it.",
         moves: "e4 e5 Nf3 Nc6 Bc4 Nf6 Ng5 d5 exd5 Nxd5 Nxf7 Kxf7 Qf3+ Ke6 Nc3",
         notes: {
           "5...Nxd5": "This natural recapture is a mistake (5...Na5 is right).",
@@ -187,7 +201,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Philidor Defence: 2...d6",
+        title: "Philidor variation",
+        about: "Black defends e5 with ...d6. White takes the centre with d4.",
         moves: "e4 e5 Nf3 d6 d4 Nf6 Nc3 Nbd7 Bc4 Be7 O-O O-O",
         notes: {
           "2...d6": "The Philidor: solid but a little passive (+0.6 for White).",
@@ -198,7 +213,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Petrov's Defence: 2...Nf6",
+        title: "Petrov variation",
+        about: "Black counterattacks e4 with ...Nf6 instead of defending e5.",
         moves: "e4 e5 Nf3 Nf6 Nxe5 d6 Nf3 Nxe4 d4 d5 Bd3",
         notes: {
           "2...Nf6": "Petrov's Defence: Black counter-attacks e4 instead of defending e5.",
@@ -209,7 +225,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Petrov trap: 3...Nxe4? 4.Qe2!",
+        title: "Petrov trap",
+        about: "In the Petrov, taking back the pawn with ...Nxe4 too early runs into Qe2.",
         moves: "e4 e5 Nf3 Nf6 Nxe5 Nxe4 Qe2 Nf6 Nc6+",
         notes: {
           "3...Nxe4": "Copying White is a mistake.",
@@ -219,7 +236,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Latvian Gambit: 2...f5",
+        title: "Latvian Gambit",
+        about: "Black sacrifices with ...f5. It's risky, and White's pieces punish it.",
         moves: "e4 e5 Nf3 f5 Nxe5 Qf6 d4 d6 Nc4 fxe4 Nc3",
         notes: {
           "2...f5": "The Latvian Gambit: very risky. Stockfish already rates it +1.5 for White.",
@@ -229,7 +247,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "When Black gives up the centre: 1...g6",
+        title: "...g6 variation",
+        about: "Black gives up the centre with ...g6. White builds the ideal centre and develops.",
         moves: "e4 g6 d4 Bg7 Nf3 d6 Bc4 Nf6 Qe2 O-O O-O",
         notes: {
           "1...g6": "Black lets you have the centre (the Modern Defence).",
@@ -242,10 +261,10 @@ export const DEMOS: Demo[] = [
   },
   {
     opening: "Ruy Lopez",
-    intro: "Bishop to b5 attacks the knight that defends e5. Castle, Re1 and c3 follow, then d4. A slow, deep opening played at every level.",
+    intro: "White puts pressure on the knight that defends e5, then builds up slowly.",
     lines: [
       {
-        title: "Main line: the Closed Ruy Lopez",
+        title: "Main",
         moves: "e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1 b5 Bb3 d6 c3 O-O h3",
         notes: {
           "3.Bb5": "The Spanish bishop attacks the knight that guards e5.",
@@ -259,7 +278,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Exchange Variation: 4.Bxc6",
+        title: "Exchange variation",
+        about: "White gives up the bishop for the knight to damage Black's pawns.",
         moves: "e4 e5 Nf3 Nc6 Bb5 a6 Bxc6 dxc6 O-O f6 d4 exd4 Nxd4",
         notes: {
           "4.Bxc6": "Give up the bishop to damage Black's pawns.",
@@ -269,7 +289,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Why not 5.Nxe5? straight away",
+        title: "Nxe5 trap",
+        about: "Why White can't win the e5 pawn straight away: ...Qd4 wins it back.",
         moves: "e4 e5 Nf3 Nc6 Bb5 a6 Bxc6 dxc6 Nxe5 Qd4 Nf3 Qxe4+",
         notes: {
           "5.Nxe5": "Grabbing the pawn doesn't work yet:",
@@ -278,7 +299,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Berlin Defence: 3...Nf6",
+        title: "Berlin variation",
+        about: "Black answers with ...Nf6 and heads for an early queen swap.",
         moves: "e4 e5 Nf3 Nc6 Bb5 Nf6 O-O Nxe4 d4 Nd6 Bxc6 dxc6 dxe5 Nf5 Qxd8+ Kxd8",
         notes: {
           "3...Nf6": "The Berlin: Black hits e4 at once.",
@@ -288,7 +310,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Schliemann Gambit: 3...f5",
+        title: "Schliemann Gambit",
+        about: "Black hits back at once with ...f5. White stays calm with d3.",
         moves: "e4 e5 Nf3 Nc6 Bb5 f5 d3 fxe4 dxe4 Nf6 O-O",
         notes: {
           "3...f5": "The Schliemann: an aggressive strike at e4.",
@@ -297,7 +320,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Classical: 3...Bc5",
+        title: "...Bc5 variation",
+        about: "Black puts the bishop on c5. White prepares d4 with c3.",
         moves: "e4 e5 Nf3 Nc6 Bb5 Bc5 c3 Nf6 d4",
         notes: {
           "3...Bc5": "Black's bishop goes to its active diagonal.",
@@ -306,7 +330,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Against the Philidor: 2...d6",
+        title: "Philidor variation",
+        about: "Black defends e5 with ...d6 before ...Nc6. White takes the centre with d4.",
         moves: "e4 e5 Nf3 d6 d4 exd4 Nxd4 Nf6 Nc3 Be7 Bf4",
         notes: {
           "2...d6": "Black avoids the Ruy Lopez altogether.",
@@ -319,10 +344,10 @@ export const DEMOS: Demo[] = [
   },
   {
     opening: "Queen's Gambit",
-    intro: "Offer the c-pawn with 2.c4 to pull Black's d-pawn away from the centre. Knights to c3 and f3, the bishops out actively, then castle.",
+    intro: "White offers the c-pawn to pull Black's d-pawn out of the centre.",
     lines: [
       {
-        title: "Main line: Queen's Gambit Declined",
+        title: "Main",
         moves: "d4 d5 c4 e6 Nc3 Nf6 Bg5 Be7 e3 O-O Nf3 Nbd7 Rc1 c6 Bd3 dxc4 Bxc4",
         notes: {
           "2.c4": "The Queen's Gambit: offer the c-pawn to lure Black's d-pawn away from the centre.",
@@ -334,7 +359,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "The Elephant Trap: don't grab d5",
+        title: "Elephant Trap",
+        about: "Black sets a trap: grabbing the d5 pawn loses a piece.",
         moves: "d4 d5 c4 e6 Nc3 Nf6 Bg5 Nbd7 cxd5 exd5 Nxd5 Nxd5 Bxd8 Bb4+ Qd2 Kxd8",
         notes: {
           "4...Nbd7": "This sets the Elephant Trap.",
@@ -345,7 +371,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Queen's Gambit Accepted: 2...dxc4",
+        title: "Accepted variation",
+        about: "Black takes the c-pawn. White wins it back calmly with e3 and Bxc4.",
         moves: "d4 d5 c4 dxc4 Nf3 Nf6 e3 e6 Bxc4 c5 O-O a6",
         notes: {
           "2...dxc4": "Accepted. Don't rush to win the pawn back.",
@@ -355,7 +382,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Accepted: if Black hangs on with ...b5",
+        title: "...b5 variation",
+        about: "Black tries to keep the extra pawn with ...b5. a4 breaks it up.",
         moves: "d4 d5 c4 dxc4 e3 b5 a4 c6 axb5 cxb5 Qf3",
         notes: {
           "3...b5": "Black tries to keep the extra pawn. It doesn't work:",
@@ -365,7 +393,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Accepted: the Central Variation 3.e4",
+        title: "e4 variation",
+        about: "Against the Accepted, White grabs the centre with e4 at once.",
         moves: "d4 d5 c4 dxc4 e4 e5 Nf3 exd4 Bxc4",
         notes: {
           "3.e4": "Take the whole centre while Black's pawn is away on c4.",
@@ -373,7 +402,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Slav Defence: 2...c6",
+        title: "Slav variation",
+        about: "Black supports d5 with ...c6 instead of ...e6.",
         moves: "d4 d5 c4 c6 Nf3 Nf6 Nc3 dxc4 a4 Bf5 e3 e6 Bxc4 Bb4 O-O",
         notes: {
           "2...c6": "The Slav: Black supports d5 with the c-pawn.",
@@ -383,7 +413,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Albin Countergambit: 2...e5",
+        title: "Albin Countergambit",
+        about: "Black hits back with ...e5. White takes and develops calmly.",
         moves: "d4 d5 c4 e5 dxe5 d4 Nf3 Nc6 g3 Nge7 Bg2 Ng6 O-O",
         notes: {
           "2...e5": "The Albin Countergambit: a pawn for activity (+0.7 for White).",
@@ -394,7 +425,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "The Lasker Trap: 4.e3?",
+        title: "Lasker Trap",
+        about: "The natural e3 is a mistake here, and Black wins with a knight promotion.",
         moves: "d4 d5 c4 e5 dxe5 d4 e3 Bb4+ Bd2 dxe3 Bxb4 exf2+ Ke2 fxg1=N+",
         notes: {
           "4.e3": "Natural, but it walks into a famous trap.",
@@ -406,10 +438,10 @@ export const DEMOS: Demo[] = [
   },
   {
     opening: "Classical centre (...e5 / ...d5)",
-    intro: "Answer White's centre pawn with your own: ...e5 against 1.e4, ...d5 against 1.d4. Knights before bishops, castle early.",
+    intro: "Meet White's centre pawn with your own, then develop and castle.",
     lines: [
       {
-        title: "Against the Italian",
+        title: "Main",
         moves: "e4 e5 Nf3 Nc6 Bc4 Bc5 c3 Nf6 d3 d6 O-O O-O",
         notes: {
           "1...e5": "Meet e4 with your own centre pawn.",
@@ -421,7 +453,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Against the Ruy Lopez",
+        title: "Ruy Lopez variation",
+        about: "White plays the Ruy Lopez with Bb5. Black chases the bishop with ...a6.",
         moves: "e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7",
         notes: {
           "3...a6": "Ask the bishop straight away.",
@@ -429,7 +462,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Scotch Game: 3.d4",
+        title: "Scotch variation",
+        about: "White opens the centre with d4 at once.",
         moves: "e4 e5 Nf3 Nc6 d4 exd4 Nxd4 Nf6 Nxc6 bxc6 Bd3 d5",
         notes: {
           "3.d4": "White opens the centre.",
@@ -440,7 +474,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "The early queen attack: 2.Qh5",
+        title: "Qh5 variation",
+        about: "White brings the queen out early to attack f7. Calm defence handles it.",
         moves: "e4 e5 Qh5 Nc6 Bc4 g6 Qf3 Nf6 Ne2 Bg7",
         notes: {
           "2.Qh5": "An early queen raid aiming at f7. It isn't good (Black is already slightly better).",
@@ -453,7 +488,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "King's Gambit: 2.f4",
+        title: "King's Gambit",
+        about: "White offers the f-pawn. Black takes it and hits back with ...d5.",
         moves: "e4 e5 f4 exf4 Nf3 d5 exd5 Nf6",
         notes: {
           "2.f4": "The King's Gambit. Stockfish already likes Black (-0.5).",
@@ -463,7 +499,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "King's Gambit: the Falkbeer 2...d5",
+        title: "Falkbeer variation",
+        about: "Black declines the King's Gambit with ...d5 straight away.",
         moves: "e4 e5 f4 d5 exd5 exf4 Nf3 Nf6",
         notes: {
           "2...d5": "Or answer the gambit with a counter-strike in the centre (Falkbeer).",
@@ -471,7 +508,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Against 1.d4: Queen's Gambit Declined",
+        title: "1.d4 variation",
+        about: "Against 1.d4, Black answers with ...d5 and the Queen's Gambit Declined.",
         moves: "d4 d5 c4 e6 Nc3 Nf6 Bg5 Be7 e3 O-O Nf3 Nbd7",
         notes: {
           "1...d5": "Meet d4 with ...d5.",
@@ -481,7 +519,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Against the London: hit back with ...c5",
+        title: "London variation",
+        about: "Against the London, Black hits back at once with ...c5.",
         moves: "d4 d5 Bf4 c5 e3 Nc6 Nf3 Nf6 c3 Qb6 Qb3 c4 Qxb6 axb6",
         notes: {
           "2...c5": "White's bishop has left c1, so b2 is loose. Hit the centre with ...c5.",
@@ -492,7 +531,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Against the London: too early 3...Qb6?",
+        title: "...Qb6 trap",
+        about: "Against the London, ...Qb6 too early lets White gain time with Nc3.",
         moves: "d4 d5 Bf4 c5 e3 Qb6 Nc3",
         notes: {
           "3...Qb6": "Too early (+0.8 for White).",
@@ -500,7 +540,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Blackmar-Diemer Gambit: 2.e4",
+        title: "Blackmar-Diemer Gambit",
+        about: "White gives up a pawn with e4 for quick development.",
         moves: "d4 d5 e4 dxe4 Nc3 Nf6 f3 exf3 Nxf3 e6",
         notes: {
           "2.e4": "The Blackmar-Diemer Gambit (-0.7 for White).",
@@ -513,10 +554,10 @@ export const DEMOS: Demo[] = [
   },
   {
     opening: "Caro-Kann / Slav (...c6 and ...d5)",
-    intro: "Support ...d5 with ...c6 so you can take back with a pawn. Get the light-squared bishop out to f5 or g4 BEFORE ...e6, then ...e6, ...Nd7 and castle.",
+    intro: "Support ...d5 with ...c6, and get the light-squared bishop out before ...e6.",
     lines: [
       {
-        title: "Caro-Kann: Classical Variation",
+        title: "Main",
         moves: "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5 Ng3 Bg6 h4 h6 Nf3 Nd7 h5 Bh7 Bd3 Bxd3 Qxd3",
         notes: {
           "1...c6": "Prepare ...d5, so you can take back with a pawn.",
@@ -527,7 +568,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Caro-Kann: Advance Variation 3.e5",
+        title: "Advance variation",
+        about: "White pushes e5 to grab space. Black gets the bishop out, then hits back with ...c5.",
         moves: "e4 c6 d4 d5 e5 Bf5 Nf3 e6 Be2 c5",
         notes: {
           "3.e5": "The Advance Variation: White grabs space.",
@@ -536,7 +578,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Caro-Kann: Exchange Variation 3.exd5",
+        title: "Exchange variation",
+        about: "White swaps on d5, leaving a symmetrical, calm position.",
         moves: "e4 c6 d4 d5 exd5 cxd5 Bd3 Nc6 c3 Nf6 Bf4 Bg4",
         notes: {
           "3...cxd5": "Take back with the c-pawn: that's what ...c6 prepared.",
@@ -544,7 +587,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Caro-Kann: 4...Nd7 and the f7 danger",
+        title: "...Nd7 variation",
+        about: "Black plays ...Nd7 instead of ...Bf5. Watch out for tricks on f7.",
         moves: "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nd7 Bc4 Ngf6 Ng5 e6 Qe2 Nb6",
         notes: {
           "4...Nd7": "Another way: ...Nd7 prepares ...Ngf6.",
@@ -555,7 +599,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Slav Defence",
+        title: "Slav variation",
+        about: "Against 1.d4 and c4, Black plays the same idea: ...c6 and ...d5.",
         moves: "d4 d5 c4 c6 Nf3 Nf6 Nc3 dxc4 a4 Bf5 e3 e6 Bxc4 Bb4 O-O O-O",
         notes: {
           "2...c6": "The Slav: support d5 with the c-pawn.",
@@ -565,7 +610,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Slav: when White plays Qb3",
+        title: "Qb3 variation",
+        about: "In the Slav, White attacks b7 with Qb3. Black meets it with ...Qb6.",
         moves: "d4 d5 c4 c6 Nf3 Nf6 e3 Bf5 Qb3 Qb6",
         notes: {
           "4...Bf5": "The bishop is out.",
@@ -574,7 +620,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Slav: Exchange Variation",
+        title: "Slav Exchange",
+        about: "White swaps on d5 in the Slav. Black develops the knights.",
         moves: "d4 d5 c4 c6 cxd5 cxd5 Nc3 Nf6 Bf4 Nc6",
         notes: {
           "3...cxd5": "Recapture with the c-pawn.",
@@ -585,10 +632,10 @@ export const DEMOS: Demo[] = [
   },
   {
     opening: "King's Indian / Pirc setup",
-    intro: "Let White build a big centre: knight to f6, bishop to g7, ...d6 and castle. Then strike back with ...e5 or ...c5.",
+    intro: "Let White build a big centre, then strike back at it.",
     lines: [
       {
-        title: "King's Indian: Classical",
+        title: "Main",
         moves: "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O Nc6 d5 Ne7",
         notes: {
           "2...g6": "The fianchetto: the bishop goes to g7.",
@@ -598,7 +645,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "King's Indian: Sämisch 5.f3",
+        title: "Sämisch variation",
+        about: "White supports e4 with f3. Black hits back with ...c5.",
         moves: "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 f3 O-O Be3 c5 dxc5 dxc5 Qxd8 Rxd8 Bxc5 Nc6",
         notes: {
           "5.f3": "The Sämisch: f3 supports e4 and prepares a kingside pawn storm.",
@@ -607,7 +655,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "King's Indian: Four Pawns Attack",
+        title: "Four Pawns variation",
+        about: "White pushes four pawns into the centre. Black strikes at it with ...c5.",
         moves: "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 f4 O-O Nf3 c5",
         notes: {
           "5.f4": "Four pawns in the centre.",
@@ -615,7 +664,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Against the London",
+        title: "London variation",
+        about: "Against the London, Black keeps the same setup and hits back with ...c5.",
         moves: "d4 Nf6 Bf4 g6 e3 Bg7 Nf3 d6 h3 O-O Be2 c5",
         notes: {
           "2.Bf4": "A London setup.",
@@ -623,7 +673,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Pirc: Classical",
+        title: "Pirc variation",
+        about: "Against 1.e4, Black uses the same setup: ...d6, ...Nf6 and ...g6.",
         moves: "e4 d6 d4 Nf6 Nc3 g6 Nf3 Bg7 Be2 O-O O-O c6",
         notes: {
           "1...d6": "The Pirc: let White build a centre, then attack it.",
@@ -632,7 +683,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Pirc: Austrian Attack 4.f4",
+        title: "Austrian Attack",
+        about: "In the Pirc, White grabs space with f4. Black answers with ...c5.",
         moves: "e4 d6 d4 Nf6 Nc3 g6 f4 Bg7 Nf3 c5",
         notes: {
           "4.f4": "The Austrian Attack: three pawns in the centre.",
@@ -640,7 +692,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Pirc: the 150 Attack",
+        title: "150 Attack",
+        about: "White aims Be3 and Qd2 at the king. Black counters on the queenside with ...c6 and ...b5.",
         moves: "e4 d6 d4 Nf6 Nc3 g6 Be3 c6 Qd2 b5",
         notes: {
           "4.Be3": "Be3, Qd2 and Bh6 next, to swap off your g7 bishop.",
@@ -651,10 +704,10 @@ export const DEMOS: Demo[] = [
   },
   {
     opening: "Sicilian Defence",
-    intro: "1...c5 fights for d4 from the side. Swap your c-pawn for White's d-pawn, then ...d6, ...Nf6, ...Nc6, ...e6, ...Be7 and castle. Against 1.d4: the King's Indian.",
+    intro: "Fight for d4 from the side with ...c5, then develop and castle.",
     lines: [
       {
-        title: "Open Sicilian",
+        title: "Main",
         moves: "e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 Nc6 Be2 e6 O-O Be7",
         notes: {
           "1...c5": "The Sicilian: fight for d4 from the side.",
@@ -665,7 +718,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Alapin: 2.c3 ...Nf6",
+        title: "Alapin ...Nf6 variation",
+        about: "White prepares d4 with c3. Black hits the e4 pawn with ...Nf6.",
         moves: "e4 c5 c3 Nf6 e5 Nd5 d4 cxd4 Nf3 Nc6 cxd4 d6",
         notes: {
           "2.c3": "The Alapin: c3 prepares d4 for a full pawn centre.",
@@ -674,7 +728,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Alapin: 2.c3 ...d5",
+        title: "Alapin ...d5 variation",
+        about: "Against c3, Black strikes with ...d5 at once.",
         moves: "e4 c5 c3 d5 exd5 Qxd5 d4 Nf6 Nf3 e6",
         notes: {
           "2...d5": "Or strike with ...d5.",
@@ -683,7 +738,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Moscow Variation: 3.Bb5+",
+        title: "Bb5+ variation",
+        about: "White checks with Bb5 and swaps bishops. Black takes back with the queen.",
         moves: "e4 c5 Nf3 d6 Bb5+ Bd7 Bxd7+ Qxd7 O-O Nc6 c3 Nf6",
         notes: {
           "3.Bb5+": "A check from b5.",
@@ -692,7 +748,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Grand Prix Attack: 3.f4",
+        title: "Grand Prix variation",
+        about: "White plays f4 for a kingside attack. Black fianchettoes and hits back.",
         moves: "e4 c5 Nc3 Nc6 f4 g6 Nf3 Bg7 Bb5 Nd4",
         notes: {
           "3.f4": "The Grand Prix: White plans a kingside attack.",
@@ -701,7 +758,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Smith-Morra Gambit: 2.d4 cxd4 3.c3",
+        title: "Smith-Morra Gambit",
+        about: "White gives a pawn for quick development. Black takes it and develops.",
         moves: "e4 c5 d4 cxd4 c3 dxc3 Nxc3 Nc6 Nf3 d6",
         notes: {
           "3.c3": "The Smith-Morra Gambit.",
@@ -710,7 +768,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Against 1.d4: the King's Indian",
+        title: "1.d4 variation",
+        about: "Against 1.d4, play the King's Indian.",
         moves: "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5",
         notes: {
           "1...Nf6": "Against 1.d4 this repertoire uses the King's Indian. See that demo for more.",
@@ -721,10 +780,10 @@ export const DEMOS: Demo[] = [
   },
   {
     opening: "Catalan Opening",
-    intro: "d4 and c4 like the Queen's Gambit, but the bishop goes to g2, where it presses on the long diagonal towards b7. Knight to f3 and castle; if Black takes on c4, win the pawn back calmly.",
+    intro: "Like the Queen's Gambit, but the bishop goes to g2 to press on the long diagonal.",
     lines: [
       {
-        title: "Main line: the Closed Catalan",
+        title: "Main",
         moves: "d4 Nf6 c4 e6 g3 d5 Bg2 Be7 Nf3 O-O O-O Nbd7 Qc2 c6 Nbd2 b6 e4",
         notes: {
           "3.g3": "The Catalan: g3 and Bg2 instead of Nc3.",
@@ -736,7 +795,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Open Catalan: 4...dxc4 5.Qa4+",
+        title: "Qa4+ variation",
+        about: "Black takes on c4 early. Qa4+ wins the pawn back at once.",
         moves: "d4 Nf6 c4 e6 g3 d5 Bg2 dxc4 Qa4+ Nbd7 Qxc4 a6 Qc2",
         notes: {
           "4...dxc4": "The Open Catalan: Black takes the pawn.",
@@ -746,7 +806,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Open Catalan: taking after castling",
+        title: "...dxc4 variation",
+        about: "Black takes on c4 after castling. White wins it back with Qc2.",
         moves: "d4 Nf6 c4 e6 Nf3 d5 g3 Be7 Bg2 O-O O-O dxc4 Qc2 a6 Qxc4 b5 Qc2 Bb7",
         notes: {
           "6...dxc4": "Black takes after both sides have castled.",
@@ -756,7 +817,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "3...Bb4+: a check to disturb you",
+        title: "...Bb4+ variation",
+        about: "Black checks with ...Bb4 to disturb White's development.",
         moves: "d4 Nf6 c4 e6 g3 Bb4+ Bd2 Be7 Bg2 d5 Nf3 O-O O-O",
         notes: {
           "3...Bb4+": "A check to disturb White's development.",
@@ -766,14 +828,16 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Move order: 1...d5",
+        title: "...d5 variation",
+        about: "Black starts with ...d5. The moves come in a different order but reach the same setup.",
         moves: "d4 d5 c4 e6 Nf3 Nf6 g3 Be7 Bg2 O-O O-O",
         notes: {
           "4.g3": "Against ...d5 and ...e6 the Catalan works just the same.",
         },
       },
       {
-        title: "Against the Slav: 2...c6",
+        title: "Slav variation",
+        about: "Against the Slav's ...c6, the bishop on g2 still presses on the long diagonal.",
         moves: "d4 d5 c4 c6 Nf3 Nf6 g3 Bf5 Bg2 e6 O-O",
         notes: {
           "2...c6": "The Slav: Black's light-squared bishop can come out to f5.",
@@ -785,10 +849,10 @@ export const DEMOS: Demo[] = [
   },
   {
     opening: "Stafford Gambit",
-    intro: "Trap practice. After 1.e4 e5 2.Nf3 Nf6 3.Nxe5, Black gives up the e-pawn with ...Nc6 for open lines and quick threats against f2. It's unsound (about +2 for White with correct play), so learn the traps AND the refutation.",
+    intro: "Trap practice: Black gives up a pawn for quick threats on f2. It's unsound, so learn the traps and the refutation.",
     lines: [
       {
-        title: "The gambit: 3...Nc6",
+        title: "Main",
         moves: "e4 e5 Nf3 Nf6 Nxe5 Nc6 Nxc6 dxc6 d3 Bc5",
         notes: {
           "3.Nxe5": "White takes the e5 pawn.",
@@ -798,7 +862,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Trap 1: 6.Bg5? ends in mate",
+        title: "Bg5 trap",
+        about: "The greedy Bg5 walks into a mating attack.",
         moves: "e4 e5 Nf3 Nf6 Nxe5 Nc6 Nxc6 dxc6 d3 Bc5 Bg5 Nxe4 Bxd8 Bxf2+ Ke2 Bg4#",
         notes: {
           "6.Bg5": "Pinning the knight to the queen looks natural, but it's a blunder:",
@@ -809,7 +874,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Trap 2: 6.Bc4? and 7.O-O??",
+        title: "Bc4 trap",
+        about: "Bc4 and castling fall for a strike on f2.",
         moves: "e4 e5 Nf3 Nf6 Nxe5 Nc6 Nxc6 dxc6 Nc3 Bc5 Bc4 Ng4 O-O Qh4 h3 Nxf2 Rxf2 Qxf2+",
         notes: {
           "6.Bc4": "Natural but inaccurate: now Black's threats on f2 start (about -0.6).",
@@ -820,14 +886,16 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "The refutation: calm 6.Be2!",
+        title: "Be2 refutation",
+        about: "The calm Be2 stops Black's tricks.",
         moves: "e4 e5 Nf3 Nf6 Nxe5 Nc6 Nxc6 dxc6 d3 Bc5 Be2",
         notes: {
           "6.Be2": "The calm Be2 takes the sting out of ...Ng4 and ...Bg4 ideas. White castles next and stays a pawn up (about +2). Expect strong players to answer like this.",
         },
       },
       {
-        title: "When White plays 3.d4",
+        title: "d4 variation",
+        about: "White plays d4 instead of taking on e5.",
         moves: "e4 e5 Nf3 Nf6 d4 Nxe4 Bd3 d5 Nxe5 Nd7",
         notes: {
           "3.d4": "No gambit: White opens the centre instead.",
@@ -836,7 +904,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "When White plays 3.Nc3",
+        title: "Nc3 variation",
+        about: "White develops with Nc3 instead.",
         moves: "e4 e5 Nf3 Nf6 Nc3 Nc6 Bb5 Bb4 O-O O-O",
         notes: {
           "3.Nc3": "White just develops (the Four Knights).",
@@ -847,10 +916,10 @@ export const DEMOS: Demo[] = [
   },
   {
     opening: "Black Lion (Philidor, Hanham)",
-    intro: "A compact setup: ...d6, ...Nf6, ...Nbd7 and ...e5, then ...Be7, ...c6 and castle. Keep the pawn on e5, and watch for Bc4 with Ng5 aiming at f7. Playable but a little passive (about +0.5 to +0.9 for White).",
+    intro: "A compact setup that holds e5 firmly. Watch out for attacks on f7.",
     lines: [
       {
-        title: "Main line: the Lion move order",
+        title: "Main",
         moves: "e4 d6 d4 Nf6 Nc3 Nbd7 Nf3 e5 Bc4 Be7 O-O O-O a4 c6",
         notes: {
           "1...d6": "Start with ...d6.",
@@ -862,7 +931,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "The bishop sacrifice: 6.Bxf7+?",
+        title: "Bxf7+ variation",
+        about: "White sacrifices on f7 too early, and Black comes out fine.",
         moves: "e4 e5 Nf3 d6 d4 Nf6 Nc3 Nbd7 Bc4 Be7 Bxf7+ Kxf7 Ng5+ Kg8 Ne6 Qe8 Nxc7 Qg6",
         notes: {
           "6.Bxf7+": "A well-known trap, but it's a mistake if Black defends well (about -1.9).",
@@ -873,7 +943,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "The forcing line: 6.Ng5 and Bxf7+",
+        title: "Ng5 variation",
+        about: "White aims Ng5 and Bxf7+ at Black's king. Black defends accurately.",
         moves: "e4 e5 Nf3 d6 d4 Nf6 Nc3 Nbd7 Bc4 Be7 Ng5 O-O Bxf7+ Rxf7 Ne6 Qe8",
         notes: {
           "6.Ng5": "Knight and bishop both aim at f7.",
@@ -882,7 +953,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Why not the Hanham order (...Nd7 before ...Nf6)?",
+        title: "Hanham variation",
+        about: "Why the Hanham move order (...Nd7 before ...Nf6) runs into trouble.",
         moves: "e4 e5 Nf3 d6 d4 Nd7 Bc4 c6 O-O Be7 dxe5 dxe5 Ng5 Bxg5 Qh5 Qe7 Qxg5",
         notes: {
           "3...Nd7": "The Hanham move order: ...Nd7 before ...Nf6.",
@@ -892,7 +964,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Hanham: 5.Ng5 and ...Nh6",
+        title: "Hanham Ng5 variation",
+        about: "In the Hanham, Ng5 is met by ...Nh6.",
         moves: "e4 e5 Nf3 d6 d4 Nd7 Bc4 c6 Ng5 Nh6",
         notes: {
           "5.Ng5": "Threatening Nxf7 or Bxf7+.",
@@ -900,7 +973,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Against 1.d4: the Old Indian Lion",
+        title: "1.d4 variation",
+        about: "Against 1.d4, Black uses the same setup: the Old Indian.",
         moves: "d4 Nf6 c4 d6 Nc3 Nbd7 e4 e5 Nf3 Be7 Be2 O-O O-O c6",
         notes: {
           "2...d6": "The Old Indian: the same ...d6, ...Nbd7, ...e5 setup.",
@@ -909,7 +983,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Anti-Philidor: 4.f4",
+        title: "f4 variation",
+        about: "White grabs space with f4. Black hits back in the centre.",
         moves: "e4 d6 d4 Nf6 Nc3 Nbd7 f4 e5 Nf3 exd4 Qxd4 c6",
         notes: {
           "4.f4": "White grabs space with f4.",
@@ -922,10 +997,10 @@ export const DEMOS: Demo[] = [
   },
   {
     opening: "Alien Gambit (vs the Caro-Kann)",
-    intro: "Trap practice. Against the Caro-Kann with 4...Nf6, White plays 5.Ng5 and sacrifices the knight on f7 to drag Black's king out. It's unsound (Black is clearly better with correct play), so learn where Black goes wrong, and when not to try it. Against other first moves, play the Italian.",
+    intro: "Trap practice: White sacrifices a knight on f7 to drag Black's king out. It's unsound, so learn where Black goes wrong.",
     lines: [
       {
-        title: "The gambit, and Black's best answer",
+        title: "Main",
         moves: "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 h6 Nxf7 Kxf7 Bc4+ Be6 Bxe6+ Kxe6",
         notes: {
           "4...Nf6": "The gambit only works against this knight move.",
@@ -938,14 +1013,16 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "Where Black goes wrong: 7...Kg6?",
+        title: "...Kg6 trap",
+        about: "Here Black's king steps forward with ...Kg6 and gets caught.",
         moves: "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 h6 Nxf7 Kxf7 Bc4+ Kg6",
         notes: {
           "7...Kg6": "The natural-looking king move throws away Black's advantage: White's attack (Nf3, Ne5+, Bd3+) is now worth the knight. About equal. (7...Ke8 keeps Black better.)",
         },
       },
       {
-        title: "No gambit: 4...Bf5",
+        title: "...Bf5 variation",
+        about: "Black plays ...Bf5 instead, so there's no gambit. Play the Classical.",
         moves: "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5 Ng3 Bg6 h4 h6 Nf3 Nd7",
         notes: {
           "4...Bf5": "Black plays the Classical Caro-Kann instead: no gambit possible.",
@@ -955,7 +1032,8 @@ export const DEMOS: Demo[] = [
         },
       },
       {
-        title: "No gambit: 4...Nd7",
+        title: "...Nd7 variation",
+        about: "Black plays ...Nd7 instead, so there's no gambit.",
         moves: "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nd7 Bc4 Ngf6 Ng5 e6 Qe2 Nb6",
         notes: {
           "4...Nd7": "Black prepares ...Ngf6 instead.",
@@ -993,7 +1071,7 @@ export function demoSteps(demo: Demo, lineIndex: number): DemoStep[] {
     // The same position reached by a different order of moves
     if (!transposed && seen && seen.path !== visit.path) {
       transposed = true;
-      const where = `the ${seen.line.toLowerCase().startsWith("main line") ? "main line" : `"${seen.line}" line`} after ${seen.label}`;
+      const where = `the ${seen.line === "Main" ? "main line" : seen.line} after ${seen.label}`;
       const said = `Transposition: this is the same position as in ${where}.`;
       step.note = step.note ? `${step.note} ${said}` : said;
     }

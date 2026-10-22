@@ -23,6 +23,14 @@
   --input: #ffffff;
   --soft: #f3f6fb; /* quiet panels: notes, the demo */
   --danger: #c62828;
+  /* The ratings worth noticing in the move list (each at least 4.5:1 on the card) */
+  --r-brilliant: #0b7a6b;
+  --r-great: #2559a8;
+  --r-best: #2e7d32;
+  --r-inaccuracy: #8a6500;
+  --r-mistake: #b4530a;
+  --r-miss: #a02c7e;
+  --r-blunder: #c0231b;
   --danger-soft: #fdecea;
   --good: #1b7f3b;
   --note: #555555;
@@ -518,8 +526,11 @@ button.move {
   border-radius: 4px;
 }
 
+/* The current move: bold and underlined in the theme's accent, no box */
 button.move.current {
-  background: var(--current-move);
+  font-weight: 700;
+  text-decoration: underline 2px var(--accent);
+  text-underline-offset: 4px;
 }
 
 /* -- Practice panels -------------------------------------------------------------- */
@@ -852,18 +863,18 @@ body.practice .bottom-buttons button {
 }
 
 /* Rating colours (the desktop app's move-list colours) */
-.r-brilliant { color: #159c82; }
-.r-great { color: #4f7aa3; }
-.r-best,
+.r-brilliant { color: var(--r-brilliant); }
+.r-great { color: var(--r-great); }
+.r-best { color: var(--r-best); }
 .r-excellent { color: #5e9431; }
 .r-good { color: #5c7347; }
 .r-book { color: #a0703f; }
 .r-forced { color: #6e8c62; }
-.r-inaccuracy { color: #b88f00; }
-.r-mistake { color: #e07a1f; }
-.r-miss { color: #e05a4c; }
-.r-missed-win { color: #a6800a; }
-.r-blunder { color: #e0301e; }
+.r-inaccuracy { color: var(--r-inaccuracy); }
+.r-mistake { color: var(--r-mistake); }
+.r-miss,
+.r-missed-win { color: var(--r-miss); }
+.r-blunder { color: var(--r-blunder); }
 
 button.move[class*="r-"] {
   font-weight: 600;

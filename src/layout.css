@@ -1659,3 +1659,69 @@ body.editing #bar-bottom {
 .odds-row.others .odds-bar i {
   background: currentColor;
 }
+
+/* The moves as plain text on a card: the theme's text colour, the current move
+   bold and underlined in the accent, rated moves in their own colour */
+.move-strip {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 2px 8px;
+}
+.move-strip button,
+.move-strip button.prev {
+  background: transparent;
+  color: var(--text);
+  padding: 4px 4px;
+  font-weight: 500;
+}
+.move-strip button .ms-num {
+  opacity: 0.55;
+  margin-right: 2px;
+  font-weight: 400;
+}
+.move-strip button.cur,
+.move-strip button.cur:hover:not(:disabled) {
+  background: transparent;
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: underline 2px var(--accent);
+  text-underline-offset: 5px;
+}
+.move-strip button[class*="r-"],
+button.move[class*="r-"] {
+  font-weight: 700;
+}
+.move-strip button.r-brilliant { color: var(--r-brilliant); }
+.move-strip button.r-great { color: var(--r-great); }
+.move-strip button.r-best { color: var(--r-best); }
+.move-strip button.r-inaccuracy { color: var(--r-inaccuracy); }
+.move-strip button.r-mistake { color: var(--r-mistake); }
+.move-strip button.r-miss,
+.move-strip button.r-missed-win { color: var(--r-miss); }
+.move-strip button.r-blunder { color: var(--r-blunder); }
+
+/* Play / pause: also when going through a reviewed game, and in the accent so it stands out */
+body.replay-on .nav-play {
+  display: inline-flex !important;
+}
+.nav-play,
+.nav-play:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: transparent;
+}
+
+/* The bubble's ‹ › through the pieces of a long message: small and quiet */
+.strip-actions .piece-nav {
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  padding: 0;
+}
+.strip-actions .piece-nav:disabled {
+  opacity: 0.35;
+}
+
+.tile-note:empty {
+  display: none;
+}
