@@ -5,7 +5,7 @@
 import { Chess } from "chessops/chess";
 import { attacks } from "chessops/attacks";
 import type { Color, NormalMove, Role } from "chessops/types";
-import { makeSquare, opposite } from "chessops/util";
+import { opposite } from "chessops/util";
 
 import { PIECE_VALUES } from "./coach";
 import type { Evaluation, Review } from "./review";
@@ -54,11 +54,11 @@ export function narrateMove(before: Chess, move: NormalMove, listener: Color | n
   after.play(move);
   const name = NAMES[piece.role];
   const subject = cap(`${mover} ${name}`);
-  const to = makeSquare(move.to);
-  if (after.isCheckmate()) return victim ? `${subject} takes on ${to}. Checkmate!` : `${subject} goes to ${to}. Checkmate!`;
+  // The board shows where: the words say what (no squares, no notation)
+  if (after.isCheckmate()) return victim ? `${subject} takes ${owner(victim.color, listener)} ${NAMES[victim.role]}. Checkmate!` : `${subject} moves in. Checkmate!`;
   const castles = piece.role === "king" && Math.abs((move.to & 7) - (move.from & 7)) > 1 ||
     (piece.role === "king" && victim?.role === "rook" && victim.color === piece.color);
-  if (castles) return `${cap(mover === "your" ? "you castle" : mover === "their" ? "they castle" : `${mover.replace("'s", "")} castles`)}: the king is tucked away safely.`;
+  if (castles) return `${cap(mover === "your" ? "you castle" : mover === "their" ? "they castle" : `${mover.replace("'s", "")} castles`)}, tucking the king away safely.`;
   if (move.promotion) return `The pawn reaches the last rank and becomes a ${NAMES[move.promotion]}!`;
 
   const check = after.isCheck();
@@ -67,10 +67,10 @@ export function narrateMove(before: Chess, move: NormalMove, listener: Color | n
   const victimOwner = victim ? owner(victim.color, listener) : "";
   let text: string;
   if (victim) text = `${subject} takes ${victimOwner} ${NAMES[victim.role]}`;
-  else if (piece.role === "pawn") text = `${subject} moves up to ${to}`;
+  else if (piece.role === "pawn") text = `${subject} moves up`;
   else if ((piece.color === "white" ? move.from >> 3 === 0 : move.from >> 3 === 7) && piece.role !== "rook" && piece.role !== "queen")
-    text = `${subject} comes out to ${to}`;
-  else text = `${subject} goes to ${to}`;
+    text = `${subject} comes out`;
+  else text = `${subject} moves`;
 
   const target = (role: Role) => `${owner(opposite(piece.color), listener)} ${NAMES[role]}`;
   if (check && hits.length) text += `, with check, and also hits ${target(hits[0])}`;
@@ -211,8 +211,6 @@ export function whyMove(before: Chess, move: NormalMove, listener: Color | null)
   return parts.join(" and ");
 }
 
-const SQUARE_NAME = (square: number) => makeSquare(square);
-
 /** What a quiet move is for, with the squares worth highlighting: it takes a
  *  square from an enemy piece, builds a pawn chain, makes room for the king,
  *  puts a rook on an open file, or gives a piece more scope. */
@@ -250,7 +248,7 @@ export function quietIdea(before: Chess, move: NormalMove, listener: Color | nul
     });
     if (best) {
       const names = [...new Set(best.roles)].map((r) => NAMES[r]);
-      return { clause: `it takes the ${SQUARE_NAME(best.square)} square away from ${theirs} ${names.join(" and ")}`, squares: [best.square] };
+      return { clause: `it takes a key square away from ${theirs} ${names.join(" and ")}`, squares: [best.square] };
     }
     if (chain.length) return { clause: "it builds a pawn chain, each pawn guarding the next", squares: [chain[0], move.to] };
     // Room for the king: a pawn in front of your castled king
@@ -262,7 +260,7 @@ export function quietIdea(before: Chess, move: NormalMove, listener: Color | nul
   }
   if (best) {
     const names = [...new Set(best.roles)].map((r) => NAMES[r]);
-    return { clause: `it controls ${SQUARE_NAME(best.square)}, keeping ${theirs} ${names.join(" and ")} out`, squares: [best.square] };
+    return { clause: `it covers a key square, keeping ${theirs} ${names.join(" and ")} out`, squares: [best.square] };
   }
   if (piece.role === "rook" && (move.to & 7) !== (move.from & 7)) {
     const file = move.to & 7;
@@ -275,6 +273,27 @@ export function quietIdea(before: Chess, move: NormalMove, listener: Color | nul
   }
   if (now.size() > was.size() + 1) return { clause: `it gives the ${NAMES[piece.role]} more room to work`, squares: [] };
   return null;
+}
+
+/** A move said as a whole sentence, then why it's good: "Your knight takes
+ *  their pawn." or "Your pawn moves up. It takes a key square away from their
+ *  bishop." (the "why" is left out when it only repeats the words). */
+export function moveInWords(before: Chess, move: NormalMove, listener: Color | null): string {
+  const said = narrateMove(before, move, listener);
+  const why = whyMove(before, move, listener);
+  const repeats = (before.board.get(move.to) && why.startsWith("it wins")) || (said.includes("check") && why === "it gives check")
+    || said.includes("castle") || said.includes("Checkmate") || why === "it's a useful waiting move";
+  return repeats || !why ? said : `${said} ${cap(why)}.`;
+}
+
+/** "an inaccuracy", "the best move", ... for "Your move was ..." */
+export function ratingWords(rating: string): string {
+  const words: Record<string, string> = {
+    Brilliant: "brilliant", Great: "a great move", Best: "the best move", Excellent: "excellent", Good: "good",
+    Book: "a known opening move", Forced: "the only move", Inaccuracy: "an inaccuracy", Mistake: "a mistake",
+    Miss: "a missed chance", "Missed Win": "a missed win", Blunder: "a blunder",
+  };
+  return words[rating] ?? rating.toLowerCase();
 }
 
 /** How dangerous a move was, judged by what Stockfish's reply can win:

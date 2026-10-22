@@ -28,7 +28,7 @@ import { afterMove as positionAfter, colourName, isCastling, standardUci, variat
 import { Engine } from "./engine";
 import { Game, type Outcome } from "./game";
 import { explainIdeas } from "./ideas";
-import { controlledSquares, dangerAfter, narrateMove, quietIdea, targetsOf, verdict, whyMove, type Danger } from "./narrate";
+import { controlledSquares, dangerAfter, moveInWords, narrateMove, quietIdea, ratingWords, targetsOf, verdict, whyMove, type Danger } from "./narrate";
 import { middlegameNotes } from "./middlegame";
 import { DEFAULT_LEVEL, LEVELS, OPPONENT_MIN_DELAY, shortName } from "./levels";
 import {
@@ -1715,7 +1715,7 @@ function puzzleShowSolution() {
   for (const move of rest) positions.push(positionAfter(positions[positions.length - 1], move));
   // your moves: the move and why; their replies: what they do
   const texts = rest.map((move, i) => positions[i].turn === puzzle!.side
-    ? `${makeSan(positions[i], move)}: ${whyMove(positions[i], move, puzzle!.side)}.`
+    ? moveInWords(positions[i], move, puzzle!.side)
     : narrateMove(positions[i], move, puzzle!.side));
   startStepper(positions, rest, texts, "talk", { ico: "skipNext", label: "Next puzzle", run: () => { closeStepper(); nextPuzzle(); }, kind: "accent" });
 }
@@ -2019,7 +2019,7 @@ async function showIdeas() {
       const plan = await planAhead(coachAnalysis, position);
       line = forcingStart(position, plan.steps.map((step) => step.move));
       score = plan.score;
-      if (line.length) moveFrame(position, line[0], `Best for you is ${makeSan(position, line[0])}: ${whyMove(position, line[0], user)}.`, line.length === 1);
+      if (line.length) moveFrame(position, line[0], `Best here: ${lowerFirst(moveInWords(position, line[0], user))}`, line.length === 1);
     }
     // Their likely replies (to your best move, or now if it's their turn)
     const after = line.length ? positionAfter(position, line[0]) : position;
@@ -2037,10 +2037,9 @@ async function showIdeas() {
     // The rest of a forcing line, move by move
     let walk = after;
     line.slice(1).forEach((move, i) => {
-      const san = `${walk.turn === "black" ? "..." : ""}${makeSan(walk, move)}`;
       const mine = walk.turn === user;
-      const text = i === 0 && !mine ? `Their best defence is ${san}. ${narrateMove(walk, move, user)}`
-        : mine ? `Then ${san}: ${whyMove(walk, move, user)}.` : narrateMove(walk, move, user);
+      const text = i === 0 && !mine ? `Their best defence: ${lowerFirst(narrateMove(walk, move, user))}`
+        : mine ? `Then ${lowerFirst(moveInWords(walk, move, user))}` : narrateMove(walk, move, user);
       moveFrame(walk, move, text, false);
       walk = positionAfter(walk, move);
     });
@@ -2144,7 +2143,7 @@ function exploreSays(reviews: (Review | undefined)[]): CoachSay {
   else {
     // after their reply, your own move's rating too, so it isn't missed
     const yours = ply >= 2 ? reviews[ply - 2] : undefined;
-    const mine = yours ? `Your ${game.moves[ply - 2].san}: ${yours.rating.toLowerCase()}. ` : "";
+    const mine = yours ? `Your move was ${ratingWords(yours.rating)}. ` : "";
     text = `${mine}${said} Your move.`;
   }
   return { mood: moodForRating(review.rating), text, buttons: [...buttons, TELL_MORE] };
@@ -2313,6 +2312,8 @@ function drawDemo() {
   for (const button of document.querySelectorAll<HTMLButtonElement>(".var-prev")) button.disabled = demo.line === 0;
   for (const button of document.querySelectorAll<HTMLButtonElement>(".var-next")) button.disabled = demo.line + 1 >= demo.demo.lines.length;
 }
+
+const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
 
 /** "London · Main", "London · Nf3 variation" */
 function demoTitle(): string {
@@ -3677,9 +3678,8 @@ function explainMove(ply: number, review: Review) {
   const better = WORTH_SHOWING.has(review.rating) && review.bestSan ? parseSan(before, review.bestSan) as NormalMove | undefined : undefined;
   const move = better ?? played;
   const why = whyMove(before, move, mine ? game.moverOf(ply) : you);
-  const san = makeSan(before, move);
   const text = better
-    ? `${mine ? "Better was" : "Stronger was"} ${san}: ${why}.`
+    ? `${mine ? "Better" : "Stronger"}: ${lowerFirst(moveInWords(before, move, mine ? game.moverOf(ply) : you))}`
     : `${review.rating === "Book" ? "A known move" : "Good choice"}: ${why}.`;
   const info = openingInfo();
   const danger = dangerAfter(review, before, after, analyser.evals.get(fenOf(before)), analyser.evals.get(fenOf(after)), !!info[ply - 1]?.book);

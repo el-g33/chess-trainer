@@ -7,10 +7,11 @@ import { attacks } from "chessops/attacks";
 import { Chess } from "chessops/chess";
 import { makeSan } from "chessops/san";
 import type { Color, NormalMove, Role } from "chessops/types";
-import { makeSquare, opposite } from "chessops/util";
+import { opposite } from "chessops/util";
 
 import { PIECE_VALUES } from "./coach";
-import { formatScore, verdictWords } from "./review";
+import { moveInWords } from "./narrate";
+import { verdictWords } from "./review";
 import type { CoachEngine } from "./strategy";
 
 export type Mark = "good" | "bad" | "plan";
@@ -58,8 +59,6 @@ export function chainOf(position: Chess, square: number): number[] {
   return pawnChains(position, piece.color).find((chain) => chain.includes(square)) ?? [];
 }
 
-const list = (words: string[]) => words.length <= 1 ? words.join("") : `${words.slice(0, -1).join(", ")} or ${words[words.length - 1]}`;
-const andList = (words: string[]) => words.length <= 1 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
 
 /** The same position with `side` to move, as if the other side passed. */
 function passTo(position: Chess, side: Color): Chess | null {
@@ -72,17 +71,30 @@ function passTo(position: Chess, side: Color): Chess | null {
   return result.isOk ? result.value : null;
 }
 
-/** Stockfish's top moves for one side, with their names ("...a5" for Black). */
-async function plansFor(engine: CoachEngine, position: Chess, side: Color, count = 3): Promise<{ move: NormalMove; san: string }[]> {
+/** A plan in words: "castling", "a queen move", "a pawn push", "taking the pawn". */
+function planWords(position: Chess, move: NormalMove): string {
+  const piece = position.board.get(move.from);
+  if (!piece) return "a move";
+  const victim = position.board.get(move.to);
+  if (piece.role === "king" && (Math.abs(file(move.to) - file(move.from)) > 1 || victim?.color === piece.color)) return "castling";
+  if (victim && victim.color !== piece.color) return `taking the ${NAMES[victim.role]}`;
+  if (piece.role === "pawn") return "a pawn push";
+  return `a ${NAMES[piece.role]} move`;
+}
+
+/** Stockfish's top moves for one side, with words for them. */
+async function plansFor(engine: CoachEngine, position: Chess, side: Color, you: Color, count = 3): Promise<{ move: NormalMove; san: string; words: string; said: string }[]> {
   const from = passTo(position, side);
   if (!from) return [];
   const seen = new Set<string>();
-  const found: { move: NormalMove; san: string }[] = [];
+  const found: { move: NormalMove; san: string; words: string; said: string }[] = [];
   for (const line of await engine.analyse(from, 1.2, count)) {
     const move = line.pv[0];
     if (!move || seen.has(`${move.from}-${move.to}`)) continue;
     seen.add(`${move.from}-${move.to}`);
-    found.push({ move, san: `${side === "black" ? "..." : ""}${makeSan(from, move)}` });
+    // the move and why, from your side of the board
+    const said = moveInWords(from, move, you);
+    found.push({ move, san: `${side === "black" ? "..." : ""}${makeSan(from, move)}`, words: planWords(from, move), said });
   }
   return found;
 }
@@ -159,7 +171,7 @@ function looseTarget(position: Chess, you: Color): { square: number; role: Role;
         if (covered && !backed) continue;
         if (attacks(piece, to, after).has(square)) {
           const move: NormalMove = { from, to };
-          return { square, role, by: `${them === "black" ? "..." : ""}${makeSan(theirs, move)}` };
+          return { square, role, by: planWords(theirs, move) };
         }
       }
     }
@@ -172,16 +184,18 @@ export async function whatYouGet(engine: CoachEngine, position: Chess, you: Colo
   const them = opposite(you);
   const [line] = await engine.analyse(position, 1.5, 1);
   const score = line?.score ?? { cp: 0 };
-  const yours = await plansFor(engine, position, you);
-  const theirs = await plansFor(engine, position, them);
+  const yours = await plansFor(engine, position, you, you);
+  const theirs = await plansFor(engine, position, them, you);
 
   // 1. The shape: the pawn chain, the king
   const chain = pawnChains(position, you)[0];
   const king = position.board.kingOf(you);
   const homeRank = you === "white" ? 0 : 7;
   const castled = king !== undefined && rank(king) === homeRank && (file(king) >= 6 || file(king) <= 2);
-  const shape: string[] = [`Stockfish says ${verdictWords(score)} (${formatScore(score)}).`];
-  if (chain && chain.length >= 3) shape.push(`Your pawns form a chain: ${andList(chain.map(makeSquare))}.`);
+  // "This position is roughly equal." / "White is slightly better here."
+  const verdict = verdictWords(score);
+  const shape: string[] = [verdict.startsWith("the position") ? `This position${verdict.slice("the position".length)}.` : `${verdict} here.`];
+  if (chain && chain.length >= 3) shape.push("Your pawns form a strong chain, each one guarding the next.");
   shape.push(castled ? "Your king is safely castled." : "Castling is next, to get your king safe.");
   const shapePage: OutlookPage = { text: shape.join(" "), arrows: [], squares: chain && chain.length >= 3 ? chain.map((s) => [s, "good"]) : [] };
 
@@ -191,31 +205,31 @@ export async function whatYouGet(engine: CoachEngine, position: Chess, you: Colo
   const strongSquares: OutlookPage["squares"] = [];
   const aim = aimAtKing(position, you);
   if (aim) {
-    strengths.push(`Your ${NAMES[aim.role]} aims at ${makeSquare(aim.to)}, next to their king.`);
+    strengths.push(`Your ${NAMES[aim.role]} is aimed at their king.`);
     strongArrows.push([aim.from, aim.to, "good"]);
   }
   const post = outpost(position, you);
   if (post !== null && strengths.length < 2) {
-    strengths.push(`${makeSquare(post)} is a safe square for a knight: no pawn can chase it away.`);
+    strengths.push("There's a safe square for a knight, where no pawn can chase it away.");
     strongSquares.push([post, "good"]);
   }
   if (yours.length) {
-    strengths.push(`Stockfish's plans for you: ${list(yours.map((p) => p.san))}.`);
+    strengths.push(`A good next step: ${yours[0].said.replace(/^./, (c) => c.toLowerCase())}`);
     for (const plan of yours) strongArrows.push([plan.move.from, plan.move.to, "plan"]);
   }
-  const strengthPage: OutlookPage = { text: `Strengths: ${strengths.join(" ") || "a solid position with no weaknesses."}`, arrows: strongArrows, squares: strongSquares };
+  const strengthPage: OutlookPage = { text: strengths.join(" ") || "A solid position, with no weaknesses.", arrows: strongArrows, squares: strongSquares };
 
   // 3. Watch out
   const watch: string[] = [];
   const watchArrows: OutlookPage["arrows"] = theirs.map((p) => [p.move.from, p.move.to, "bad"]);
   const watchSquares: OutlookPage["squares"] = [];
-  if (theirs.length) watch.push(`They'd like ${list(theirs.map((p) => p.san))}.`);
+  if (theirs.length) watch.push(`Watch out: ${theirs[0].said.replace(/^./, (c) => c.toLowerCase())}`);
   const target = looseTarget(position, you);
   if (target) {
-    watch.push(`Nothing guards your ${NAMES[target.role]} on ${makeSquare(target.square)}${target.by ? `, and ${target.by} would attack it` : ""}.`);
+    watch.push(`Nothing guards your ${NAMES[target.role]}${target.by ? `, and ${target.by} would attack it` : ""}.`);
     watchSquares.push([target.square, "bad"]);
   }
-  const watchPage: OutlookPage = { text: `Watch out: ${watch.join(" ") || "nothing serious yet."}`, arrows: watchArrows, squares: watchSquares };
+  const watchPage: OutlookPage = { text: watch.join(" ") || "Nothing serious to watch out for yet.", arrows: watchArrows, squares: watchSquares };
 
   return [shapePage, strengthPage, watchPage];
 }
