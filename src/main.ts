@@ -2382,6 +2382,15 @@ function demoShapes(): DrawShape[] {
   }
   for (const square of chainOf(after, move.to)) mark(square);
   for (const square of quietIdea(before, move, orientation)?.squares ?? []) mark(square);
+  // The moves and squares this note talks about
+  const label = demo.steps[ply - 1]?.label;
+  for (const item of (label && demo.demo.lines[demo.line].arrows?.[label]) || []) {
+    const threat = item.endsWith("!");
+    const brush = threat ? "them" : "guess";
+    const squares = item.replace(/[@!]/g, "");
+    if (item.startsWith("@")) shapes.push({ orig: squares as Key, brush });
+    else shapes.push({ orig: squares.slice(0, 2) as Key, dest: squares.slice(2, 4) as Key, brush });
+  }
   return shapes;
 }
 
