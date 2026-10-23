@@ -878,6 +878,7 @@ function resetBoard(newGame: Game, headers: Headers = { White: "?", Black: "?", 
   gameHeaders = { ...headers };
   currentGameId = null;
   puzzle = null;
+  drill = null;
   editor = null;
   lesson = null;
   explore = null;
@@ -1245,6 +1246,9 @@ function clickPosition(): Chess {
 /** Can pieces be moved right now, and which side's? */
 function movableColour(): Color | undefined {
   if (busy || thinking || preview || menuOpen || quiz?.lineStep || demo || stepper || overlayOpen() || editor) return undefined;
+  if (drill) {
+    return drill.state === "playing" && !drill.waiting && viewPly === null && game.position.turn === drill.user ? drill.user : undefined;
+  }
   if (puzzle) {
     return puzzle.state === "solving" && viewPly === null && game.length > 0 && game.position.turn === puzzle.side ? puzzle.side : undefined;
   }
@@ -1262,7 +1266,9 @@ function onBoardMove(from: Key, to: Key) {
   // Pawns reaching the last rank always become queens (as in the desktop app)
   if (position.board.get(given.from)?.role === "pawn" && (to[1] === "8" || to[1] === "1")) given.promotion = "queen";
   const move = normalizeMove(position, given) as NormalMove;
-  if (puzzle) {
+  if (drill) {
+    drillMove(move);
+  } else if (puzzle) {
     puzzleMove(move);
   } else if (quizWaiting()) {
     answerQuiz(move);
@@ -2546,9 +2552,13 @@ async function showWhatYouGet() {
     }));
     const line = demo.line;
     const more = line + 1 < demo.demo.lines.length;
-    const extra: CoachButton = more
+    const chosen = demo.demo;
+    const extra: CoachButton | CoachButton[] = more
       ? { ico: "next", label: "Next line", kind: "accent", run: () => { closeStepper(); loadDemoLine(line + 1); } }
-      : { ico: "play", label: "Try it yourself", kind: "accent", run: () => { closeStepper(); onDemoTry(); } };
+      : [
+          { ico: "target", label: "Drill it", kind: "accent", labelled: true, run: () => { closeStepper(); startDrill(chosen); } },
+          { ico: "knight", label: "Practice match", labelled: true, run: () => { closeStepper(); onDemoTry(); } },
+        ];
     stepper = { positions: frames.map((f) => f.position), moves: [], texts: pages.map((p) => p.text), step: 1, mood: "talk", extra, frames };
     refresh();
   } catch (error) {
@@ -2632,8 +2642,422 @@ async function onShowDemo() {
 
 /** Try it yourself: back to the menu, set up to practise this opening. */
 function onDemoTry() {
-  if (!demo) return;
-  const opening = REPERTOIRE.find((o) => o.name === demo!.demo.opening);
+  if (demo) practiseOpening(demo.demo.opening);
+}
+
+// -- Opening drills: you play the lesson's moves -------------------------------
+// Round 1 is the main line. Round 2 mixes it up: a few of the variations, and in
+// most of them the opponent slips (an inaccuracy or a mistake) somewhere along
+// the way, for you to spot and punish.
+
+const DRILL_VARIATIONS = 3; // lines in the mixed round
+const DRILL_SLIP_MIN = 8; // their slip costs them at least this much winning chance (an inaccuracy)...
+const DRILL_SLIP_MAX = 30; // ...and at most this much (a mistake, nothing silly)
+const DRILL_ANSWER = 5; // your answer to it counts within this of the best move ("Good" or better)
+const DRILL_MOVE_DELAY = 700; // ms before their move
+
+interface DrillScore {
+  moves: number; // your moves
+  right: number; // ...found first time
+  slips: number; // their slips
+  spotted: number; // ...that you punished first time
+}
+
+interface DrillState {
+  demo: Demo;
+  opening?: Opening;
+  user: Color;
+  round: 1 | 2;
+  queue: { line: number; slip: boolean }[]; // the mixed round's lines still to come
+  line: number;
+  script: NormalMove[]; // the line's moves
+  slipAt?: number; // the ply where they slip (the mixed round)
+  slipped: boolean; // they did: now find the answer
+  best?: { move: NormalMove; chance: number }; // the best answer to their slip
+  state: "playing" | "between" | "done";
+  waiting: boolean; // the coach is thinking (the board waits)
+  tries: number; // wrong tries at this move
+  note: string;
+  mood: Mood;
+  scores: [DrillScore, DrillScore];
+  token: number; // a new line cancels the old one's timers
+}
+
+let drill: DrillState | null = null;
+
+const newScore = (): DrillScore => ({ moves: 0, right: 0, slips: 0, spotted: 0 });
+const pickOne = <T,>(list: T[]): T => list[Math.floor(Math.random() * list.length)];
+const shuffled = <T,>(list: T[]): T[] => [...list].sort(() => Math.random() - 0.5);
+
+/** Start the drill of an opening, from round 1. */
+function startDrill(chosen: Demo) {
+  const opening = REPERTOIRE.find((o) => o.name === chosen.opening);
+  const user = opening?.colour ?? "white";
+  resetBoard(new Game(), { White: "White", Black: "Black", Event: `${chosen.opening} drill`, Date: today() });
+  mode = "play"; // no eval bar to give it away
+  gameOrigin = "learn";
+  currentView = "board";
+  orientation = user;
+  drill = {
+    demo: chosen, opening, user, round: 1, queue: [], line: 0, script: [], slipped: false, state: "playing",
+    waiting: false, tries: 0, note: "", mood: "talk", scores: [newScore(), newScore()], token: 0,
+  };
+  if (menuOpen) hideMenu();
+  startDrillLine(0, false, "Round 1: the main line. You play your moves, I'll play theirs.");
+}
+
+/** One line of the drill, from the start. */
+function startDrillLine(line: number, slip: boolean, note: string) {
+  const d = drill;
+  if (!d) return;
+  const token = ++d.token;
+  d.line = line;
+  d.script = demoSteps(d.demo, line).map((step) => step.move);
+  d.slipped = false;
+  d.best = undefined;
+  d.slipAt = undefined;
+  if (slip) {
+    // their slip comes after their first move, somewhere in the line
+    const theirs: number[] = [];
+    for (let ply = 2; ply < d.script.length; ply++) if ((ply % 2 === 0 ? "white" : "black") !== d.user) theirs.push(ply);
+    if (theirs.length) d.slipAt = pickOne(theirs);
+  }
+  d.state = "playing";
+  d.waiting = false;
+  d.tries = 0;
+  d.note = note;
+  d.mood = "talk";
+  game = new Game();
+  viewPly = null;
+  analysis = null;
+  preview = null;
+  refresh();
+  drillContinue(token, 1200);
+}
+
+/** After a move: their reply, the end of the line, or your turn. */
+function drillContinue(token: number, delay = DRILL_MOVE_DELAY) {
+  const d = drill;
+  if (!d || d.token !== token || d.state !== "playing") return;
+  if (!d.slipped && game.length >= d.script.length) {
+    drillLineDone();
+    return;
+  }
+  if (game.position.turn === d.user) {
+    refresh();
+    return;
+  }
+  d.waiting = true;
+  refresh();
+  setTimeout(() => void drillTheirMove(token), delay);
+}
+
+async function drillTheirMove(token: number) {
+  const d = drill;
+  if (!d || d.token !== token) return;
+  const ply = game.length;
+  let move = d.script[ply];
+  let slipped = false;
+  if (ply === d.slipAt) {
+    const slip = await findSlip(game.position, move);
+    if (drill !== d || d.token !== token) return;
+    if (slip) [move, slipped] = [slip, true];
+  }
+  const played = game.play(move);
+  void play(soundForMove(played.san));
+  if (!slipped) {
+    d.waiting = false;
+    drillContinue(token);
+    return;
+  }
+  // Their slip: what's your best answer?
+  d.slipped = true;
+  d.scores[1].slips++;
+  d.note = "That's not the move from the lesson. Look carefully: what does it change?";
+  d.mood = "think";
+  refresh();
+  const [line] = await coachAnalysis.analyse(game.position, 1.2, 1);
+  if (drill !== d || d.token !== token) return;
+  if (!line?.pv[0]) {
+    drillLineDone();
+    return;
+  }
+  d.best = { move: line.pv[0], chance: winningChance(line.score, d.user) };
+  d.waiting = false;
+  refresh();
+}
+
+/** A move they could play instead of the lesson's: an inaccuracy or a
+ *  mistake, not a silly blunder - something you need to spot. */
+async function findSlip(position: Chess, lessonMove: NormalMove): Promise<NormalMove | undefined> {
+  const mover = position.turn;
+  const lines = await coachAnalysis.analyse(position, 1, 12);
+  if (!lines.length) return undefined;
+  const best = Math.max(...lines.map((line) => winningChance(line.score, mover)));
+  const fits = (chance: number) => best - chance >= DRILL_SLIP_MIN && best - chance <= DRILL_SLIP_MAX;
+  const isLesson = (move: NormalMove) => makeUci(move) === makeUci(lessonMove);
+  const listed = lines.filter((line) => line.pv[0] && !isLesson(line.pv[0]) && fits(winningChance(line.score, mover)));
+  if (listed.length) return pickOne(listed).pv[0];
+  // Not among the engine's top moves: try a few ordinary-looking ones
+  const seen = new Set(lines.map((line) => (line.pv[0] ? makeUci(line.pv[0]) : "")));
+  const others: NormalMove[] = [];
+  for (const [from, dests] of position.allDests()) {
+    if (position.board.get(from)?.role === "king") continue;
+    for (const to of dests) {
+      const move: NormalMove = { from, to };
+      if (!seen.has(makeUci(move)) && !isLesson(move)) others.push(move);
+    }
+  }
+  for (const move of shuffled(others).slice(0, 8)) {
+    const score = await coachAnalysis.moveScore!(position, move, 0.3);
+    if (fits(winningChance(score, mover))) return move;
+  }
+  return undefined;
+}
+
+/** Your move in a drill. */
+function drillMove(move: NormalMove) {
+  const d = drill;
+  if (!d || d.state !== "playing" || d.waiting) return;
+  if (d.slipped) {
+    void drillAnswer(move);
+    return;
+  }
+  const before = game.position.clone();
+  const expected = d.script[game.length];
+  const score = d.scores[d.round - 1];
+  if (makeUci(move) === makeUci(expected)) {
+    if (d.tries === 0) score.right++;
+    score.moves++;
+    d.tries = 0;
+    const played = game.play(move);
+    void play(soundForMove(played.san));
+    const goal = goalDone(before, move);
+    d.note = goal ? `Right: ${goal}, that's ticked off.` : pickOne(["Right.", "That's the move.", "Yes, that's the lesson's move.", "Good."]);
+    d.mood = "happy";
+    drillContinue(d.token);
+    return;
+  }
+  void drillWrong(before, move, expected);
+}
+
+/** A wrong move: say how good it was, then take it back. */
+async function drillWrong(before: Chess, move: NormalMove, expected: NormalMove) {
+  const d = drill!;
+  const token = d.token;
+  d.tries++;
+  d.waiting = true;
+  const played = game.play(move);
+  void play(soundForMove(played.san));
+  d.note = "Let me check that...";
+  d.mood = "think";
+  refresh();
+  const [best] = await coachAnalysis.analyse(before, 0.5, 1);
+  const score = await coachAnalysis.moveScore!(before, move, 0.5);
+  if (drill !== d || d.token !== token) return;
+  const loss = best ? Math.max(0, winningChance(best.score, d.user) - winningChance(score, d.user)) : 0;
+  const rating = loss < 2 ? "Excellent" : loss < 5 ? "Good" : loss < 10 ? "Inaccuracy" : loss < 20 ? "Mistake" : "Blunder";
+  const verdictText = loss < 5
+    ? `That's ${ratingWords(rating)} too, but it isn't the lesson's move.`
+    : `That would be ${ratingWords(rating)}.`;
+  const goal = goalDone(before, expected);
+  const hint = d.tries >= 2 ? "The arrow shows the lesson's move." : goal ? `Think about your setup: ${goal}.` : "Think back to the lesson.";
+  d.note = `${verdictText} ${hint}`;
+  d.mood = loss < 5 ? "talk" : "worried";
+  setTimeout(() => {
+    if (drill !== d || d.token !== token) return;
+    game.undo();
+    void play("wrong");
+    d.waiting = false;
+    refresh();
+  }, 900);
+}
+
+/** Your answer to their slip: good enough is good enough. */
+async function drillAnswer(move: NormalMove) {
+  const d = drill!;
+  const token = d.token;
+  const before = game.position.clone();
+  d.waiting = true;
+  const played = game.play(move);
+  void play(soundForMove(played.san));
+  d.note = "Let me check that...";
+  d.mood = "think";
+  refresh();
+  const score = await coachAnalysis.moveScore!(before, move, 0.8);
+  if (drill !== d || d.token !== token || !d.best) return;
+  const good = makeUci(move) === makeUci(d.best.move) || winningChance(score, d.user) >= d.best.chance - DRILL_ANSWER;
+  if (good) {
+    if (d.tries === 0) d.scores[1].spotted++;
+    void play("right");
+    d.note = `Well spotted! ${moveInWords(before, move, d.user)}`;
+    d.mood = "wow";
+    d.waiting = false;
+    drillLineDone(true);
+    return;
+  }
+  d.tries++;
+  d.note = d.tries >= 2
+    ? "Not that either. The arrow shows the way to make them pay."
+    : "There's something better. What did their last move leave open, or what does it threaten?";
+  d.mood = "worried";
+  setTimeout(() => {
+    if (drill !== d || d.token !== token) return;
+    game.undo();
+    void play("wrong");
+    d.waiting = false;
+    refresh();
+  }, 900);
+}
+
+/** The setup goal a move achieves, in words ("bishop to f4"), if any. */
+function goalDone(before: Chess, move: NormalMove): string | undefined {
+  const d = drill;
+  if (!d?.opening || before.turn !== d.user) return undefined;
+  const setup = drillSystem()?.setup;
+  if (!setup) return undefined;
+  const [, missingBefore] = setupProgress(before, d.user, setup);
+  const [, missingAfter] = setupProgress(positionAfter(before, move), d.user, setup);
+  const done = missingBefore.find((goal) => !missingAfter.includes(goal));
+  return done ? goalWords(done) : undefined;
+}
+
+/** The opening system the drill's line uses (its setup is the checklist). */
+function drillSystem() {
+  const d = drill;
+  if (!d?.opening) return undefined;
+  return systemFor(d.opening, firstMoveOf(game.positionAt(0), gameMoves()));
+}
+
+/** The end of a line: on to the next one, or the result. */
+function drillLineDone(answered = false) {
+  const d = drill;
+  if (!d) return;
+  d.waiting = false;
+  if (d.round === 1) {
+    const s = d.scores[0];
+    d.state = "between";
+    d.note = `Main line done: ${s.right} of ${s.moves} moves first time. Let's do that again, this time I'll mix it up - good luck!`;
+    d.mood = "happy";
+    refresh();
+    return;
+  }
+  if (!d.queue.length) {
+    drillDone();
+    return;
+  }
+  d.state = "between";
+  if (!answered) {
+    d.note = d.tries === 0 && !d.slipped ? "That line's done. Ready for the next one?" : "That line's done. Next one?";
+    d.mood = "happy";
+  }
+  refresh();
+}
+
+/** Round 2: some variations, most with a slip in them. */
+function startMixedRound() {
+  const d = drill;
+  if (!d) return;
+  const variations = d.demo.lines.map((_, i) => i).slice(1);
+  const lines = variations.length ? shuffled(variations).slice(0, DRILL_VARIATIONS) : [0, 0];
+  // at least one slip; the others more often than not
+  const slips = lines.map((_, i) => i === 0 || Math.random() < 0.6);
+  d.queue = shuffled(lines.map((line, i) => ({ line, slip: slips[i] })));
+  d.round = 2;
+  nextDrillLine();
+}
+
+function nextDrillLine() {
+  const d = drill;
+  if (!d) return;
+  const next = d.queue.shift();
+  if (!next) {
+    drillDone();
+    return;
+  }
+  const title = d.demo.lines[next.line].title;
+  startDrillLine(next.line, next.slip, title === "Main" ? "The main line again, but stay alert." : `Next up: the ${title}. Stay alert.`);
+}
+
+function drillDone() {
+  const d = drill;
+  if (!d) return;
+  d.state = "done";
+  d.waiting = false;
+  const [one, two] = d.scores;
+  const right = one.right + two.right;
+  const moves = one.moves + two.moves;
+  d.mood = right === moves && two.spotted === two.slips ? "wow" : right >= moves * 0.75 ? "happy" : "talk";
+  d.note = "That's the drill done.";
+  refresh();
+  const words = [
+    `Round 1, the main line: ${one.right} of ${one.moves} moves first time.`,
+    `Round 2, mixed up: ${two.right} of ${two.moves} moves first time` +
+      (two.slips ? `, and you spotted ${two.spotted} of ${two.slips} slip${two.slips === 1 ? "" : "s"}.` : "."),
+    right === moves && two.spotted === two.slips ? "Perfect! You know this opening."
+      : right >= moves * 0.75 ? "Nicely done. Another go will make it stick."
+        : "A good start. Drill it again and it'll soon feel natural.",
+  ];
+  const name = d.demo.opening;
+  showOverlay(d.mood, words.map((text) => para(text)), [
+    { ico: "replay", label: "Drill again", kind: "accent", run: () => { closeOverlay(false); startDrill(d.demo); } },
+    { ico: "knight", label: "Play a practice match with it", run: () => { closeOverlay(false); practiseOpening(name); } },
+    { ico: "school", label: "Back to Training", kind: "soft", run: () => { closeOverlay(false); backToTraining(name); } },
+  ]);
+}
+
+/** What the coach says during a drill. */
+function drillSays(): CoachSay {
+  const d = drill!;
+  if (d.state === "between") {
+    const next: CoachButton = d.round === 1
+      ? { ico: "play", label: "Round 2", kind: "accent", run: startMixedRound }
+      : { ico: "skipNext", label: "Next line", kind: "accent", run: nextDrillLine };
+    return { mood: d.mood, text: d.note, buttons: [next], key: `drill:${d.token}:between` };
+  }
+  if (d.state === "done") {
+    const again: CoachButton = { ico: "replay", label: "See the result", kind: "accent", run: drillDone };
+    return { mood: d.mood, text: d.note, buttons: [again], key: `drill:${d.token}:done` };
+  }
+  return { mood: d.mood, text: d.note, buttons: [], key: `drill:${d.token}:${game.length}:${d.tries}:${d.note}` };
+}
+
+/** After two wrong tries, the arrow shows the move. */
+function drillShapes(): DrawShape[] {
+  const d = drill;
+  if (!d || d.state !== "playing" || d.waiting || d.tries < 2 || game.position.turn !== d.user) return [];
+  const move = d.slipped ? d.best?.move : d.script[game.length];
+  return move ? [{ orig: makeSquare(move.from) as Key, dest: makeSquare(move.to) as Key, brush: "you" }] : [];
+}
+
+/** The setup checklist under the board: a tick for each part that's in place. */
+function drawDrillSetup() {
+  const box = $("drill-setup");
+  const system = drill ? drillSystem() : undefined;
+  box.hidden = !drill || !system;
+  document.body.classList.toggle("drilling", !!drill);
+  if (!drill || !system) return;
+  const [, missing] = setupProgress(game.position, drill.user, system.setup);
+  const colour = drill.user;
+  const roles: Record<string, Role> = { P: "pawn", N: "knight", B: "bishop", R: "rook", Q: "queen", K: "king" };
+  box.replaceChildren(...system.setup.map((goal) => {
+    const chip = document.createElement("span");
+    chip.className = "setup-chip";
+    chip.classList.toggle("done", !missing.includes(goal));
+    chip.title = goalWords(goal);
+    if (typeof goal === "string") {
+      chip.innerHTML = `<span class="mini-piece king ${colour}"></span><span>castle</span>`;
+    } else {
+      const role = roles[goal[0]] ?? "pawn";
+      chip.innerHTML = `<span class="mini-piece ${role} ${colour}"></span><span>${goal[1].join("/")}</span>`;
+    }
+    return chip;
+  }));
+}
+
+/** Play a practice match with an opening: the practice screen, set up for it. */
+function practiseOpening(name: string) {
+  const opening = REPERTOIRE.find((o) => o.name === name);
   resetBoard(new Game());
   const practice = menuCard.querySelector<HTMLInputElement>('input[name="mode"][value="practice"]');
   if (practice) practice.checked = true;
@@ -2647,6 +3071,20 @@ function onDemoTry() {
   showMenu();
   homeChoice = "practice";
   showScreen("practice");
+}
+
+/** Back to Training, on the Openings tab. */
+function backToTraining(name: string) {
+  resetBoard(new Game());
+  refresh();
+  showMenu();
+  homeChoice = "train";
+  trainTab = "openings";
+  learnOpening = name;
+  learnColour = REPERTOIRE.find((o) => o.name === name)?.colour ?? "white";
+  $("lesson-list").hidden = true;
+  showScreen("train");
+  drawTrainScreen();
 }
 
 function onDemoExit() {
@@ -2957,6 +3395,7 @@ function refresh() {
   drawReview(reviews, info);
   drawCoachFace(reviews);
   drawEditor();
+  drawDrillSetup();
   drawWhatIf();
   drawMoveStrip(reviews, info);
   syncDropdowns();
@@ -3110,7 +3549,7 @@ function drawBoard(reviews: (Review | undefined)[], info: OpeningInfo[]) {
   }
   const colour = movableColour();
   const movesFrom = quizWaiting() ? quiz!.threat!.passed! : position;
-  ground.setAutoShapes(stepper ? stepperShapes() : puzzle ? puzzleShapes() : editor ? [] : demo ? demoShapes() : [...badgeShapes(reviews, info), ...arrowShapes(), ...replayShapes()]);
+  ground.setAutoShapes(stepper ? stepperShapes() : drill ? drillShapes() : puzzle ? puzzleShapes() : editor ? [] : demo ? demoShapes() : [...badgeShapes(reviews, info), ...arrowShapes(), ...replayShapes()]);
   if (editor || demo?.intro) last = undefined;
   ground.set({
     fen: fenOf(position),
@@ -3232,6 +3671,7 @@ function drawPlayerBars() {
   for (const [bar, colour] of bars) {
     const name = bar.querySelector<HTMLElement>(".pb-name")!;
     name.textContent = demo && bar.id === "bar-top" ? demoTitle()
+      : drill && bar.id === "bar-top" ? `${openingShortName(drill.demo.opening)} drill · Round ${drill.round}`
       : puzzle && bar.id === "bar-top" ? `${puzzle.phase === "openings" ? "Opening trap" : "Puzzle"} · ${PUZZLE_LEVELS.find(([v]) => v === puzzle!.level)?.[1]}${puzzle.streak ? ` · ${puzzle.streak} in a row` : ""}`
       : editor && bar.id === "bar-top" ? "Set up a position"
       : lesson && bar.id === "bar-top" ? `Lesson ${lesson.index + 1}: ${LESSONS[lesson.phase][lesson.index].title}`
@@ -3604,6 +4044,7 @@ function coachSays(reviews: (Review | undefined)[]): CoachSay {
   if (editor) return { mood: "talk", text: editor.pick
     ? "Tap squares to place it, or tap it again to put it away. Done when you're ready."
     : "Drag pieces to move them (off the board to remove), or pick a piece below to add. Done when you're ready.", buttons: [] };
+  if (drill) return drillSays();
   if (puzzle) return puzzleSays();
   if (lesson) return { mood: "talk", text: LESSONS[lesson.phase][lesson.index].title, buttons: [] };
   if (demo?.intro) {
@@ -4073,7 +4514,7 @@ interface Stepper {
   texts: string[];
   step: number; // 1 = after the first move
   mood: Mood;
-  extra?: CoachButton;
+  extra?: CoachButton | CoachButton[];
   illustration?: boolean; // one move, with what the piece controls
   frames?: StepFrame[]; // lesson pages (or illustrations) instead of moves
 }
@@ -4151,7 +4592,7 @@ function drawStepper() {
   $<HTMLButtonElement>("step-back").disabled = stepper.step <= 1;
   $<HTMLButtonElement>("step-next").disabled = stepper.step >= stepCount();
   // the extra button (e.g. "Try it") only on the last page of a lesson
-  const extra = stepper.extra && (!stepper.frames || stepper.step >= stepCount()) ? [labelledButton(stepper.extra)] : [];
+  const extra = stepper.extra && (!stepper.frames || stepper.step >= stepCount()) ? [stepper.extra].flat().map(labelledButton) : [];
   $("step-extra").replaceChildren(...extra);
 }
 
@@ -4655,7 +5096,7 @@ const inProgress = () => match !== null && game.length > 0 && !game.outcome();
 /** New game: the setup screen of the mode you're in. */
 async function onNewGame() {
   if (inProgress() && !(await message("New game?", "Are you sure? This game will end.", true))) return;
-  const learning = demo ? demo.demo.opening : null;
+  const learning = demo ? demo.demo.opening : drill ? drill.demo.opening : null;
   const screen: HomeChoice | null = gameOrigin === "learn" ? "train" : gameOrigin;
   if (screen === "train") $("lesson-list").hidden = true;
   showMenu();
@@ -5285,7 +5726,7 @@ if (import.meta.env.DEV) {
   (window as unknown as { trainer: unknown }).trainer = {
     analyser, game: () => game, gameScores, answerQuiz, startTask, quiz: () => quiz, parseUci, normalizeMove, base,
     boardMove: onBoardMove, clock: () => clock, clockTimes: () => clockTimes, onUndo,
-    demo: () => demo, startDemo, DEMOS, demoSteps, showTour,
+    demo: () => demo, startDemo, DEMOS, demoSteps, showTour, drill: () => drill, startDrill,
     puzzle: () => puzzle, editor: () => editor, startPuzzles, startEditor, startLesson, editorTap,
     outlook: (fen: string, you: Color) => whatYouGet(coachAnalysis, new Game(fen).position, you),
   };

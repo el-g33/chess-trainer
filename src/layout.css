@@ -618,7 +618,10 @@ html body .board-area .board-controls {
 
 .step-extra {
   display: flex;
+  flex-wrap: wrap; /* two buttons (e.g. Drill it, Practice match) stack when there's no room */
+  justify-content: flex-end;
   gap: 6px;
+  min-width: 0;
   margin-left: auto;
 }
 
@@ -1895,4 +1898,38 @@ body.demo-intro .move-strip {
 }
 .train-openings .seg {
   margin-bottom: 10px;
+}
+
+/* A drill: the setup checklist under the board */
+.drill-setup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+.drill-setup[hidden] {
+  display: none;
+}
+.setup-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px 2px 5px;
+  border-radius: 9px;
+  background: var(--line);
+  color: var(--muted);
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+.setup-chip .mini-piece {
+  margin-right: 0;
+}
+.setup-chip.done {
+  background: var(--accent);
+  color: #fff;
+  opacity: 1;
+}
+.setup-chip.done::after {
+  content: "✓";
+  font-weight: 700;
 }
