@@ -75,6 +75,7 @@
             <button type="button" class="mode-choice" data-choice="train" role="radio" aria-checked="false"><span class="mc-icon" data-ico="puzzle" data-ico-size="22"></span>Training</button>
           </div>
           <button type="button" id="home-next" class="home-next accent" disabled>Next</button>
+          <button type="button" id="home-resume" class="home-resume" hidden></button>
           <p id="engine-status" class="engine-status">Loading Stockfish...</p>
         </section>
 
@@ -228,6 +229,11 @@
         <div id="whatif-bar" class="whatif-bar" hidden>
           <span id="whatif-text"></span>
           <button type="button" id="whatif-exit">Back to game</button>
+        </div>
+        <!-- Came from a statistic: the way back -->
+        <div id="stats-back-bar" class="whatif-bar stats-back-bar" hidden>
+          <span>From your statistics</span>
+          <button type="button" id="stats-back">Back to statistics</button>
         </div>
         <div class="board-row">
           <div id="eval-bar" hidden aria-label="Evaluation">

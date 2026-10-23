@@ -689,6 +689,14 @@ function drawHome() {
     button.setAttribute("aria-checked", String(on));
   }
   $<HTMLButtonElement>("home-next").disabled = !homeChoice;
+  // A game still loaded for analysis: a way back to it
+  const resumable = analysedGame && reviewing && game.length > 0 && !preparing;
+  $("home-resume").hidden = !resumable;
+  if (resumable) {
+    const white = gameHeaders.White && gameHeaders.White !== "?" ? gameHeaders.White : "White";
+    const black = gameHeaders.Black && gameHeaders.Black !== "?" ? gameHeaders.Black : "Black";
+    $("home-resume").textContent = `Back to your game analysis: ${white} vs ${black}`;
+  }
   syncDropdowns();
 
   // Play
@@ -887,6 +895,8 @@ function resetBoard(newGame: Game, headers: Headers = { White: "?", Black: "?", 
   editor = null;
   lesson = null;
   explore = null;
+  analysedGame = false;
+  fromStats = false;
   stepper = null;
   closeOverlay(false);
   currentView = "board";
@@ -1142,6 +1152,7 @@ const watching = () => reviewing && reviewTitle !== "" && reviewSide === null;
 const PREP_MIN_MS = 2500; // long enough to see the animation, even for a game already checked
 
 function startPreparing() {
+  analysedGame = true;
   if (!rateMovesBox.checked) return;
   preparing = true;
   preparingSince = performance.now();
@@ -1176,6 +1187,8 @@ function drawPrep(list: (Review | undefined)[]) {
 
 let gradeJump = { key: "", next: 0 };
 let silentJump = false; // from the statistics: the top bubble says nothing, the card below does the talking
+let fromStats = false; // jumped to a move from the statistics: a bar leads back
+let analysedGame = false; // the board holds a game loaded for review (Home offers a way back)
 
 /** From the statistics: the next move of this grade by this side, on the board, explained. */
 function jumpToGrade(colour: Color, grade: string, list: (Review | undefined)[]) {
@@ -1190,6 +1203,7 @@ function jumpToGrade(colour: Color, grade: string, list: (Review | undefined)[])
   // the position before the move first, then the move plays in with its explanation
   goTo(ply - 1);
   silentJump = true;
+  fromStats = true;
   refresh();
   const review = list[ply - 1]!;
   setTimeout(() => {
@@ -1198,6 +1212,22 @@ function jumpToGrade(colour: Color, grade: string, list: (Review | undefined)[])
 }
 
 const GRADE_JUMP_PAUSE = 1000; // ms on the position before the move
+
+/** The bar back to the statistics, while you're on the board after a jump. */
+function drawStatsBack() {
+  if (!reviewing) fromStats = false;
+  const show = fromStats && currentView === "board" && !analysis && !demo;
+  $("stats-back-bar").hidden = !show;
+  document.querySelector(".board-area")!.classList.toggle("statsback", show);
+}
+
+function backToStats() {
+  fromStats = false;
+  silentJump = false;
+  stepper = null;
+  currentView = "stats";
+  refresh();
+}
 
 /** Start going through the game, from the first move. */
 function startReview() {
@@ -2932,6 +2962,7 @@ function refresh() {
   drawCoach();
   drawDemo();
   drawPrep(reviews);
+  drawStatsBack();
 }
 
 /** Show the parts of the page that belong to the current mode. */
@@ -5086,6 +5117,12 @@ function wireButtons() {
   for (const button of document.querySelectorAll(".var-next")) button.addEventListener("click", () => demo && demo.line + 1 < demo.demo.lines.length && loadDemoLine(demo.line + 1));
   $("home-button").addEventListener("click", () => void onHome());
   $("prep-back").addEventListener("click", () => { stopPreparing(); showMenu(); });
+  $("stats-back").addEventListener("click", backToStats);
+  // Home: straight back to a game that's still loaded for analysis
+  $("home-resume").addEventListener("click", () => {
+    hideMenu();
+    refresh();
+  });
   for (const tab of document.querySelectorAll<HTMLButtonElement>(".view-tabs button")) {
     tab.addEventListener("click", () => {
       currentView = tab.dataset.view as typeof currentView;

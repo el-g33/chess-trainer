@@ -21,12 +21,18 @@ import { fenOf, isDrawnPosition, winningChance, type Evaluation } from "./review
 // worse (in winning chance) than their best reply
 const POISON_DROP = 15;
 
-// How long Stockfish thinks about each position (as the desktop's EVAL_THINK_TIME)
-const THINK_TIME = 0.4;
-// ...and for the second look at positions behind a Mistake, Blunder or Miss
-const DEEP_TIME = 3.0;
+// How deep Stockfish looks at each position: a fixed depth, so the same game
+// gets the same ratings every time and on every device (thinking for a fixed
+// time instead depends on how fast and how busy the device is). The time is
+// only a safety limit for the odd position that takes much longer.
+const THINK_DEPTH = 12;
+const THINK_LIMIT = 4.0;
+// ...deeper for the second look at inaccuracies, mistakes and sacrifices
+const DEEP_DEPTH = 16;
+const DEEP_LIMIT = 12.0;
 // ...and for what happens if an offered piece is taken
-const POISON_TIME = 2.0;
+const POISON_DEPTH = 14;
+const POISON_LIMIT = 8.0;
 
 // How many copies of Stockfish work at once: the spare cores, at most three
 const POOL = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 2) - 1));
@@ -143,13 +149,15 @@ export class Analyser {
   private async do(engine: Engine, job: Job) {
     if (job.kind === "eval") {
       const fen = job.fens[0];
-      const lines = await engine.analyse(fen, THINK_TIME * 1000, 2);
+      await engine.newGame(); // a clean memory: the same answer whatever was looked at before
+      const lines = await engine.analyse(fen, THINK_LIMIT * 1000, 2, undefined, THINK_DEPTH);
       if (!this.evals.has(fen) || !this.deepDone.has(fen)) this.evals.set(fen, toEvaluation(job.position, lines));
       return;
     }
     if (job.kind === "deep") {
       const fen = job.fens[0];
-      const lines = await engine.analyse(fen, DEEP_TIME * 1000, 2);
+      await engine.newGame();
+      const lines = await engine.analyse(fen, DEEP_LIMIT * 1000, 2, undefined, DEEP_DEPTH);
       this.evals.set(fen, toEvaluation(job.position, lines));
       this.deepDone.add(fen);
       return;
@@ -157,12 +165,14 @@ export class Analyser {
     const pending = job.move;
     const [beforeFen, afterFen] = job.fens;
     if (!this.deepDone.has(beforeFen)) {
-      const lines = await engine.analyse(beforeFen, DEEP_TIME * 1000, 2);
+      await engine.newGame();
+      const lines = await engine.analyse(beforeFen, DEEP_LIMIT * 1000, 2, undefined, DEEP_DEPTH);
       this.evals.set(beforeFen, toEvaluation(pending.before, lines));
       this.deepDone.add(beforeFen);
     }
     // the played move, searched from the same position for the same time
-    const [played] = await engine.analyse(beforeFen, DEEP_TIME * 1000, 1, [standardUci(pending.before, pending.move)]);
+    await engine.newGame();
+    const [played] = await engine.analyse(beforeFen, DEEP_LIMIT * 1000, 1, [standardUci(pending.before, pending.move)], DEEP_DEPTH);
     const previous = this.evals.get(afterFen);
     if (played) this.evals.set(afterFen, { ...(previous ?? { best: undefined }), score: lineScore(pending.before, played) });
     // A piece offered up: what happens if they take it?
@@ -175,7 +185,8 @@ export class Analyser {
         takes.push(makeSquare(from) + makeSquare(pending.offered) + (pawn && last ? "q" : ""));
       }
       if (takes.length) {
-        const [taking] = await engine.analyse(afterFen, POISON_TIME * 1000, 1, takes);
+        await engine.newGame();
+        const [taking] = await engine.analyse(afterFen, POISON_LIMIT * 1000, 1, takes, POISON_DEPTH);
         const taker = pending.after.turn;
         const best = winningChance(previous.score, taker);
         if (taking && best - winningChance(lineScore(pending.after, taking), taker) >= POISON_DROP) {

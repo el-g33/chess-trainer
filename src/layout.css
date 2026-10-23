@@ -1853,3 +1853,32 @@ body.replay-on .nav-play {
   text-decoration: underline dotted;
   text-underline-offset: 3px;
 }
+
+/* Back to the statistics, after jumping to a move from them */
+.stats-back-bar {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.stats-back-bar[hidden],
+.board-area.statsback #bar-top {
+  display: none;
+}
+#stats-back {
+  min-height: 0;
+  padding: 3px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* Home: back to a game that's still loaded for analysis */
+.home-resume {
+  margin-top: 8px;
+  width: 100%;
+  font-weight: 600;
+}
+.home-resume[hidden] {
+  display: none;
+}

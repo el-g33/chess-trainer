@@ -79,7 +79,7 @@ export class Engine {
 
   /** Stockfish's top `lines` moves for a position, each with its score from
    *  the point of view of the side to move and the line it expects. */
-  analyse(fen: string, movetimeMs: number, lines = 2, onlyMoves?: string[]): Promise<AnalysisLine[]> {
+  analyse(fen: string, movetimeMs: number, lines = 2, onlyMoves?: string[], depth?: number): Promise<AnalysisLine[]> {
     return this.enqueue(async () => {
       this.send("setoption name Skill Level value 20");
       this.send(`setoption name MultiPV value ${lines}`);
@@ -103,7 +103,10 @@ export class Engine {
         });
       };
       this.listeners.push(collect);
-      await this.waitFor("bestmove", `go movetime ${Math.round(movetimeMs)}${searchmoves}`);
+      // A fixed depth gives the same answer every time, on any device (the time
+      // is then only a safety limit); otherwise it thinks for the time given
+      const limit = depth ? `depth ${depth} movetime ${Math.round(movetimeMs)}` : `movetime ${Math.round(movetimeMs)}`;
+      await this.waitFor("bestmove", `go ${limit}${searchmoves}`);
       this.listeners = this.listeners.filter((l) => l !== collect);
       this.send("setoption name MultiPV value 1");
       return [...found.keys()].sort((a, b) => a - b).map((k) => found.get(k)!);
