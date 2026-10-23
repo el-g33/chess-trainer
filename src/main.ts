@@ -2081,7 +2081,9 @@ function startExplore(fen: string, user: Color) {
   explore = { user, band: exploreBand, auto: true, thinking: false };
   orientation = user;
   refresh();
-  void showIdeas();
+  // You go first: the best moves wait until you ask (the bulb). If it's their
+  // move, they make it.
+  autoReply();
 }
 
 /** Playing a move from an earlier point replaces the moves after it. */
@@ -2257,8 +2259,8 @@ function exploreSays(reviews: (Review | undefined)[]): CoachSay {
     return { mood: "talk", text, buttons };
   }
   if (ply === 0) {
-    const text = theirs ? (auto ? "It's their move. Simulate, and they'll make it." : "It's their move. Move for them on the board, or let them reply.")
-      : auto ? "Your move. They'll reply by themselves (pause to move for them)." : "Your move. Follow my idea or play your instinct, and I'll rate it.";
+    const text = theirs ? (auto ? "It's their move first. Here it comes..." : "It's their move. Move for them on the board, or let them reply.")
+      : "Your move. Play what you think is best and I'll rate it. Tap the bulb when you want my best move.";
     return { mood: "talk", text, buttons };
   }
   const review = reviews[ply - 1];
