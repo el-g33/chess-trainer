@@ -65,7 +65,7 @@ import { chainOf, whatYouGet, type Mark } from "./outlook";
 import { fitsIn, readingTime, splitToFit, Typer } from "./talk";
 import { runTour, tourOpen, type TourStep } from "./tour";
 import { readPgn, saveFile, today, writePgn, type Headers, type PgnGame } from "./pgn";
-import { addMisses, fenOf, formatScore, isDrawnPosition, isSacrifice, reviewMove, verdictWords, type Review } from "./review";
+import { addMisses, fenOf, formatScore, isDrawnPosition, isSacrifice, reviewMove, verdictWords, winningChance, type Review } from "./review";
 import { gradeGuess, planAhead, threatCheck, type CoachEngine, type Plan, type Threat } from "./strategy";
 import { Board } from "chessops/board";
 import { defaultSetup } from "chessops/setup";
@@ -308,6 +308,24 @@ const coachAnalysis: CoachEngine = {
     return lineScore(position, line);
   },
 };
+
+/** The coach's best line starting with one of these moves (all moves if none given). */
+async function coachLine(position: Chess, seconds: number, first: NormalMove[] = []): Promise<{ score: Score; pv: NormalMove[] } | undefined> {
+  coachEngine ??= new Engine();
+  const [line] = await coachEngine.analyse(fenOf(position), seconds * 1000, 1, first.map((m) => standardUci(position, m)));
+  if (!line) return undefined;
+  let walk = position;
+  const pv: NormalMove[] = [];
+  for (const uci of line.pv) {
+    const parsed = parseUci(uci);
+    if (!parsed || !("from" in parsed)) break;
+    const move = normalizeMove(walk, parsed) as NormalMove;
+    if (!walk.isLegal(move)) break;
+    pv.push(move);
+    walk = positionAfter(walk, move);
+  }
+  return { score: lineScore(position, line), pv };
+}
 
 const ground: Api = Chessground($("board"), {
   coordinates: true,
@@ -2314,6 +2332,7 @@ function drawDemo() {
 }
 
 const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
+const cap = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /** "London · Main", "London · Nf3 variation" */
 function demoTitle(): string {
@@ -2430,7 +2449,7 @@ async function showWhatYouGet() {
 
 let replaying = false;
 let replayStepping = false; // the replay itself is moving (not you)
-const REPLAY_STOPS = new Set(["Brilliant", "Inaccuracy", "Mistake", "Blunder", "Miss", "Missed Win"]);
+const REPLAY_STOPS = new Set(["Brilliant", "Great", "Inaccuracy", "Mistake", "Blunder", "Miss", "Missed Win"]);
 const REPLAY_MOVE_MS = 900; // an ordinary move, then the next
 const REPLAY_WAIT_MS = 6000; // the longest it waits for a move's rating
 const canReplay = () => !demo && reviewing && game.length > 0;
@@ -3694,6 +3713,8 @@ const WORTH_SHOWING = new Set(["Inaccuracy", "Mistake", "Miss", "Missed Win", "B
  *  move itself. A hazard button appears only when the move let something go,
  *  coloured by how much. */
 function explainMove(ply: number, review: Review) {
+  if (review.rating === "Brilliant") return void explainBrilliant(ply);
+  if (review.rating === "Great") return void explainGreat(ply);
   const before = game.positionAt(ply - 1);
   const after = game.positionAt(ply);
   const played = game.moves[ply - 1].move;
@@ -3709,6 +3730,158 @@ function explainMove(ply: number, review: Review) {
   const danger = dangerAfter(review, before, after, analyser.evals.get(fenOf(before)), analyser.evals.get(fenOf(after)), !!info[ply - 1]?.book);
   const extra = danger && !after.isEnd() ? hazardButton(ply, danger) : undefined;
   startStepper([before, positionAfter(before, move)], [move], [text], moodForRating(review.rating), extra, true);
+}
+
+const MATERIAL: Record<string, number> = { pawn: 1, knight: 3, bishop: 3, rook: 5, queen: 9, king: 0 };
+const NAME: Record<string, string> = { pawn: "pawn", knight: "knight", bishop: "bishop", rook: "rook", queen: "queen", king: "king" };
+
+/** Material of one side minus the other's. */
+function materialFor(position: Chess, side: Color): number {
+  let total = 0;
+  for (const square of position.board.occupied) {
+    const piece = position.board.get(square)!;
+    total += (piece.color === side ? 1 : -1) * MATERIAL[piece.role];
+  }
+  return total;
+}
+
+/** How a line ends for `side`, in words: checkmate, the biggest piece won, or
+ *  the verdict ("you" when `side` is the viewer's, "they" when it isn't). */
+function lineOutcome(start: Chess, line: NormalMove[], score: Score, side: Color, viewer: Color): string {
+  const you = side === viewer;
+  const positions = [start];
+  for (const move of line) positions.push(positionAfter(positions[positions.length - 1], move));
+  const end = positions[positions.length - 1];
+  if (end.isCheckmate()) return "it's checkmate!";
+  const gain = materialFor(end, side) - materialFor(start, side);
+  if (gain >= 3) {
+    // the most valuable piece of theirs that went missing
+    const them = opposite(side);
+    const lost = (["queen", "rook", "bishop", "knight"] as PieceRole[]).find((role) => end.board.pieces(them, role).size() < start.board.pieces(them, role).size());
+    const who = you ? "you" : "they";
+    if (lost === "queen") return `${who} win ${you ? "their" : "your"} queen.`;
+    return gain >= 5 ? `${who} come out well ahead in material.` : `${who} come out a ${lost ? NAME[lost] : "piece"} up.`;
+  }
+  return `${verdictWords(score)}.`;
+}
+
+/** The first `count` moves of a line, carried on while pieces are still
+ *  being taken, so it never stops in the middle of an exchange. */
+function wholeLine(start: Chess, pv: NormalMove[], count: number): NormalMove[] {
+  let walk = start;
+  const line: NormalMove[] = [];
+  for (const move of pv) {
+    const capture = walk.board.get(move.to) !== undefined;
+    if (line.length >= count && !capture) break;
+    if (line.length >= count + 3) break;
+    line.push(move);
+    walk = positionAfter(walk, move);
+  }
+  return line;
+}
+
+/** The moves of a line from a position, with a sentence for each. */
+function talkLine(start: Chess, line: NormalMove[], viewer: Color): { positions: Chess[]; texts: string[] } {
+  const positions = [start];
+  const texts: string[] = [];
+  for (const move of line) {
+    texts.push(narrateMove(positions[positions.length - 1], move, viewer));
+    positions.push(positionAfter(positions[positions.length - 1], move));
+  }
+  return { positions, texts };
+}
+
+/** Tell me more about a brilliant move: the piece it offers, and what
+ *  happens if they take it - the trap it sets, played out on the board. */
+async function explainBrilliant(ply: number) {
+  if (busy) return;
+  const before = game.positionAt(ply - 1);
+  const after = game.positionAt(ply);
+  const played = game.moves[ply - 1].move;
+  const mover = game.moverOf(ply);
+  const viewer = listener() ?? mover;
+  const offered = isSacrifice(before, played, after);
+  const piece = offered !== undefined ? after.board.get(offered) : undefined;
+  const takes: NormalMove[] = [];
+  if (offered !== undefined) {
+    for (const [from, dests] of after.allDests()) if (dests.has(offered)) takes.push({ from, to: offered });
+  }
+  setBusy(true, "Let me show you why it works...");
+  try {
+    const taken = takes.length ? await coachLine(after, 2, takes) : undefined;
+    const best = await coachLine(after, 1.5);
+    setBusy(false);
+    const whose = mover === viewer ? "your" : "their";
+    const intro = `Brilliant! ${narrateMove(before, played, viewer)}`;
+    if (taken && piece && taken.pv.length) {
+      const line = wholeLine(after, taken.pv, 5);
+      const story = talkLine(after, line, viewer);
+      const trap = best?.pv[0] && makeUci(best.pv[0]) !== makeUci(line[0]);
+      // who can take it: the cheapest piece that can
+      const taker = takes.map((m) => after.board.get(m.from)!.role).sort((a, b) => MATERIAL[a] - MATERIAL[b])[0];
+      const theirs = mover === viewer ? "their" : "your";
+      const offer = offered === played.to
+        ? `Brilliant! ${cap(whose)} ${NAME[piece.role]} goes where ${theirs} ${NAME[taker]} can take it, but taking it is a trap.`
+        : `${intro} It leaves ${whose} ${NAME[piece.role]} to be taken, but taking it is a trap.`;
+      const texts = [
+        offer,
+        ...story.texts.map((text, i) => i === 0 ? `If they take it: ${lowerFirst(text)}` : text),
+      ];
+      texts[texts.length - 1] += ` In the end, ${lineOutcome(after, line, taken.score, mover, viewer)}`;
+      if (trap) texts[texts.length - 1] += " So they shouldn't take it.";
+      startStepper([before, ...story.positions], [played, ...line], texts, "happy");
+    } else if (best?.pv.length) {
+      // no piece to take any more: show what the move sets up
+      const line = wholeLine(after, best.pv, 4);
+      const story = talkLine(after, line, viewer);
+      const texts = [`${intro} A bold move that Stockfish confirms.`, ...story.texts];
+      texts[texts.length - 1] += ` In the end, ${lineOutcome(after, line, best.score, mover, viewer)}`;
+      startStepper([before, ...story.positions], [played, ...line], texts, "happy");
+    }
+  } catch (error) {
+    errorText = `Something went wrong: ${error}`;
+    setBusy(false);
+    refresh();
+  }
+}
+
+/** Tell me more about a great move: it was the only good one, and the board
+ *  plays out the opportunity it creates. */
+async function explainGreat(ply: number) {
+  if (busy) return;
+  const before = game.positionAt(ply - 1);
+  const after = game.positionAt(ply);
+  const played = game.moves[ply - 1].move;
+  const mover = game.moverOf(ply);
+  const viewer = listener() ?? mover;
+  setBusy(true, "Let me show you what it sets up...");
+  try {
+    const best = await coachLine(after, 2);
+    setBusy(false);
+    const why = whyMove(before, played, viewer);
+    // why it had to be this move: the piece was under attack, or what it does
+    const piece = before.board.get(played.from)!;
+    const attacked = before.kingAttackers(played.from, opposite(mover), before.board.occupied).nonEmpty();
+    const reason = attacked && piece.role !== "king" ? `It gets ${mover === viewer ? "your" : "their"} ${NAME[piece.role]} out of danger.` : why && why !== "it's a useful waiting move" ? `${cap(why)}.` : "";
+    const intro = `Great move! ${narrateMove(before, played, viewer)} ${reason} It was the only good move here: everything else was clearly worse.`.replace(/  +/g, " ");
+    const line = wholeLine(after, best?.pv ?? [], 3);
+    if (!line.length) {
+      startStepper([before, after], [played], [`${intro} ${why ? `${why.charAt(0).toUpperCase()}${why.slice(1)}.` : ""}`], "happy", undefined, true);
+      return;
+    }
+    const story = talkLine(after, line, viewer);
+    const texts = [intro, ...story.texts];
+    // still worse after the only move: it keeps you in the game
+    const behind = winningChance(best!.score, mover) < 45;
+    texts[texts.length - 1] += behind
+      ? ` ${cap(verdictWords(best!.score))}, but this move keeps ${mover === viewer ? "you" : "them"} in the game.`
+      : ` In the end, ${lineOutcome(after, line, best!.score, mover, viewer)}`;
+    startStepper([before, ...story.positions], [played, ...line], texts, "happy");
+  } catch (error) {
+    errorText = `Something went wrong: ${error}`;
+    setBusy(false);
+    refresh();
+  }
 }
 
 function hazardButton(ply: number, danger: Danger): CoachButton {

@@ -73,12 +73,33 @@ export function narrateMove(before: Chess, move: NormalMove, listener: Color | n
   else text = `${subject} moves`;
 
   const target = (role: Role) => `${owner(opposite(piece.color), listener)} ${NAMES[role]}`;
+  // A pin: the piece it hits can't move, because their king stands behind it
+  const pinned = pinnedBy(after, move.to);
+  if (pinned !== undefined && !check) {
+    text += `${victim ? "," : " and"} pins ${target(after.board.get(pinned)!.role)} to the king.`;
+    return text;
+  }
   if (check && hits.length) text += `, with check, and also hits ${target(hits[0])}`;
   else if (check) text += ", with check";
   else if (fork) text += ` and attacks ${target(hits[0])} and ${target(hits[1])} at once: a fork!`;
   else if (hits.length) text += ` and hits ${target(hits[0])}`;
   if (!fork) text += ".";
   return text;
+}
+
+/** An enemy piece the slider on `square` pins to its king (one in between, the king behind). */
+export function pinnedBy(position: Chess, square: number): number | undefined {
+  const piece = position.board.get(square);
+  if (!piece || !["bishop", "rook", "queen"].includes(piece.role)) return undefined;
+  const king = position.board.kingOf(opposite(piece.color));
+  if (king === undefined) return undefined;
+  const occupied = position.board.occupied;
+  for (const hit of attacks(piece, square, occupied).intersect(position.board[opposite(piece.color)])) {
+    const role = position.board.get(hit)!.role;
+    if (role === "king" || role === "pawn") continue;
+    if (attacks(piece, square, occupied.without(hit)).has(king)) return hit;
+  }
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
