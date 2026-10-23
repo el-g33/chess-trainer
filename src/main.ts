@@ -72,6 +72,11 @@ import { Board } from "chessops/board";
 import { defaultSetup } from "chessops/setup";
 import type { Piece, Role as PieceRole } from "chessops/types";
 
+// The styles are in (imports run first), so the page can show; the theme's
+// stand-in background (see index.html) gives way to the real one
+document.documentElement.classList.add("styled");
+document.documentElement.style.background = "";
+
 // Opening choices in the start menu (the openings themselves are in openings.ts)
 const STOCKFISH_DECIDES = "None (plays normally for its level)";
 const NO_OPENING = "None";

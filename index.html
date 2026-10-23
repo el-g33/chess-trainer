@@ -23,8 +23,17 @@
         document.documentElement.dataset.pieces = pieces || theme;
         var bars = { classic: "#fafafa", ember: "#16181e", stone: "#9a908a", violet: "#33365e" };
         document.querySelector('meta[name="theme-color"]').setAttribute("content", bars[theme] || "#9a908a");
+        // the theme's background straight away, while the page waits for its styles
+        document.documentElement.style.background = bars[theme] || "#9a908a";
       })();
     </script>
+    <!-- Show nothing (just the theme's background) until the app's styles are
+         in, rather than a bare, unstyled page for a moment. If something goes
+         wrong, the page shows anyway after a few seconds. -->
+    <style>
+      html:not(.styled) body { visibility: hidden; animation: show-anyway 0s 3s forwards; }
+      @keyframes show-anyway { to { visibility: visible; } }
+    </style>
     <!-- Installable: add to the home screen, opens full-screen, works offline -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
