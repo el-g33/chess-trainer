@@ -8,16 +8,20 @@
 // analysed again for longer before the rating is final (requestDeep).
 import { normalizeMove, type Chess } from "chessops/chess";
 import type { NormalMove } from "chessops/types";
-import { parseUci } from "chessops/util";
+import { makeSquare, makeUci, parseUci } from "chessops/util";
 
 import type { Score } from "./coach";
 import { Engine, type AnalysisLine } from "./engine";
-import { fenOf, isDrawnPosition, type Evaluation } from "./review";
+import { fenOf, isDrawnPosition, winningChance, type Evaluation } from "./review";
+
+// Taking an offered piece is "poisoned" when it leaves the taker this much
+// worse (in winning chance) than their best reply
+const POISON_DROP = 15;
 
 // How long Stockfish thinks about each position (as the desktop's EVAL_THINK_TIME)
 const THINK_TIME = 0.4;
 // ...and for the second look at positions behind a Mistake, Blunder or Miss
-const DEEP_TIME = 2.0;
+const DEEP_TIME = 3.0;
 
 export class Analyser {
   readonly evals = new Map<string, Evaluation>();
@@ -25,6 +29,8 @@ export class Analyser {
   private engine?: Engine;
   private wanted: Chess[] = [];
   private deepWanted: Chess[] = [];
+  private deepMoves: DeepMove[] = [];
+  private readonly poisoned = new Set<string>(); // "fen uci" of moves offering a piece that can't be taken
   private running = false;
 
   /** Called after each position Stockfish finishes. */
@@ -40,6 +46,20 @@ export class Analyser {
   requestDeep(positions: Chess[]) {
     this.deepWanted = positions.filter((p) => !p.isEnd() && !isDrawnPosition(p) && !this.deepDone.has(fenOf(p)));
     if (!this.running) void this.run();
+  }
+
+  /** Moves to look at again, the fair way: the best move and the played
+   *  move scored in the same search from the position before, so both are
+   *  judged at the same depth. (Two separate searches - before and after -
+   *  can disagree enough to turn a good move into an "inaccuracy".) */
+  requestDeepMoves(moves: DeepMove[]) {
+    this.deepMoves = moves.filter((m) => !m.after.isEnd() && !isDrawnPosition(m.after) && !this.deepDone.has(fenOf(m.after)));
+    if (!this.running) void this.run();
+  }
+
+  /** Does this move offer a piece the opponent can't safely take? */
+  isPoisoned(before: Chess, move: NormalMove): boolean {
+    return this.poisoned.has(`${fenOf(before)} ${makeUci(move)}`);
   }
 
   /** Has this position had its second, longer look? */
@@ -70,6 +90,41 @@ export class Analyser {
           this.onUpdate();
           continue;
         }
+        const pending = this.deepMoves.find((m) => !this.deepDone.has(fenOf(m.after)));
+        if (pending) {
+          const beforeFen = fenOf(pending.before);
+          const afterFen = fenOf(pending.after);
+          if (!this.deepDone.has(beforeFen)) {
+            const lines = await this.engine.analyse(beforeFen, DEEP_TIME * 1000, 2);
+            this.evals.set(beforeFen, toEvaluation(pending.before, lines));
+            this.deepDone.add(beforeFen);
+          }
+          // the played move, searched from the same position for the same time
+          const [played] = await this.engine.analyse(beforeFen, DEEP_TIME * 1000, 1, [standardUci(pending.before, pending.move)]);
+          const previous = this.evals.get(afterFen);
+          if (played) this.evals.set(afterFen, { ...(previous ?? { best: undefined }), score: lineScore(pending.before, played) });
+          // A piece offered up: what happens if they take it?
+          if (pending.offered !== undefined && previous) {
+            const takes: string[] = [];
+            for (const [from, dests] of pending.after.allDests()) {
+              if (!dests.has(pending.offered)) continue;
+              const pawn = pending.after.board.get(from)?.role === "pawn";
+              const last = (pending.offered >> 3) === 0 || (pending.offered >> 3) === 7;
+              takes.push(makeSquare(from) + makeSquare(pending.offered) + (pawn && last ? "q" : ""));
+            }
+            if (takes.length) {
+              const [taking] = await this.engine.analyse(afterFen, DEEP_TIME * 1000, 1, takes);
+              const taker = pending.after.turn;
+              const best = winningChance(previous.score, taker);
+              if (taking && best - winningChance(lineScore(pending.after, taking), taker) >= POISON_DROP) {
+                this.poisoned.add(`${beforeFen} ${makeUci(pending.move)}`);
+              }
+            }
+          }
+          this.deepDone.add(afterFen);
+          this.onUpdate();
+          continue;
+        }
         const deep = this.deepWanted.find((p) => !this.deepDone.has(fenOf(p)));
         if (!deep) break;
         const fen = fenOf(deep);
@@ -82,6 +137,26 @@ export class Analyser {
       this.running = false;
     }
   }
+}
+
+/** A move to look at again: the position before, the move, the position
+ *  after, and the square of a piece it offers up (if any). */
+export interface DeepMove {
+  before: Chess;
+  move: NormalMove;
+  after: Chess;
+  offered?: number;
+}
+
+/** A move as Stockfish writes it (castling as the king's two-square step). */
+function standardUci(position: Chess, move: NormalMove): string {
+  const piece = position.board.get(move.from);
+  const target = position.board.get(move.to);
+  if (piece?.role === "king" && target?.role === "rook" && target.color === piece.color) {
+    const file = move.to > move.from ? 6 : 2;
+    return makeSquare(move.from) + makeSquare((move.from & ~7) + file);
+  }
+  return makeUci(move);
 }
 
 /** A line's score from White's point of view (Stockfish gives it for the side to move). */

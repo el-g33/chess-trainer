@@ -19,7 +19,7 @@ import "@lichess-org/chessground/assets/chessground.base.css";
 import "./style.css";
 import "./themes.css";
 import "./layout.css";
-import { Analyser, lineMove, lineScore } from "./analyser";
+import { Analyser, lineMove, lineScore, type DeepMove } from "./analyser";
 import { avatarSvg, moodForRating, type Mood } from "./avatar";
 import { drawIcons, icon } from "./icons";
 import { enhanceSelects, syncDropdowns } from "./dropdown";
@@ -2430,7 +2430,9 @@ async function showWhatYouGet() {
 
 let replaying = false;
 let replayStepping = false; // the replay itself is moving (not you)
-const REPLAY_STOPS = new Set(["Mistake", "Blunder", "Miss", "Missed Win"]);
+const REPLAY_STOPS = new Set(["Brilliant", "Inaccuracy", "Mistake", "Blunder", "Miss", "Missed Win"]);
+const REPLAY_MOVE_MS = 900; // an ordinary move, then the next
+const REPLAY_WAIT_MS = 6000; // the longest it waits for a move's rating
 const canReplay = () => !demo && reviewing && game.length > 0;
 
 function toggleReplay() {
@@ -2450,7 +2452,8 @@ function toggleReplay() {
   setTimeout(replayNext, 400);
 }
 
-/** The next move; the one after follows once the coach has spoken (onSpoken). */
+/** The next move. Ordinary moves go by quickly; it stops on a brilliant move
+ *  or an inaccuracy, mistake, miss or blunder, so it can be looked at. */
 function replayNext() {
   if (!replaying) return;
   const ply = currentPly();
@@ -2462,6 +2465,24 @@ function replayNext() {
   replayStepping = true;
   goTo(ply + 1);
   replayStepping = false;
+  const shownAt = performance.now();
+  const check = () => {
+    if (!replaying || currentPly() !== ply + 1) return;
+    const review = lastReviews[ply];
+    const waited = performance.now() - shownAt;
+    // wait for the rating (Stockfish may still be on it), but not for ever
+    if (!review && ratingsOn() && waited < REPLAY_WAIT_MS) {
+      setTimeout(check, 200);
+      return;
+    }
+    if (review && REPLAY_STOPS.has(review.rating)) {
+      replaying = false;
+      refresh();
+      return;
+    }
+    setTimeout(replayNext, Math.max(0, REPLAY_MOVE_MS - waited));
+  };
+  setTimeout(check, 200);
 }
 
 function onNavPlay() {
@@ -2695,8 +2716,9 @@ function openingInfo(): OpeningInfo[] {
 }
 
 // Ratings this harsh get a second, longer look by Stockfish before they're final
-const HARSH = new Set(["Mistake", "Blunder", "Miss", "Missed Win"]);
+const HARSH = new Set(["Inaccuracy", "Mistake", "Blunder", "Miss", "Missed Win"]);
 let deepNeeded: Chess[] = []; // positions waiting for that second look
+let deepMoves: DeepMove[] = []; // moves waiting for it
 
 // A drop in the mover's winning chance this big (lichess's measure) also gets the second look
 const BIG_DROP = 8;
@@ -2705,13 +2727,15 @@ function rateMove(before: Chess, move: NormalMove): Review | undefined {
   const key = `${fenOf(before)} ${makeUci(move)}`;
   let review = reviewCache.get(key);
   if (!review) {
-    review = reviewMove(before, move, analyser.evals);
+    review = reviewMove(before, move, analyser.evals, analyser.isPoisoned(before, move));
     if (!review) return undefined;
     const after = positionAfter(before, move);
     const checked = analyser.isDeep(before) && analyser.isDeep(after);
-    const suspicious = HARSH.has(review.rating) || bigDrop(before, after);
+    // a piece offered up may be a brilliant sacrifice the quick look misjudged
+    const offered = isSacrifice(before, move, after);
+    const suspicious = HARSH.has(review.rating) || bigDrop(before, after) || offered !== undefined;
     if (!suspicious || checked) reviewCache.set(key, review);
-    else deepNeeded.push(before, after);
+    else deepMoves.push({ before, move, after, offered });
   }
   return review;
 }
@@ -2735,6 +2759,7 @@ function bigDrop(before: Chess, after: Chess): boolean {
  *  finished, and when ratings are off). */
 function moveReviews(): (Review | undefined)[] {
   deepNeeded = [];
+  deepMoves = [];
   if (!ratingsOn()) return game.moves.map(() => undefined);
   const reviews = addMisses(game.moves.map((played, i) => rateMove(game.positionAt(i), played.move)));
   // A Miss is decided after the ratings, so make sure its positions get the second look too
@@ -2778,6 +2803,7 @@ function requestEval() {
     wanted.push(...all);
     wanted.push(...brilliantCandidates(all.slice(0, -1), analyser.evals));
     analyser.requestDeep(deepNeeded);
+    analyser.requestDeepMoves(deepMoves);
   }
   analyser.request(wanted);
 }
@@ -3591,17 +3617,6 @@ function onSpoken() {
     } else {
       scheduleDemo(500);
     }
-  }
-  if (replaying) {
-    const ply = currentPly();
-    const review = ply ? lastReviews[ply - 1] : undefined;
-    if (ply && ratingsOn() && !review) return; // still being checked: its verdict comes next
-    if (review && REPLAY_STOPS.has(review.rating)) {
-      replaying = false; // stop on a mistake, so it can be looked at
-      refresh();
-      return;
-    }
-    setTimeout(replayNext, 300);
   }
 }
 

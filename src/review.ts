@@ -42,6 +42,15 @@ const RATINGS: [number, string, string][] = [
 ];
 
 const GREAT_GAP = 12; // "only good move": the next best is at least this much worse
+// A sacrifice is brilliant when it's this close to the best move (in winning
+// chance)... and leaves the mover at least roughly level - a little more
+// generous than "Excellent and never worse", nearer to how chess.com judges it
+export const BRILLIANT_LOSS = 3.5;
+export const BRILLIANT_FLOOR = 45;
+// A "poisoned" offer - a piece the opponent can't take without losing badly -
+// is brilliant as long as the move isn't a real mistake
+const POISONED_LOSS = 10;
+const POISONED_FLOOR = 40;
 const WINNING = 70; // winning chances this high count as a winning position
 const CLEARLY_WINNING = 90; // ...and this high as a decisive one
 
@@ -137,7 +146,7 @@ export function isSacrifice(before: Chess, move: NormalMove, after: Chess): Squa
 
 /** Rate one move, or undefined if Stockfish hasn't looked at the positions yet.
  *  `evals` holds Stockfish's results keyed by position (see fenOf). */
-export function reviewMove(before: Chess, move: NormalMove, evals: Map<string, Evaluation>): Review | undefined {
+export function reviewMove(before: Chess, move: NormalMove, evals: Map<string, Evaluation>, poisoned = false): Review | undefined {
   const after = afterMove(before, move);
   const mover = before.turn;
   const played = makeSan(before, move);
@@ -167,8 +176,9 @@ export function reviewMove(before: Chess, move: NormalMove, evals: Map<string, E
   else [, rating, symbol] = RATINGS.find(([limit]) => loss < limit)!;
 
   // Special ratings for good moves
-  const sacrifice = rating === "Best" || rating === "Excellent" ? isSacrifice(before, move, after) : undefined;
-  if (sacrifice !== undefined && chanceAfter >= 50 && chanceBefore < 97) {
+  const near = loss < BRILLIANT_LOSS || (poisoned && loss < POISONED_LOSS);
+  const sacrifice = rating !== "Forced" && near ? isSacrifice(before, move, after) : undefined;
+  if (sacrifice !== undefined && chanceAfter >= (poisoned ? POISONED_FLOOR : BRILLIANT_FLOOR) && chanceBefore < 97) {
     [rating, symbol] = ["Brilliant", "!!"];
   } else if (rating === "Best" && gap >= GREAT_GAP && !isCapture(before, move) && chanceAfter < 98) {
     [rating, symbol] = ["Great", "!"];

@@ -11,12 +11,12 @@ import { makeSquare, makeUci } from "chessops/util";
 
 import { afterMove, describeMove, variationSan } from "./coach";
 import { moveTactics } from "./ideas";
-import { fenOf as fenKey, isSacrifice, reviewMove, winningChance, type Evaluation } from "./review";
+import { BRILLIANT_FLOOR, BRILLIANT_LOSS, fenOf as fenKey, isSacrifice, reviewMove, winningChance, type Evaluation } from "./review";
 import type { CoachEngine } from "./strategy";
 
 const THINK = 1.5; // seconds
 const LINES = 3; // Stockfish's top moves looked at
-const NEARLY_BEST = 2; // points of winning chance (an "Excellent" move or better)
+const NEARLY_BEST = BRILLIANT_LOSS; // points of winning chance, as in the rating
 
 export interface Brilliant {
   found: boolean;
@@ -42,7 +42,7 @@ export async function findBrilliant(engine: CoachEngine, position: Chess): Promi
     const after = afterMove(position, move);
     const square = isSacrifice(position, move, after);
     // As in the rating: it must not leave you worse, and you mustn't already be completely winning
-    if (square === undefined || chance < 50 || bestChance >= 97) continue;
+    if (square === undefined || chance < BRILLIANT_FLOOR || bestChance >= 97) continue;
     const piece = after.board.get(square)!;
     const san = makeSan(position, move);
     const tactics = moveTactics(position, move, me);
