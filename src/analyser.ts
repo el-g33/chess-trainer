@@ -1,6 +1,9 @@
-// Stockfish scores positions in the background, one at a time, so every
-// move of the game can be rated - like the desktop app's eval thread. The
-// list of wanted positions can change at any time (the first ones go first).
+// Stockfish scores positions in the background so every move of the game
+// can be rated - like the desktop app's eval thread. Several copies of
+// Stockfish work side by side (one per spare processor core, up to three),
+// each taking the next position nobody is working on, so a whole game is
+// checked in a fraction of the time. The list of wanted positions can change
+// at any time (the first ones go first).
 //
 // A second, longer look: the browser's Stockfish is the light version and
 // thinks briefly, so it can miss a deep idea (e.g. a mating sacrifice) and
@@ -22,16 +25,27 @@ const POISON_DROP = 15;
 const THINK_TIME = 0.4;
 // ...and for the second look at positions behind a Mistake, Blunder or Miss
 const DEEP_TIME = 3.0;
+// ...and for what happens if an offered piece is taken
+const POISON_TIME = 2.0;
+
+// How many copies of Stockfish work at once: the spare cores, at most three
+const POOL = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 2) - 1));
+
+type Job =
+  | { kind: "eval"; position: Chess; fens: string[] }
+  | { kind: "move"; move: DeepMove; fens: string[] }
+  | { kind: "deep"; position: Chess; fens: string[] };
 
 export class Analyser {
   readonly evals = new Map<string, Evaluation>();
   private readonly deepDone = new Set<string>();
-  private engine?: Engine;
+  private readonly engines: Engine[] = [];
+  private readonly claimed = new Set<string>(); // positions a copy of Stockfish is working on
+  private readonly busy = new Set<Engine>(); // the copies working right now
   private wanted: Chess[] = [];
   private deepWanted: Chess[] = [];
   private deepMoves: DeepMove[] = [];
   private readonly poisoned = new Set<string>(); // "fen uci" of moves offering a piece that can't be taken
-  private running = false;
 
   /** Called after each position Stockfish finishes. */
   constructor(private onUpdate: () => void) {}
@@ -39,13 +53,13 @@ export class Analyser {
   /** Positions to score, most urgent first. Replaces the previous list. */
   request(positions: Chess[]) {
     this.wanted = positions.filter((p) => !p.isEnd() && !isDrawnPosition(p));
-    if (!this.running) void this.run();
+    this.start();
   }
 
   /** Positions to look at again, for longer (after the normal ones). */
   requestDeep(positions: Chess[]) {
     this.deepWanted = positions.filter((p) => !p.isEnd() && !isDrawnPosition(p) && !this.deepDone.has(fenOf(p)));
-    if (!this.running) void this.run();
+    this.start();
   }
 
   /** Moves to look at again, the fair way: the best move and the played
@@ -54,7 +68,7 @@ export class Analyser {
    *  can disagree enough to turn a good move into an "inaccuracy".) */
   requestDeepMoves(moves: DeepMove[]) {
     this.deepMoves = moves.filter((m) => !m.after.isEnd() && !isDrawnPosition(m.after) && !this.deepDone.has(fenOf(m.after)));
-    if (!this.running) void this.run();
+    this.start();
   }
 
   /** Does this move offer a piece the opponent can't safely take? */
@@ -77,65 +91,99 @@ export class Analyser {
     return { done, total: fens.size + deep.size };
   }
 
-  private async run() {
-    this.running = true;
+  /** Put idle copies of Stockfish to work, while there's work for them. */
+  private start() {
+    while (this.peek()) {
+      let engine = this.engines.find((e) => !this.busy.has(e));
+      if (!engine) {
+        if (this.engines.length >= POOL) break;
+        engine = new Engine();
+        this.engines.push(engine);
+      }
+      this.busy.add(engine);
+      void this.work(engine); // claims its first job before returning here
+    }
+  }
+
+  /** The next job nobody is working on: the wanted positions first (in
+   *  order), then the second looks at moves, then at positions. */
+  private peek(): Job | undefined {
+    const free = (fens: string[]) => fens.every((fen) => !this.claimed.has(fen));
+    for (const position of this.wanted) {
+      const fen = fenOf(position);
+      if (!this.evals.has(fen) && free([fen])) return { kind: "eval", position, fens: [fen] };
+    }
+    for (const move of this.deepMoves) {
+      const fens = [fenOf(move.before), fenOf(move.after)];
+      if (!this.deepDone.has(fens[1]) && free(fens)) return { kind: "move", move, fens };
+    }
+    for (const position of this.deepWanted) {
+      const fen = fenOf(position);
+      if (!this.deepDone.has(fen) && free([fen])) return { kind: "deep", position, fens: [fen] };
+    }
+    return undefined;
+  }
+
+  private async work(engine: Engine) {
     try {
-      for (;;) {
-        this.engine ??= new Engine();
-        const position = this.wanted.find((p) => !this.evals.has(fenOf(p)));
-        if (position) {
-          const fen = fenOf(position);
-          const lines = await this.engine.analyse(fen, THINK_TIME * 1000, 2);
-          if (!this.evals.has(fen) || !this.deepDone.has(fen)) this.evals.set(fen, toEvaluation(position, lines));
-          this.onUpdate();
-          continue;
+      for (let job = this.peek(); job; job = this.peek()) {
+        for (const fen of job.fens) this.claimed.add(fen);
+        try {
+          await this.do(engine, job);
+        } finally {
+          for (const fen of job.fens) this.claimed.delete(fen);
         }
-        const pending = this.deepMoves.find((m) => !this.deepDone.has(fenOf(m.after)));
-        if (pending) {
-          const beforeFen = fenOf(pending.before);
-          const afterFen = fenOf(pending.after);
-          if (!this.deepDone.has(beforeFen)) {
-            const lines = await this.engine.analyse(beforeFen, DEEP_TIME * 1000, 2);
-            this.evals.set(beforeFen, toEvaluation(pending.before, lines));
-            this.deepDone.add(beforeFen);
-          }
-          // the played move, searched from the same position for the same time
-          const [played] = await this.engine.analyse(beforeFen, DEEP_TIME * 1000, 1, [standardUci(pending.before, pending.move)]);
-          const previous = this.evals.get(afterFen);
-          if (played) this.evals.set(afterFen, { ...(previous ?? { best: undefined }), score: lineScore(pending.before, played) });
-          // A piece offered up: what happens if they take it?
-          if (pending.offered !== undefined && previous) {
-            const takes: string[] = [];
-            for (const [from, dests] of pending.after.allDests()) {
-              if (!dests.has(pending.offered)) continue;
-              const pawn = pending.after.board.get(from)?.role === "pawn";
-              const last = (pending.offered >> 3) === 0 || (pending.offered >> 3) === 7;
-              takes.push(makeSquare(from) + makeSquare(pending.offered) + (pawn && last ? "q" : ""));
-            }
-            if (takes.length) {
-              const [taking] = await this.engine.analyse(afterFen, DEEP_TIME * 1000, 1, takes);
-              const taker = pending.after.turn;
-              const best = winningChance(previous.score, taker);
-              if (taking && best - winningChance(lineScore(pending.after, taking), taker) >= POISON_DROP) {
-                this.poisoned.add(`${beforeFen} ${makeUci(pending.move)}`);
-              }
-            }
-          }
-          this.deepDone.add(afterFen);
-          this.onUpdate();
-          continue;
-        }
-        const deep = this.deepWanted.find((p) => !this.deepDone.has(fenOf(p)));
-        if (!deep) break;
-        const fen = fenOf(deep);
-        const lines = await this.engine.analyse(fen, DEEP_TIME * 1000, 2);
-        this.evals.set(fen, toEvaluation(deep, lines));
-        this.deepDone.add(fen);
         this.onUpdate();
       }
     } finally {
-      this.running = false;
+      this.busy.delete(engine);
     }
+  }
+
+  private async do(engine: Engine, job: Job) {
+    if (job.kind === "eval") {
+      const fen = job.fens[0];
+      const lines = await engine.analyse(fen, THINK_TIME * 1000, 2);
+      if (!this.evals.has(fen) || !this.deepDone.has(fen)) this.evals.set(fen, toEvaluation(job.position, lines));
+      return;
+    }
+    if (job.kind === "deep") {
+      const fen = job.fens[0];
+      const lines = await engine.analyse(fen, DEEP_TIME * 1000, 2);
+      this.evals.set(fen, toEvaluation(job.position, lines));
+      this.deepDone.add(fen);
+      return;
+    }
+    const pending = job.move;
+    const [beforeFen, afterFen] = job.fens;
+    if (!this.deepDone.has(beforeFen)) {
+      const lines = await engine.analyse(beforeFen, DEEP_TIME * 1000, 2);
+      this.evals.set(beforeFen, toEvaluation(pending.before, lines));
+      this.deepDone.add(beforeFen);
+    }
+    // the played move, searched from the same position for the same time
+    const [played] = await engine.analyse(beforeFen, DEEP_TIME * 1000, 1, [standardUci(pending.before, pending.move)]);
+    const previous = this.evals.get(afterFen);
+    if (played) this.evals.set(afterFen, { ...(previous ?? { best: undefined }), score: lineScore(pending.before, played) });
+    // A piece offered up: what happens if they take it?
+    if (pending.offered !== undefined && previous) {
+      const takes: string[] = [];
+      for (const [from, dests] of pending.after.allDests()) {
+        if (!dests.has(pending.offered)) continue;
+        const pawn = pending.after.board.get(from)?.role === "pawn";
+        const last = (pending.offered >> 3) === 0 || (pending.offered >> 3) === 7;
+        takes.push(makeSquare(from) + makeSquare(pending.offered) + (pawn && last ? "q" : ""));
+      }
+      if (takes.length) {
+        const [taking] = await engine.analyse(afterFen, POISON_TIME * 1000, 1, takes);
+        const taker = pending.after.turn;
+        const best = winningChance(previous.score, taker);
+        if (taking && best - winningChance(lineScore(pending.after, taking), taker) >= POISON_DROP) {
+          this.poisoned.add(`${beforeFen} ${makeUci(pending.move)}`);
+        }
+      }
+    }
+    this.deepDone.add(afterFen);
   }
 }
 

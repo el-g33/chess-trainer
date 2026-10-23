@@ -1186,9 +1186,15 @@ function jumpToGrade(colour: Color, grade: string, list: (Review | undefined)[])
   gradeJump.next++;
   currentView = "board";
   stepper = null;
-  goTo(ply);
-  explainMove(ply, list[ply - 1]!);
+  // the position before the move first, then the move plays in with its explanation
+  goTo(ply - 1);
+  const review = list[ply - 1]!;
+  setTimeout(() => {
+    if (currentPly() === ply - 1 && !stepper) explainMove(ply, review);
+  }, GRADE_JUMP_PAUSE);
 }
+
+const GRADE_JUMP_PAUSE = 1000; // ms on the position before the move
 
 /** Start going through the game, from the first move. */
 function startReview() {
