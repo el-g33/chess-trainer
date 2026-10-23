@@ -621,7 +621,6 @@ type HomeChoice = "play" | "practice" | "analysis" | "train";
 
 let homeChoice: HomeChoice | null = null;
 let greeting = "";
-let practiceTab: "learn" | "match" = "learn";
 let learnColour: Color = "white";
 let matchColour: Color = "white"; // your side in a practice match
 let learnOpening: string | null = null;
@@ -644,9 +643,9 @@ function pickGreeting(): string {
 
 const MODE_LINES: Record<HomeChoice, string> = {
   play: "A real game against Stockfish. No hints until it's over, then I'll go through it with you.",
-  practice: "Learn an opening, or play a game with me helping along the way.",
+  practice: "A game against Stockfish with me helping along the way: ratings, hints and plans.",
   analysis: "Got a game from lichess or chess.com? Let's look at it together.",
-  train: "Middlegame and endgame: short lessons, puzzles for every level, and your own positions to play out with me.",
+  train: "Openings, middlegame and endgame: short lessons, puzzles for every level, and your own positions to play out with me.",
 };
 
 // The time controls under each icon (values as in the clock's PRESETS)
@@ -725,13 +724,7 @@ function drawHome() {
   chips.hidden = !TC_KINDS[kind].length;
   $("tc-custom").hidden = timeControlBox.value !== "custom";
 
-  // Practice
-  for (const button of menu.querySelectorAll<HTMLButtonElement>(".tabs button")) {
-    const on = button.dataset.tab === practiceTab;
-    button.classList.toggle("on", on);
-    button.setAttribute("aria-selected", String(on));
-  }
-  for (const panel of menu.querySelectorAll<HTMLElement>(".tab-panel")) panel.hidden = panel.dataset.panel !== practiceTab;
+  // Training: the openings (White or Black)
   for (const button of menu.querySelectorAll<HTMLButtonElement>("#learn-colour button")) {
     button.classList.toggle("on", button.dataset.colour === learnColour);
   }
@@ -747,10 +740,12 @@ function drawHome() {
     tile.querySelector(".tile-note")!.textContent = opening.gambit ? "Gambit and traps" : "";
     tile.addEventListener("click", () => {
       learnOpening = d.opening;
-      drawHome();
+      gameOrigin = "learn";
+      startDemo(d);
     });
     return tile;
   }));
+  // Practice match
   // Your side decides the openings on offer: yours for your side, Stockfish's for the other
   for (const button of menu.querySelectorAll<HTMLButtonElement>("#match-colour button")) {
     button.classList.toggle("on", button.dataset.colour === matchColour);
@@ -763,7 +758,7 @@ function drawHome() {
     if (box.selectedOptions[0]?.hidden) box.selectedIndex = 0;
   }
   $("practice-note").textContent = stickinessNote();
-  const practiceReady = practiceTab === "learn" ? learnOpening !== null : myOpeningBox.value !== NO_OPENING;
+  const practiceReady = myOpeningBox.value !== NO_OPENING;
   menu.querySelector<HTMLButtonElement>('[data-start="practice"]')!.disabled = !practiceReady;
 
   // Analysis
@@ -798,12 +793,6 @@ function setupHome() {
       const presets = TC_KINDS[button.dataset.kind!];
       if (tcKindOf(timeControlBox.value) !== button.dataset.kind) timeControlBox.value = presets[0]?.[0] ?? "none";
       saveSettings();
-      drawHome();
-    });
-  }
-  for (const button of menu.querySelectorAll<HTMLButtonElement>(".tabs button")) {
-    button.addEventListener("click", () => {
-      practiceTab = button.dataset.tab as "learn" | "match";
       drawHome();
     });
   }
@@ -848,11 +837,6 @@ function setMode(value: Mode) {
 }
 
 function startFromHome(kind: "play" | "practice") {
-  if (kind === "practice" && practiceTab === "learn") {
-    const chosen = demoFor(learnOpening ?? undefined);
-    if (chosen) startDemo(chosen);
-    return;
-  }
   gameOrigin = kind;
   setMode(kind);
   opponentBox.selectedIndex = 0;
@@ -1606,6 +1590,7 @@ const PUZZLE_LEVELS: [PuzzleLevel, string][] = [["beginner", "Beginner"], ["club
 type PuzzleRow = [id: string, fen: string, moves: string, rating: number, themes: string];
 
 let trainPhase: TrainPhase = "middlegame";
+let trainTab: "openings" | TrainPhase = "openings"; // the tab on screen (openings, or a phase)
 let puzzleLevel: PuzzleLevel = "club";
 const puzzleFiles = new Map<TrainPhase, Promise<Record<PuzzleLevel, PuzzleRow[]>>>();
 
@@ -1648,10 +1633,15 @@ function loadPuzzles(phase: TrainPhase) {
 
 function drawTrainScreen() {
   for (const tab of menu.querySelectorAll<HTMLButtonElement>("[data-train-tab]")) {
-    const on = tab.dataset.trainTab === trainPhase;
+    const on = tab.dataset.trainTab === trainTab;
     tab.classList.toggle("on", on);
     tab.setAttribute("aria-selected", String(on));
   }
+  // Openings: the lessons by colour; the phases: principles and puzzles. Your position is on every tab.
+  const openings = trainTab === "openings";
+  $("train-openings").hidden = !openings;
+  $("train-principles").hidden = openings;
+  $("train-puzzles").hidden = openings;
   const lessons = LESSONS[trainPhase];
   $("principles-note").textContent = lessons.length
     ? `${lessons.length} short lessons on how to play the ${trainPhase}.`
@@ -1673,7 +1663,8 @@ function drawTrainScreen() {
 function setupTrain() {
   for (const tab of menu.querySelectorAll<HTMLButtonElement>("[data-train-tab]")) {
     tab.addEventListener("click", () => {
-      trainPhase = tab.dataset.trainTab as TrainPhase;
+      trainTab = tab.dataset.trainTab as "openings" | TrainPhase;
+      if (trainTab !== "openings") trainPhase = trainTab;
       $("lesson-list").hidden = true;
       $("train-cards").hidden = false;
       drawTrainScreen();
@@ -2672,7 +2663,6 @@ function onDemoTry() {
   refresh();
   showMenu();
   homeChoice = "practice";
-  practiceTab = "match";
   showScreen("practice");
 }
 
@@ -4683,19 +4673,20 @@ const inProgress = () => match !== null && game.length > 0 && !game.outcome();
 async function onNewGame() {
   if (inProgress() && !(await message("New game?", "Are you sure? This game will end.", true))) return;
   const learning = demo ? demo.demo.opening : null;
-  const screen: HomeChoice | null = gameOrigin === "learn" ? "practice" : gameOrigin;
+  const screen: HomeChoice | null = gameOrigin === "learn" ? "train" : gameOrigin;
   if (screen === "train") $("lesson-list").hidden = true;
   showMenu();
   if (!screen) return;
   homeChoice = screen;
-  if (screen === "practice") {
-    practiceTab = learning ? "learn" : "match";
+  if (gameOrigin === "learn") {
+    trainTab = "openings";
     if (learning) {
       learnOpening = learning;
       learnColour = REPERTOIRE.find((o) => o.name === learning)?.colour ?? "white";
     }
   }
   showScreen(screen);
+  drawTrainScreen();
 }
 
 /** Home: the coach's welcome. */

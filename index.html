@@ -70,7 +70,7 @@
           <p id="home-bubble" class="home-bubble" aria-live="polite"></p>
           <div class="mode-choices" role="radiogroup" aria-label="What would you like to do?">
             <button type="button" class="mode-choice" data-choice="play" role="radio" aria-checked="false"><span class="mc-icon" data-ico="knight" data-ico-size="22"></span>Play against the computer</button>
-            <button type="button" class="mode-choice" data-choice="practice" role="radio" aria-checked="false"><span class="mc-icon" data-ico="school" data-ico-size="22"></span>Practice mode</button>
+            <button type="button" class="mode-choice" data-choice="practice" role="radio" aria-checked="false"><span class="mc-icon" data-ico="school" data-ico-size="22"></span>Practice match</button>
             <button type="button" class="mode-choice" data-choice="analysis" role="radio" aria-checked="false"><span class="mc-icon" data-ico="search" data-ico-size="22"></span>Game analysis</button>
             <button type="button" class="mode-choice" data-choice="train" role="radio" aria-checked="false"><span class="mc-icon" data-ico="puzzle" data-ico-size="22"></span>Training</button>
           </div>
@@ -112,21 +112,10 @@
         <section class="screen" data-screen="practice" hidden>
           <div class="setup-head">
             <button type="button" class="home-link setup-back"><span data-ico="home" data-ico-size="18"></span> Home</button>
-            <h2>Practice</h2>
+            <h2>Practice match</h2>
             <button type="button" class="setup-start accent" data-start="practice" disabled>Start</button>
           </div>
-          <div class="tabs" role="tablist">
-            <button type="button" role="tab" data-tab="learn">Learn an opening</button>
-            <button type="button" role="tab" data-tab="match">Practice match</button>
-          </div>
-          <div class="tab-panel" data-panel="learn">
-            <div class="seg" id="learn-colour">
-              <button type="button" data-colour="white"><span class="seg-icon">♔</span>White</button>
-              <button type="button" data-colour="black"><span class="seg-icon">♚</span>Black</button>
-            </div>
-            <div class="tiles" id="opening-tiles"></div>
-          </div>
-          <div class="tab-panel" data-panel="match" hidden>
+          <div class="match-panel">
             <div class="seg" id="match-colour">
               <button type="button" data-colour="white"><span class="seg-icon">♔</span>White</button>
               <button type="button" data-colour="black"><span class="seg-icon">♚</span>Black</button>
@@ -172,15 +161,23 @@
             <span></span>
           </div>
           <div class="tabs" role="tablist">
+            <button type="button" role="tab" data-train-tab="openings">Openings</button>
             <button type="button" role="tab" data-train-tab="middlegame">Middlegame</button>
             <button type="button" role="tab" data-train-tab="endgame">Endgame</button>
           </div>
           <div id="train-cards" class="train-cards">
+            <div id="train-openings" class="train-openings" hidden>
+              <div class="seg" id="learn-colour">
+                <button type="button" data-colour="white"><span class="seg-icon">♔</span>White</button>
+                <button type="button" data-colour="black"><span class="seg-icon">♚</span>Black</button>
+              </div>
+              <div class="tiles" id="opening-tiles"></div>
+            </div>
             <button type="button" class="train-card" id="train-principles">
               <span class="tc-ico" data-ico="book" data-ico-size="24"></span>
               <span><b>Principles</b><small id="principles-note"></small></span>
             </button>
-            <div class="train-card puzzles-card">
+            <div class="train-card puzzles-card" id="train-puzzles">
               <span class="tc-ico" data-ico="puzzle" data-ico-size="24"></span>
               <span class="pc-body"><b>Puzzles</b><small>Choose a level, then solve as many as you like.</small>
                 <span class="chips" id="puzzle-levels"></span>
@@ -189,7 +186,7 @@
             </div>
             <button type="button" class="train-card" id="train-position">
               <span class="tc-ico" data-ico="board" data-ico-size="24"></span>
-              <span><b>Your position</b><small>Set up or paste a position. I'll take a side and explain the best moves and plans.</small></span>
+              <span><b>Your position</b><small>Set up or paste any position and play it out with me.</small></span>
             </button>
           </div>
           <div id="lesson-list" class="lesson-list" hidden></div>

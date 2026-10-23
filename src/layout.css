@@ -314,7 +314,8 @@ button.round:disabled {
   font-weight: 600;
 }
 
-.tab-panel {
+.tab-panel,
+.match-panel {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1886,4 +1887,12 @@ body.replay-on .nav-play {
 /* An opening's introduction: just the finished setup, no move list yet */
 body.demo-intro .move-strip {
   visibility: hidden;
+}
+
+/* Training, Openings tab: the colour switch and the opening tiles */
+.train-openings[hidden] {
+  display: none;
+}
+.train-openings .seg {
+  margin-bottom: 10px;
 }
