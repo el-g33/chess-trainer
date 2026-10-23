@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Coach outfits</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 16px; background: #f4efe9; color: #1c1c1c; }
+      .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 14px; }
+      .row h2 { width: 100%; margin: 6px 0 0; font-size: 1rem; }
+      figure { margin: 0; text-align: center; font-size: 0.75rem; }
+      .small { display: flex; gap: 8px; align-items: center; }
+    </style>
+  </head>
+  <body>
+    <h1>Coach: gestures and outfits</h1>
+    <p id="today"></p>
+    <div id="gallery"></div>
+    <script type="module">
+      import { avatarSvg, outfitFor } from "../src/avatar.ts";
+      const moods = ["wave", "talk", "happy", "think", "wow", "worried"];
+      const outfits = ["tee", "smart", "hoodie", "christmas", "newyear", "easter"];
+      document.getElementById("today").textContent = `Today's outfit: ${outfitFor()}`;
+      const gallery = document.getElementById("gallery");
+      for (const outfit of outfits) {
+        const row = document.createElement("div");
+        row.className = "row";
+        row.innerHTML = `<h2>${outfit}</h2>` +
+          moods.map((mood) => `<figure>${avatarSvg(mood, 96, outfit)}<figcaption>${mood}</figcaption></figure>`).join("") +
+          `<span class="small">${avatarSvg("talk", 46, outfit)}${avatarSvg("happy", 34, outfit)}</span>`;
+        gallery.append(row);
+      }
+    </script>
+  </body>
+</html>

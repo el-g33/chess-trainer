@@ -687,7 +687,7 @@ function stickinessNote(): string {
 
 function drawHome() {
   // Welcome
-  setFace($("home-face"), homeChoice ? "talk" : "happy", 96);
+  setFace($("home-face"), homeChoice ? "talk" : "wave", 96);
   $("home-bubble").textContent = homeChoice ? MODE_LINES[homeChoice] : greeting;
   for (const button of menu.querySelectorAll<HTMLButtonElement>(".mode-choice")) {
     const on = button.dataset.choice === homeChoice;
