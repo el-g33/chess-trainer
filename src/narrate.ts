@@ -135,8 +135,9 @@ function pick(options: string[], seed: number): string {
 /** The coach's verdict, in plain words, on the move that led from `before`
  *  to `after` (played by `mover`; the listener is `you`, or null for neither). */
 export function verdict(review: Review, before: Chess, after: Chess,
-  afterEval: Evaluation | undefined, you: Color | null, seed: number): string {
+  afterEval: Evaluation | undefined, you: Color | null, seed: number, neutral = false): string {
   const mover = before.turn;
+  if (neutral) return neutralVerdict(review, after, afterEval, mover);
   const mine = !you || you === mover;
   const them = !you ? (mover === "white" ? "Black" : "White") : mine ? "them" : "you";
   if (PRAISE[review.rating]) {
@@ -179,6 +180,44 @@ export function verdict(review: Review, before: Chess, after: Chess,
   };
   const line = pick(generic[review.rating] ?? ["Interesting choice."], seed);
   return mine ? line : line.replace("I'm afraid", "for them");
+}
+
+/** The verdict for someone watching (no "you"): "White has allowed Black to win the rook." */
+function neutralVerdict(review: Review, after: Chess, afterEval: Evaluation | undefined, mover: Color): string {
+  const me = mover === "white" ? "White" : "Black";
+  const other = mover === "white" ? "Black" : "White";
+  const praise: Record<string, string> = {
+    Brilliant: `A brilliant sacrifice by ${me}!`, Great: `A great move by ${me}.`, Best: `${me} found the best move.`,
+    Excellent: `A strong move by ${me}.`, Good: `A solid move by ${me}.`, Book: "A known opening move.", Forced: `That was ${me}'s only move.`,
+  };
+  if (praise[review.rating]) return praise[review.rating];
+  if (review.rating === "Missed Win") return `${me} had a winning move there.`;
+  if (review.rating === "Miss") return `${me} missed a chance to win material.`;
+  const reply = afterEval?.best;
+  const score = afterEval?.score;
+  if (score?.mate !== undefined && (mover === "white" ? score.mate < 0 : score.mate > 0)) return `${me} walks into a checkmate.`;
+  if (reply) {
+    const victim = after.board.get(reply.to);
+    const piece = after.board.get(reply.from);
+    if (victim && victim.color === mover && PIECE_VALUES[victim.role] >= 3) return `${me} has allowed ${other} to win the ${NAMES[victim.role]}.`;
+    const replyAfter = after.clone();
+    replyAfter.play(reply);
+    if (replyAfter.isCheck()) return `${me} has allowed ${other} to hit back with a check.`;
+    const hits = targets(replyAfter, reply.to);
+    if (piece && piece.role !== "pawn" && hits.length && !victim) {
+      const developing = (piece.color === "white" ? reply.from >> 3 === 0 : reply.from >> 3 === 7);
+      if (developing) return `${me} has let ${other} develop with tempo.`;
+      if (hits.length >= 2) return `${me} has allowed a fork.`;
+      return `${me} has allowed ${other} to attack the ${NAMES[hits[0]]}.`;
+    }
+    if (victim && victim.color === mover) return `${me} has given ${other} a free ${NAMES[victim.role]}.`;
+  }
+  const generic: Record<string, string> = {
+    Inaccuracy: `Playable, but ${me} had something stronger.`,
+    Mistake: `${me} hands over the advantage.`,
+    Blunder: `A big mistake by ${me}.`,
+  };
+  return generic[review.rating] ?? "Interesting choice.";
 }
 
 // ---------------------------------------------------------------------------

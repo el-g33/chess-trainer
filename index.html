@@ -446,6 +446,29 @@
     <!-- Help: About, and a tour of the screen you're on -->
     <div id="help-menu" class="help-menu" role="menu" hidden></div>
 
+    <!-- Before a review: Stockfish checks the whole game while a little animation plays -->
+    <div id="prep-screen" class="prep-screen" hidden>
+      <div class="prep-card">
+        <div id="prep-stage" class="prep-stage"></div>
+        <p id="prep-caption" class="prep-caption"></p>
+        <p class="prep-note">The review opens once every move has been checked.</p>
+        <button type="button" id="prep-back" class="soft">Back</button>
+      </div>
+    </div>
+
+    <!-- A game from chess.com or lichess: whose side are you on? -->
+    <dialog id="side-pick" class="settings-dialog">
+      <form method="dialog">
+        <h3 id="side-pick-title">Whose side are you on?</h3>
+        <p id="side-pick-note" class="setup-note"></p>
+        <div class="save-choices">
+          <button value="white" id="side-pick-white">I'm White</button>
+          <button value="black" id="side-pick-black">I'm Black</button>
+          <button value="neither">Neither, just watching</button>
+        </div>
+      </form>
+    </dialog>
+
     <!-- Save a game: copy the PGN text, or download a .pgn file -->
     <dialog id="save-dialog" class="settings-dialog">
       <form method="dialog">

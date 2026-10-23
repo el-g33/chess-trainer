@@ -63,6 +63,7 @@ import { LESSONS, type Lesson, type TrainPhase } from "./lessons";
 import { BANDS, likelyMoves, pickLikely, type Band, type LikelyMove } from "./explore";
 import { chainOf, whatYouGet, type Mark } from "./outlook";
 import { fitsIn, readingTime, splitToFit, Typer } from "./talk";
+import { startLoadAnimation } from "./loading";
 import { runTour, tourOpen, type TourStep } from "./tour";
 import { readPgn, saveFile, today, writePgn, type Headers, type PgnGame } from "./pgn";
 import { addMisses, fenOf, formatScore, isDrawnPosition, isSacrifice, reviewMove, verdictWords, winningChance, type Review } from "./review";
@@ -241,6 +242,10 @@ let demoStepping = false; // the demo itself is moving on (not you)
 let canReview = false; // a finished Play game can be reviewed in Practice mode
 let reviewing = false; // reviewing a Play game in Practice mode
 let reviewTitle = ""; // for a game opened from PGN, e.g. "Reviewing: Carlsen - Nakamura (1-0)"
+let reviewSide: Color | null = null; // a PGN game: the side you played (null: just watching)
+let preparing = false; // Stockfish is checking the whole game before the review opens
+let preparingSince = 0;
+let stopLoading: (() => void) | null = null;
 let showReply = false; // in a match, the review shows Stockfish's reply instead of your move
 let plyNotes = new Map<number, string[]>(); // opening notes for a move (1 = the first)
 let gameHeaders: Headers = {}; // the game's PGN headers: who played, when, the result
@@ -1120,7 +1125,64 @@ function onReviewGame() {
   canReview = false;
   reviewing = true;
   currentView = "stats"; // the statistics first, then the review from move 1
+  startPreparing();
   refresh();
+}
+
+/** Watching a game you didn't play: the coach says "White" and "Black", not "you". */
+const watching = () => reviewing && reviewTitle !== "" && reviewSide === null;
+
+// -- The load screen: Stockfish checks everything before the review --------------
+
+const PREP_MIN_MS = 2500; // long enough to see the animation, even for a game already checked
+
+function startPreparing() {
+  if (!rateMovesBox.checked) return;
+  preparing = true;
+  preparingSince = performance.now();
+  stopLoading?.();
+  stopLoading = startLoadAnimation($("prep-stage"), $("prep-caption"));
+  $("prep-screen").hidden = false;
+}
+
+function stopPreparing() {
+  preparing = false;
+  stopLoading?.();
+  stopLoading = null;
+  $("prep-screen").hidden = true;
+}
+
+/** Once every move has its final rating (the second looks included), the
+ *  load screen gives way to the statistics. */
+function drawPrep(list: (Review | undefined)[]) {
+  if (!preparing) return;
+  const { done, total } = analyser.progress();
+  const finished = done >= total && !deepNeeded.length && !deepMoves.length && list.every(Boolean);
+  if (!finished) return;
+  const wait = PREP_MIN_MS - (performance.now() - preparingSince);
+  if (wait > 0) {
+    setTimeout(refresh, wait);
+    return;
+  }
+  stopPreparing();
+  currentView = "stats";
+  applyView();
+}
+
+let gradeJump = { key: "", next: 0 };
+
+/** From the statistics: the next move of this grade by this side, on the board, explained. */
+function jumpToGrade(colour: Color, grade: string, list: (Review | undefined)[]) {
+  const plies = list.flatMap((review, i) => (review?.rating === grade && game.moverOf(i + 1) === colour ? [i + 1] : []));
+  if (!plies.length) return;
+  const key = `${colour}:${grade}`;
+  if (gradeJump.key !== key) gradeJump = { key, next: 0 };
+  const ply = plies[gradeJump.next % plies.length];
+  gradeJump.next++;
+  currentView = "board";
+  stepper = null;
+  goTo(ply);
+  explainMove(ply, list[ply - 1]!);
 }
 
 /** Start going through the game, from the first move. */
@@ -2854,6 +2916,7 @@ function refresh() {
   drawButtons();
   drawCoach();
   drawDemo();
+  drawPrep(reviews);
 }
 
 /** Show the parts of the page that belong to the current mode. */
@@ -3474,6 +3537,7 @@ function setFace(element: HTMLElement, mood: Mood, size: number) {
 /** Who the coach is talking to: you in a match, otherwise nobody in particular. */
 function listener(): Color | null {
   if (explore) return explore.user;
+  if (reviewing && reviewTitle) return reviewSide;
   if (match) return match.user;
   if (reviewing && !reviewTitle) return orientation; // your own finished game
   return null;
@@ -3542,7 +3606,7 @@ function coachSays(reviews: (Review | undefined)[]): CoachSay {
   if (!review) return { mood: "think", text: "Hmm, let me check that move...", buttons: [STRATEGY] };
   const before = game.positionAt(ply - 1);
   const after = game.positionAt(ply);
-  const text = verdict(review, before, after, analyser.evals.get(fenOf(after)), listener(), ply);
+  const text = verdict(review, before, after, analyser.evals.get(fenOf(after)), listener(), ply, watching());
   return { mood: moodForRating(review.rating), text, buttons: [TELL_MORE, STRATEGY] };
 }
 
@@ -3747,7 +3811,7 @@ function materialFor(position: Chess, side: Color): number {
 
 /** How a line ends for `side`, in words: checkmate, the biggest piece won, or
  *  the verdict ("you" when `side` is the viewer's, "they" when it isn't). */
-function lineOutcome(start: Chess, line: NormalMove[], score: Score, side: Color, viewer: Color): string {
+function lineOutcome(start: Chess, line: NormalMove[], score: Score, side: Color, viewer: Color | null): string {
   const you = side === viewer;
   const positions = [start];
   for (const move of line) positions.push(positionAfter(positions[positions.length - 1], move));
@@ -3758,9 +3822,12 @@ function lineOutcome(start: Chess, line: NormalMove[], score: Score, side: Color
     // the most valuable piece of theirs that went missing
     const them = opposite(side);
     const lost = (["queen", "rook", "bishop", "knight"] as PieceRole[]).find((role) => end.board.pieces(them, role).size() < start.board.pieces(them, role).size());
-    const who = you ? "you" : "they";
-    if (lost === "queen") return `${who} win ${you ? "their" : "your"} queen.`;
-    return gain >= 5 ? `${who} come out well ahead in material.` : `${who} come out a ${lost ? NAME[lost] : "piece"} up.`;
+    const named = viewer === null; // watching: "White wins Black's queen"
+    const who = named ? colourName(side) : you ? "you" : "they";
+    const win = named ? "wins" : "win";
+    const come = named ? "comes" : "come";
+    if (lost === "queen") return `${who} ${win} ${whoseOf(them, viewer)} queen.`;
+    return gain >= 5 ? `${who} ${come} out well ahead in material.` : `${who} ${come} out a ${lost ? NAME[lost] : "piece"} up.`;
   }
   return `${verdictWords(score)}.`;
 }
@@ -3780,8 +3847,14 @@ function wholeLine(start: Chess, pv: NormalMove[], count: number): NormalMove[] 
   return line;
 }
 
+/** "your" / "their" from the viewer's side, or "White's" / "Black's" when watching. */
+function whoseOf(side: Color, viewer: Color | null): string {
+  if (viewer === null) return side === "white" ? "White's" : "Black's";
+  return side === viewer ? "your" : "their";
+}
+
 /** The moves of a line from a position, with a sentence for each. */
-function talkLine(start: Chess, line: NormalMove[], viewer: Color): { positions: Chess[]; texts: string[] } {
+function talkLine(start: Chess, line: NormalMove[], viewer: Color | null): { positions: Chess[]; texts: string[] } {
   const positions = [start];
   const texts: string[] = [];
   for (const move of line) {
@@ -3799,7 +3872,7 @@ async function explainBrilliant(ply: number) {
   const after = game.positionAt(ply);
   const played = game.moves[ply - 1].move;
   const mover = game.moverOf(ply);
-  const viewer = listener() ?? mover;
+  const viewer: Color | null = watching() ? null : listener() ?? mover;
   const offered = isSacrifice(before, played, after);
   const piece = offered !== undefined ? after.board.get(offered) : undefined;
   const takes: NormalMove[] = [];
@@ -3811,7 +3884,7 @@ async function explainBrilliant(ply: number) {
     const taken = takes.length ? await coachLine(after, 2, takes) : undefined;
     const best = await coachLine(after, 1.5);
     setBusy(false);
-    const whose = mover === viewer ? "your" : "their";
+    const whose = whoseOf(mover, viewer);
     const intro = `Brilliant! ${narrateMove(before, played, viewer)}`;
     if (taken && piece && taken.pv.length) {
       const line = wholeLine(after, taken.pv, 5);
@@ -3819,16 +3892,16 @@ async function explainBrilliant(ply: number) {
       const trap = best?.pv[0] && makeUci(best.pv[0]) !== makeUci(line[0]);
       // who can take it: the cheapest piece that can
       const taker = takes.map((m) => after.board.get(m.from)!.role).sort((a, b) => MATERIAL[a] - MATERIAL[b])[0];
-      const theirs = mover === viewer ? "their" : "your";
+      const theirs = whoseOf(opposite(mover), viewer);
       const offer = offered === played.to
         ? `Brilliant! ${cap(whose)} ${NAME[piece.role]} goes where ${theirs} ${NAME[taker]} can take it, but taking it is a trap.`
         : `${intro} It leaves ${whose} ${NAME[piece.role]} to be taken, but taking it is a trap.`;
       const texts = [
         offer,
-        ...story.texts.map((text, i) => i === 0 ? `If they take it: ${lowerFirst(text)}` : text),
+        ...story.texts.map((text, i) => i === 0 ? `If ${viewer === null ? colourName(opposite(mover)) : "they"} take${viewer === null ? "s" : ""} it: ${lowerFirst(text)}` : text),
       ];
       texts[texts.length - 1] += ` In the end, ${lineOutcome(after, line, taken.score, mover, viewer)}`;
-      if (trap) texts[texts.length - 1] += " So they shouldn't take it.";
+      if (trap) texts[texts.length - 1] += viewer === null ? ` So ${colourName(opposite(mover))} shouldn't take it.` : " So they shouldn't take it.";
       startStepper([before, ...story.positions], [played, ...line], texts, "happy");
     } else if (best?.pv.length) {
       // no piece to take any more: show what the move sets up
@@ -3853,7 +3926,7 @@ async function explainGreat(ply: number) {
   const after = game.positionAt(ply);
   const played = game.moves[ply - 1].move;
   const mover = game.moverOf(ply);
-  const viewer = listener() ?? mover;
+  const viewer: Color | null = watching() ? null : listener() ?? mover;
   setBusy(true, "Let me show you what it sets up...");
   try {
     const best = await coachLine(after, 2);
@@ -3862,7 +3935,7 @@ async function explainGreat(ply: number) {
     // why it had to be this move: the piece was under attack, or what it does
     const piece = before.board.get(played.from)!;
     const attacked = before.kingAttackers(played.from, opposite(mover), before.board.occupied).nonEmpty();
-    const reason = attacked && piece.role !== "king" ? `It gets ${mover === viewer ? "your" : "their"} ${NAME[piece.role]} out of danger.` : why && why !== "it's a useful waiting move" ? `${cap(why)}.` : "";
+    const reason = attacked && piece.role !== "king" ? `It gets ${whoseOf(mover, viewer)} ${NAME[piece.role]} out of danger.` : why && why !== "it's a useful waiting move" ? `${cap(why)}.` : "";
     const intro = `Great move! ${narrateMove(before, played, viewer)} ${reason} It was the only good move here: everything else was clearly worse.`.replace(/  +/g, " ");
     const line = wholeLine(after, best?.pv ?? [], 3);
     if (!line.length) {
@@ -3874,7 +3947,7 @@ async function explainGreat(ply: number) {
     // still worse after the only move: it keeps you in the game
     const behind = winningChance(best!.score, mover) < 45;
     texts[texts.length - 1] += behind
-      ? ` ${cap(verdictWords(best!.score))}, but this move keeps ${mover === viewer ? "you" : "them"} in the game.`
+      ? ` ${cap(verdictWords(best!.score))}, but this move keeps ${viewer === null ? colourName(mover) : mover === viewer ? "you" : "them"} in the game.`
       : ` In the end, ${lineOutcome(after, line, best!.score, mover, viewer)}`;
     startStepper([before, ...story.positions], [played, ...line], texts, "happy");
   } catch (error) {
@@ -4234,7 +4307,15 @@ function drawStats() {
       label.append(element("span", `grade-dot ${ratingClass(grade)}`), element("span", "", grade));
       row(label, sides.map((c) => {
         const cell = element("span", "stats-cell");
-        cell.append(element("span", `count-chip ${ratingClass(grade)}`, pending ? "??" : String(counts[c][grade] ?? 0)));
+        const chip = element("span", `count-chip ${ratingClass(grade)}`, pending ? "??" : String(counts[c][grade] ?? 0));
+        if (!pending && counts[c][grade]) {
+          // tap: the board at the first such move, illustrated; tap again for the next
+          chip.classList.add("tappable");
+          chip.setAttribute("role", "button");
+          chip.tabIndex = 0;
+          chip.addEventListener("click", () => jumpToGrade(c, grade, list));
+        }
+        cell.append(chip);
         return cell;
       }));
     }
@@ -4719,17 +4800,59 @@ async function reviewPgnGame(event: Event) {
   const chosen = pgnGames[Number(pgnPick.value) || 0];
   if (!chosen) return;
   const { game: loaded, problem } = chosen.load();
+  // Only finished games: a game still being played could be used to cheat
+  const result = chosen.headers.Result;
+  const outcome = loaded.outcome();
+  const over = result === "1-0" || result === "0-1" || result === "1/2-1/2" || (outcome !== undefined && loaded.position.isEnd());
+  if (!over) {
+    await message("This game isn't finished",
+      "It has no result yet, so it's still being played. To keep things fair, only finished games can be analysed. Come back once it's over.");
+    return;
+  }
+  const side = await pickSide(chosen.headers);
+  if (side === "cancel") return;
   mode = "practice";
   resetBoard(loaded, chosen.headers);
   canReview = false;
   reviewing = true;
   reviewTitle = `Reviewing: ${chosen.title}`;
+  reviewSide = side;
   gameOrigin = "analysis";
   viewPly = loaded.length ? 0 : null; // start from the first position and step through
-  orientation = "white";
+  orientation = side ?? "white";
+  currentView = "stats";
   if (menuOpen) hideMenu();
+  startPreparing();
   refresh();
   if (problem) await message("PGN", problem);
+}
+
+/** Whose side are you on in this game? (A name that matches yours is suggested.) */
+async function pickSide(headers: Record<string, string>): Promise<Color | null | "cancel"> {
+  const ask = $<HTMLDialogElement>("side-pick");
+  const named = (value?: string) => (value && value !== "?" ? value : "");
+  const white = named(headers.White);
+  const black = named(headers.Black);
+  const mine = playerName().trim().toLowerCase();
+  $("side-pick-white").textContent = white ? `I'm White: ${white}` : "I'm White";
+  $("side-pick-black").textContent = black ? `I'm Black: ${black}` : "I'm Black";
+  $("side-pick-white").classList.toggle("accent", !!mine && white.toLowerCase() === mine);
+  $("side-pick-black").classList.toggle("accent", !!mine && black.toLowerCase() === mine);
+  const result = headers.Result === "1-0" ? "White won" : headers.Result === "0-1" ? "Black won" : headers.Result === "1/2-1/2" ? "A draw" : "";
+  $("side-pick-note").textContent = [headers.Site && headers.Site !== "?" ? headers.Site : "", result].filter(Boolean).join(" · ") +
+    (result ? ". " : "") + "I'll talk about the game from your side.";
+  ask.showModal();
+  return new Promise((resolve) => {
+    const buttons = [...ask.querySelectorAll<HTMLButtonElement>("button[value]")];
+    const done = (value: string) => {
+      for (const button of buttons) button.onclick = null;
+      ask.oncancel = null;
+      ask.close();
+      resolve(value === "white" || value === "black" ? value : value === "neither" ? null : "cancel");
+    };
+    for (const button of buttons) button.onclick = (event) => { event.preventDefault(); done(button.value); };
+    ask.oncancel = (event) => { event.preventDefault(); done("cancel"); };
+  });
 }
 
 /** What the download button saves: the game on screen, or (on the History
@@ -4938,6 +5061,7 @@ function wireButtons() {
   for (const button of document.querySelectorAll(".var-prev")) button.addEventListener("click", () => demo && demo.line > 0 && loadDemoLine(demo.line - 1));
   for (const button of document.querySelectorAll(".var-next")) button.addEventListener("click", () => demo && demo.line + 1 < demo.demo.lines.length && loadDemoLine(demo.line + 1));
   $("home-button").addEventListener("click", () => void onHome());
+  $("prep-back").addEventListener("click", () => { stopPreparing(); showMenu(); });
   for (const tab of document.querySelectorAll<HTMLButtonElement>(".view-tabs button")) {
     tab.addEventListener("click", () => {
       currentView = tab.dataset.view as typeof currentView;
