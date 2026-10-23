@@ -1175,6 +1175,7 @@ function drawPrep(list: (Review | undefined)[]) {
 }
 
 let gradeJump = { key: "", next: 0 };
+let silentJump = false; // from the statistics: the top bubble says nothing, the card below does the talking
 
 /** From the statistics: the next move of this grade by this side, on the board, explained. */
 function jumpToGrade(colour: Color, grade: string, list: (Review | undefined)[]) {
@@ -1188,9 +1189,11 @@ function jumpToGrade(colour: Color, grade: string, list: (Review | undefined)[])
   stepper = null;
   // the position before the move first, then the move plays in with its explanation
   goTo(ply - 1);
+  silentJump = true;
+  refresh();
   const review = list[ply - 1]!;
   setTimeout(() => {
-    if (currentPly() === ply - 1 && !stepper) explainMove(ply, review);
+    if (silentJump && currentPly() === ply - 1 && !stepper) explainMove(ply, review);
   }, GRADE_JUMP_PAUSE);
 }
 
@@ -1331,6 +1334,7 @@ function exitAnalysis() {
 
 function goTo(ply: number) {
   stepper = null;
+  silentJump = false;
   if (demo && !demoStepping) {
     clearTimeout(demo.timer);
     if (demo.playing) demo.interrupted = true;
@@ -3559,6 +3563,7 @@ const STRATEGY: CoachButton = { ico: "target", label: "Strategy", run: () => voi
 
 /** What the coach says about the position on screen. */
 function coachSays(reviews: (Review | undefined)[]): CoachSay {
+  if (silentJump) return { mood: "talk", text: "", buttons: [], key: "silent" };
   if (busy) return { mood: "think", text: statusMessage || "Hmm, let me think...", buttons: [] };
   if (editor) return { mood: "talk", text: editor.pick
     ? "Tap squares to place it, or tap it again to put it away. Done when you're ready."
@@ -3875,10 +3880,20 @@ function talkLine(start: Chess, line: NormalMove[], viewer: Color | null): { pos
   return { positions, texts };
 }
 
+/** Add more moves (and what's said about them) to the open step-through card,
+ *  if it's still the one they belong to. */
+function extendStepper(card: Stepper | null, positions: Chess[], moves: NormalMove[], texts: string[]) {
+  if (!card || stepper !== card || !moves.length) return;
+  card.positions.push(...positions);
+  card.moves.push(...moves);
+  card.texts.push(...texts);
+  refresh();
+}
+
 /** Tell me more about a brilliant move: the piece it offers, and what
- *  happens if they take it - the trap it sets, played out on the board. */
+ *  happens if they take it - the trap it sets, played out on the board.
+ *  The card opens at once with the move; Stockfish's line follows. */
 async function explainBrilliant(ply: number) {
-  if (busy) return;
   const before = game.positionAt(ply - 1);
   const after = game.positionAt(ply);
   const played = game.moves[ply - 1].move;
@@ -3890,80 +3905,77 @@ async function explainBrilliant(ply: number) {
   if (offered !== undefined) {
     for (const [from, dests] of after.allDests()) if (dests.has(offered)) takes.push({ from, to: offered });
   }
-  setBusy(true, "Let me show you why it works...");
+  const whose = whoseOf(mover, viewer);
+  const intro = `Brilliant! ${narrateMove(before, played, viewer)}`;
+  const trapped = piece !== undefined && takes.length > 0;
+  let first = `${intro} A bold move that Stockfish confirms.`;
+  if (trapped) {
+    // who can take it: the cheapest piece that can
+    const taker = takes.map((m) => after.board.get(m.from)!.role).sort((a, b) => MATERIAL[a] - MATERIAL[b])[0];
+    const theirs = whoseOf(opposite(mover), viewer);
+    first = offered === played.to
+      ? `Brilliant! ${cap(whose)} ${NAME[piece!.role]} goes where ${theirs} ${NAME[taker]} can take it, but taking it is a trap.`
+      : `${intro} It leaves ${whose} ${NAME[piece!.role]} to be taken, but taking it is a trap.`;
+  }
+  startStepper([before, after], [played], [first], "happy");
+  const card = stepper;
   try {
-    const taken = takes.length ? await coachLine(after, 2, takes) : undefined;
-    const best = await coachLine(after, 1.5);
-    setBusy(false);
-    const whose = whoseOf(mover, viewer);
-    const intro = `Brilliant! ${narrateMove(before, played, viewer)}`;
-    if (taken && piece && taken.pv.length) {
+    const taken = trapped ? await coachLine(after, 1.5, takes) : undefined;
+    if (taken?.pv.length) {
       const line = wholeLine(after, taken.pv, 5);
       const story = talkLine(after, line, viewer);
+      const best = await coachLine(after, 1);
       const trap = best?.pv[0] && makeUci(best.pv[0]) !== makeUci(line[0]);
-      // who can take it: the cheapest piece that can
-      const taker = takes.map((m) => after.board.get(m.from)!.role).sort((a, b) => MATERIAL[a] - MATERIAL[b])[0];
-      const theirs = whoseOf(opposite(mover), viewer);
-      const offer = offered === played.to
-        ? `Brilliant! ${cap(whose)} ${NAME[piece.role]} goes where ${theirs} ${NAME[taker]} can take it, but taking it is a trap.`
-        : `${intro} It leaves ${whose} ${NAME[piece.role]} to be taken, but taking it is a trap.`;
-      const texts = [
-        offer,
-        ...story.texts.map((text, i) => i === 0 ? `If ${viewer === null ? colourName(opposite(mover)) : "they"} take${viewer === null ? "s" : ""} it: ${lowerFirst(text)}` : text),
-      ];
+      const texts = story.texts.map((text, i) => i === 0 ? `If ${viewer === null ? colourName(opposite(mover)) : "they"} take${viewer === null ? "s" : ""} it: ${lowerFirst(text)}` : text);
       texts[texts.length - 1] += ` In the end, ${lineOutcome(after, line, taken.score, mover, viewer)}`;
       if (trap) texts[texts.length - 1] += viewer === null ? ` So ${colourName(opposite(mover))} shouldn't take it.` : " So they shouldn't take it.";
-      startStepper([before, ...story.positions], [played, ...line], texts, "happy");
-    } else if (best?.pv.length) {
-      // no piece to take any more: show what the move sets up
-      const line = wholeLine(after, best.pv, 4);
-      const story = talkLine(after, line, viewer);
-      const texts = [`${intro} A bold move that Stockfish confirms.`, ...story.texts];
-      texts[texts.length - 1] += ` In the end, ${lineOutcome(after, line, best.score, mover, viewer)}`;
-      startStepper([before, ...story.positions], [played, ...line], texts, "happy");
+      extendStepper(card, story.positions.slice(1), line, texts);
+      return;
     }
+    // no piece to take: show what the move sets up
+    const best = await coachLine(after, 1.5);
+    if (!best?.pv.length) return;
+    const line = wholeLine(after, best.pv, 4);
+    const story = talkLine(after, line, viewer);
+    const texts = [...story.texts];
+    texts[texts.length - 1] += ` In the end, ${lineOutcome(after, line, best.score, mover, viewer)}`;
+    extendStepper(card, story.positions.slice(1), line, texts);
   } catch (error) {
     errorText = `Something went wrong: ${error}`;
-    setBusy(false);
     refresh();
   }
 }
 
 /** Tell me more about a great move: it was the only good one, and the board
- *  plays out the opportunity it creates. */
+ *  plays out the opportunity it creates. The card opens at once. */
 async function explainGreat(ply: number) {
-  if (busy) return;
   const before = game.positionAt(ply - 1);
   const after = game.positionAt(ply);
   const played = game.moves[ply - 1].move;
   const mover = game.moverOf(ply);
   const viewer: Color | null = watching() ? null : listener() ?? mover;
-  setBusy(true, "Let me show you what it sets up...");
+  const why = whyMove(before, played, viewer);
+  // why it had to be this move: the piece was under attack, or what it does
+  const piece = before.board.get(played.from)!;
+  const attacked = before.kingAttackers(played.from, opposite(mover), before.board.occupied).nonEmpty();
+  const reason = attacked && piece.role !== "king" ? `It gets ${whoseOf(mover, viewer)} ${NAME[piece.role]} out of danger.` : why && why !== "it's a useful waiting move" ? `${cap(why)}.` : "";
+  const intro = `Great move! ${narrateMove(before, played, viewer)} ${reason} It was the only good move here: everything else was clearly worse.`.replace(/  +/g, " ");
+  startStepper([before, after], [played], [intro], "happy");
+  const card = stepper;
   try {
-    const best = await coachLine(after, 2);
-    setBusy(false);
-    const why = whyMove(before, played, viewer);
-    // why it had to be this move: the piece was under attack, or what it does
-    const piece = before.board.get(played.from)!;
-    const attacked = before.kingAttackers(played.from, opposite(mover), before.board.occupied).nonEmpty();
-    const reason = attacked && piece.role !== "king" ? `It gets ${whoseOf(mover, viewer)} ${NAME[piece.role]} out of danger.` : why && why !== "it's a useful waiting move" ? `${cap(why)}.` : "";
-    const intro = `Great move! ${narrateMove(before, played, viewer)} ${reason} It was the only good move here: everything else was clearly worse.`.replace(/  +/g, " ");
+    const best = await coachLine(after, 1.5);
     const line = wholeLine(after, best?.pv ?? [], 3);
-    if (!line.length) {
-      startStepper([before, after], [played], [`${intro} ${why ? `${why.charAt(0).toUpperCase()}${why.slice(1)}.` : ""}`], "happy", undefined, true);
-      return;
-    }
+    if (!best || !line.length) return;
     const story = talkLine(after, line, viewer);
-    const texts = [intro, ...story.texts];
+    const texts = [...story.texts];
     // still worse after the only move: it keeps you in the game
-    const behind = winningChance(best!.score, mover) < 45;
+    const behind = winningChance(best.score, mover) < 45;
     texts[texts.length - 1] += behind
-      ? ` ${cap(verdictWords(best!.score))}, but this move keeps ${viewer === null ? colourName(mover) : mover === viewer ? "you" : "them"} in the game.`
-      : ` In the end, ${lineOutcome(after, line, best!.score, mover, viewer)}`;
-    startStepper([before, ...story.positions], [played, ...line], texts, "happy");
+      ? ` ${cap(verdictWords(best.score))}, but this move keeps ${viewer === null ? colourName(mover) : mover === viewer ? "you" : "them"} in the game.`
+      : ` In the end, ${lineOutcome(after, line, best.score, mover, viewer)}`;
+    extendStepper(card, story.positions.slice(1), line, texts);
   } catch (error) {
     errorText = `Something went wrong: ${error}`;
-    setBusy(false);
     refresh();
   }
 }
@@ -4019,6 +4031,7 @@ function stepTo(step: number) {
 
 function closeStepper() {
   stepper = null;
+  silentJump = false;
   if (lesson) {
     // leaving a lesson goes back to the list
     lesson = null;
