@@ -240,6 +240,7 @@ interface DemoState {
   steps: DemoStep[];
   playing: boolean;
   interrupted: boolean; // stopped by you (Back/Next), not by a note
+  intro: boolean; // before play: the finished setup on the board, the coach introduces it
   timer?: number;
 }
 let demo: DemoState | null = null;
@@ -1369,6 +1370,7 @@ function goTo(ply: number) {
     clearTimeout(demo.timer);
     if (demo.playing) demo.interrupted = true;
     demo.playing = false;
+    demo.intro = false;
   }
   if (replaying && !replayStepping) replaying = false;
   ply = Math.max(0, Math.min(ply, game.length));
@@ -2360,7 +2362,7 @@ function startDemo(chosen: Demo, line = 0) {
   reviewing = false;
   // Black openings are shown from Black's side
   orientation = REPERTOIRE.find((o) => o.name === chosen.opening)?.colour ?? "white";
-  demo = { demo: chosen, line: 0, steps: [], playing: true, interrupted: false };
+  demo = { demo: chosen, line: 0, steps: [], playing: false, interrupted: false, intro: true };
   gameOrigin = "learn";
   demoPick.replaceChildren(...chosen.lines.map((l, i) => new Option(`${i + 1}. ${l.title}`, String(i))));
   if (menuOpen) hideMenu();
@@ -2368,7 +2370,7 @@ function startDemo(chosen: Demo, line = 0) {
 }
 
 /** Set up one line of the demo from its first move, and start playing it. */
-function loadDemoLine(index: number) {
+function loadDemoLine(index: number, intro = true) {
   if (!demo) return;
   clearTimeout(demo.timer);
   demo.line = index;
@@ -2379,10 +2381,32 @@ function loadDemoLine(index: number) {
   analysis = null;
   preview = null;
   quiz = null;
+  demo.interrupted = false;
+  demo.intro = intro;
+  if (intro) {
+    // the setup the line ends in, while the coach introduces it; play starts it
+    viewPly = null;
+    demo.playing = false;
+    refresh();
+    return;
+  }
   viewPly = 0;
   demo.playing = true;
+  refresh(); // the moves follow once the coach has spoken
+  scheduleDemo(800);
+}
+
+/** Play, after the introduction: back to the start, and the line plays out. */
+function startDemoLine() {
+  if (!demo) return;
+  demo.intro = false;
+  demo.playing = true; // (before going back to the start, so the coach says "Here we go")
   demo.interrupted = false;
-  refresh(); // the coach introduces the line; the moves follow once that's said
+  demoStepping = true;
+  goTo(0);
+  demoStepping = false;
+  refresh();
+  scheduleDemo(900);
 }
 
 function scheduleDemo(delay = DEMO_MOVE_DELAY) {
@@ -2408,8 +2432,12 @@ function demoAdvance() {
 
 function onDemoPlay() {
   if (!demo) return;
+  if (demo.intro) {
+    startDemoLine();
+    return;
+  }
   if (currentPly() >= game.length) {
-    loadDemoLine(demo.line); // watch it again
+    loadDemoLine(demo.line, false); // watch it again
     return;
   }
   demo.playing = !demo.playing;
@@ -2425,9 +2453,10 @@ function drawDemo() {
   document.body.classList.toggle("replay-on", canReplay());
   $("moves-heading").textContent = demo ? demoTitle() : "Moves";
   if (!demo && !canReplay()) return;
-  const atEnd = currentPly() >= game.length;
+  const atEnd = currentPly() >= game.length && !demo?.intro;
   const playing = demo ? demo.playing : replaying;
   const [glyph, label] = atEnd ? ["replay", demo ? "Watch again" : "Play from the start"] : playing ? ["pause", "Pause"] : ["play", "Play"];
+  document.body.classList.toggle("demo-intro", !!demo?.intro);
   for (const button of document.querySelectorAll<HTMLButtonElement>(".nav-play")) {
     button.title = label;
     button.setAttribute("aria-label", label);
@@ -2487,7 +2516,7 @@ function setupArrows(): DrawShape[] {
  *  builds, and the square a quiet move takes away. At the start: where the
  *  pieces are heading. */
 function demoShapes(): DrawShape[] {
-  if (!demo) return [];
+  if (!demo || demo.intro) return [];
   const ply = currentPly();
   if (ply === 0) return setupArrows();
   const before = game.positionAt(ply - 1);
@@ -3107,7 +3136,7 @@ function drawBoard(reviews: (Review | undefined)[], info: OpeningInfo[]) {
   const colour = movableColour();
   const movesFrom = quizWaiting() ? quiz!.threat!.passed! : position;
   ground.setAutoShapes(stepper ? stepperShapes() : puzzle ? puzzleShapes() : editor ? [] : demo ? demoShapes() : [...badgeShapes(reviews, info), ...arrowShapes(), ...replayShapes()]);
-  if (editor) last = undefined;
+  if (editor || demo?.intro) last = undefined;
   ground.set({
     fen: fenOf(position),
     orientation,
@@ -3601,15 +3630,27 @@ function coachSays(reviews: (Review | undefined)[]): CoachSay {
     : "Drag pieces to move them (off the board to remove), or pick a piece below to add. Done when you're ready.", buttons: [] };
   if (puzzle) return puzzleSays();
   if (lesson) return { mood: "talk", text: LESSONS[lesson.phase][lesson.index].title, buttons: [] };
+  if (demo?.intro) {
+    const lines = demo.demo.lines;
+    const count = lines.length === 1 ? "one line" : `${lines.length} lines`;
+    const start = `The ${openingShortName(demo.demo.opening)} has ${count}. We'll go through all of them, starting with the main line.`;
+    const text = demo.line === 0
+      ? `${start} ${demo.demo.intro} Here's where the pieces end up. Ready when you are: press play.`
+      : `${lines[demo.line].about ?? demo.demo.intro} When you're ready, let's go: press play.`;
+    const play: CoachButton = { ico: "play", label: "Play the line", run: startDemoLine, kind: "accent" };
+    return { mood: "talk", text, buttons: [play], key: `demo:${demo.line}:intro` };
+  }
   if (demo) {
     const ply = currentPly();
     const step = ply ? demo.steps[ply - 1] : undefined;
     const lines = demo.demo.lines;
     let text: string;
-    if (!ply) {
+    if (!ply && !demo.playing) {
       const count = lines.length === 1 ? "one line" : `${lines.length} lines`;
       const start = `The ${openingShortName(demo.demo.opening)} has ${count}. We'll go through all of them, starting with the main line.`;
       text = demo.line === 0 ? `${start} ${demo.demo.intro}` : lines[demo.line].about ?? demo.demo.intro;
+    } else if (!ply) {
+      text = "Here we go.";
     } else {
       text = step!.note ?? narrateMove(game.positionAt(ply - 1), step!.move, null);
     }
@@ -3673,6 +3714,7 @@ function drawCoachFace(reviews: (Review | undefined)[]) {
   const say = coachSays(reviews);
   setFace($("strip-face"), say.mood, 46);
   stripButtons = say.buttons;
+  drawStripActions(true); // first, so the words are measured against the room the buttons leave
   speak(say.text, say.key ?? `${currentPly()}:${say.text}`);
   drawStripActions();
   drawStepper();
@@ -3723,9 +3765,9 @@ function showPiece(index: number) {
 }
 
 /** The bubble's buttons: ‹ › through the pieces (when there's more than one), then the coach's own. */
-function drawStripActions() {
+function drawStripActions(roomForNav = false) {
   const nav: HTMLButtonElement[] = [];
-  if (speech.pieces.length > 1) {
+  if (speech.pieces.length > 1 || roomForNav) {
     const back = iconButton({ ico: "back", label: "Back a sentence", run: () => showPiece(speech.index - 1), kind: "soft" }, 16);
     const next = iconButton({ ico: "next", label: "Next sentence", run: () => showPiece(speech.index + 1), kind: "soft" }, 16);
     back.disabled = speech.index === 0;
@@ -3785,6 +3827,20 @@ const para = (text: string, className = "") => {
 
 const CLOSE: CoachButton = { ico: "close", label: "Back", run: () => closeOverlay(), kind: "soft" };
 
+/** The quiz result in plain words: was it their idea, and if not, what their
+ *  idea really is (the board's "Show me" plays it out). */
+function quizInWords(): string[] {
+  const asked = quiz!;
+  const threat = asked.threat!;
+  const idea = threat.threatMove && threat.passed ? narrateMove(threat.passed, threat.threatMove, threat.you) : "";
+  if (asked.result![0]) return [`Yes, that's their idea! ${idea}`.trim()];
+  const kind = asked.explanation?.kind;
+  const first = kind === "mistake" ? "That move wouldn't be a threat: it would be a mistake for them, and you could punish it."
+    : kind === "smaller-threat" ? "That's a threat too, but a smaller one."
+    : "That move doesn't threaten anything serious.";
+  return idea ? [first, `Their real idea: ${lowerFirst(idea)}`] : [first];
+}
+
 /** Tell me more: the full review of the move (or the demo note, or the quiz result). */
 function openMore() {
   if (demo) {
@@ -3794,8 +3850,7 @@ function openMore() {
     return;
   }
   if (quiz?.answered && quiz.result) {
-    const parts = [para(quiz.result[1])];
-    if (quiz.explanation) parts.push(para(quiz.explanation.text));
+    const parts = quizInWords().map((text) => para(text));
     const buttons: CoachButton[] = [];
     const explanation = quiz.explanation;
     if (explanation?.line.length) {
@@ -3835,10 +3890,11 @@ function explainMove(ply: number, review: Review) {
   const move = better ?? played;
   const why = whyMove(before, move, mine ? game.moverOf(ply) : you);
   const text = better
-    ? `${mine ? "Better" : "Stronger"}: ${lowerFirst(moveInWords(before, move, mine ? game.moverOf(ply) : you))}`
-    : `${review.rating === "Book" ? "A known move" : "Good choice"}: ${why}.`;
+    ? `${mine ? "Better was" : "Better for them was"}: ${lowerFirst(moveInWords(before, move, mine ? game.moverOf(ply) : you))}`
+    : `${review.rating === "Book" ? "A known opening move" : mine ? "Why it's good" : "Their idea"}: ${why}.`;
   const info = openingInfo();
-  const danger = dangerAfter(review, before, after, analyser.evals.get(fenOf(before)), analyser.evals.get(fenOf(after)), !!info[ply - 1]?.book);
+  const danger = dangerAfter(review, before, after, analyser.evals.get(fenOf(before)), analyser.evals.get(fenOf(after)), !!info[ply - 1]?.book,
+    watching() ? null : you ?? game.moverOf(ply));
   const extra = danger && !after.isEnd() ? hazardButton(ply, danger) : undefined;
   startStepper([before, positionAfter(before, move)], [move], [text], moodForRating(review.rating), extra, true);
 }
@@ -4012,7 +4068,8 @@ async function explainGreat(ply: number) {
 }
 
 function hazardButton(ply: number, danger: Danger): CoachButton {
-  return { ico: "hazard", label: `What can they do now? ${danger.text}`, kind: `hazard ${danger.level}` as CoachButton["kind"], run: () => void openThreatLine(ply, danger) };
+  const theirSlip = !watching() && listener() !== null && game.moverOf(ply) !== listener();
+  return { ico: "hazard", label: `${theirSlip ? "What can you do now?" : "What can they do now?"} ${danger.text}`, kind: `hazard ${danger.level}` as CoachButton["kind"], run: () => void openThreatLine(ply, danger) };
 }
 
 /** The reviews of the game's moves (the same ones the move list shows). */
@@ -4141,7 +4198,7 @@ async function openThreatLine(ply: number, danger?: Danger) {
     const plan = await planAhead(coachAnalysis, position);
     const moves = plan.steps.slice(0, 4).map((step) => step.move);
     const positions = plan.positions.slice(0, moves.length + 1);
-    const texts = moves.map((move, i) => narrateMove(positions[i], move, game.moverOf(ply)));
+    const texts = moves.map((move, i) => narrateMove(positions[i], move, watching() ? null : listener() ?? game.moverOf(ply)));
     if (danger && texts.length) texts[0] = `${danger.text} ${texts[0]}`;
     setBusy(false);
     startStepper(positions, moves, texts, "worried");

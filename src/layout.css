@@ -1882,3 +1882,8 @@ body.replay-on .nav-play {
 .home-resume[hidden] {
   display: none;
 }
+
+/* An opening's introduction: just the finished setup, no move list yet */
+body.demo-intro .move-strip {
+  visibility: hidden;
+}

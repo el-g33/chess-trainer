@@ -109,7 +109,7 @@ export function pinnedBy(position: Chess, square: number): number | undefined {
 const PRAISE: Record<string, string[]> = {
   Brilliant: ["Brilliant! A sacrifice that really works.", "Wow, what a move! That sacrifice is spot on."],
   Great: ["Great find! That was the move to play.", "Great move: you found the strong one."],
-  Best: ["That's the best move.", "Spot on, the top engine move.", "Perfect, that's the best move."],
+  Best: ["That's the best move.", "Spot on, that's the move.", "Perfect, that's the best move."],
   Excellent: ["Very nice, almost the best move.", "Excellent, that keeps things going your way."],
   Good: ["Good, solid move.", "That's a sensible choice.", "Fine move, nothing wrong with that."],
   Book: ["Straight out of the opening book.", "Good theory: that's a known move.", "Right on track with the opening."],
@@ -249,25 +249,52 @@ export function whyMove(before: Chess, move: NormalMove, listener: Color | null)
   if (after.isCheckmate()) return "it's checkmate";
   const castles = piece.role === "king" && (Math.abs((move.to & 7) - (move.from & 7)) > 1 || victim?.color === piece.color);
   if (castles) return "it gets the king safe and brings the rook into play";
-  const parts: string[] = [];
-  // Taking something smaller where it can be taken back is a sacrifice
-  const sacrifice = victim && victim.color !== piece.color && PIECE_VALUES[victim.role] < PIECE_VALUES[piece.role]
-    && after.kingAttackers(move.to, opposite(piece.color), after.board.occupied).nonEmpty();
-  if (sacrifice) {
-    const king = after.board.kingOf(opposite(piece.color));
-    const near = king !== undefined && Math.abs((king & 7) - (move.to & 7)) <= 2 && Math.abs((king >> 3) - (move.to >> 3)) <= 2;
-    return `it gives up ${yours} ${name} for a ${NAMES[victim.role]}${near ? " to break open the king" : ""}`;
+  const them = opposite(piece.color);
+  const home = piece.color === "white" ? 0 : 7;
+  // The king: out of check, or (with the queens gone) into play
+  if (piece.role === "king") {
+    if (before.isCheck()) return "it gets the king out of check";
+    const queens = before.board.pieces("white", "queen").size() + before.board.pieces("black", "queen").size();
+    return queens ? "it moves the king to a safer square" : "it brings the king into the game";
   }
-  if (victim && victim.color !== piece.color) parts.push(`it wins ${theirs} ${NAMES[victim.role]}`);
-  else if (after.isCheck()) parts.push("it gives check");
-  else if (piece.role !== "pawn" && (piece.color === "white" ? move.from >> 3 === 0 : move.from >> 3 === 7)) parts.push(`it develops ${yours} ${name}`);
+  if (victim && victim.color !== piece.color) {
+    // can they take back?
+    const retaken = after.kingAttackers(move.to, them, after.board.occupied).nonEmpty();
+    const defended = after.kingAttackers(move.to, piece.color, after.board.occupied).nonEmpty();
+    // Taking something smaller where it can be taken back, with nothing to take back in turn, is a sacrifice
+    if (retaken && !defended && PIECE_VALUES[victim.role] < PIECE_VALUES[piece.role]) {
+      const king = after.board.kingOf(them);
+      const near = king !== undefined && Math.abs((king & 7) - (move.to & 7)) <= 2 && Math.abs((king >> 3) - (move.to >> 3)) <= 2;
+      return `it gives up ${yours} ${name} for a ${NAMES[victim.role]}${near ? " to break open the king" : ""}`;
+    }
+    const check = after.isCheck() ? ", with check" : "";
+    // a free piece (or a bigger one) is won; otherwise it's a trade
+    if (!retaken || PIECE_VALUES[victim.role] > PIECE_VALUES[piece.role]) return `it wins ${theirs} ${NAMES[victim.role]}${check}`;
+    return `it takes ${theirs} ${NAMES[victim.role]}${check}`;
+  }
+  if (after.isCheck()) {
+    const hits = targets(after, move.to);
+    return hits.length ? `it gives check and attacks ${theirs} ${NAMES[hits[0]]}` : "it gives check";
+  }
+  const parts: string[] = [];
+  const minor = piece.role === "knight" || piece.role === "bishop";
+  if (minor && move.from >> 3 === home) parts.push(`it develops ${yours} ${name}`);
+  else if (piece.role === "rook" && move.from >> 3 === home && move.to >> 3 === home) parts.push("it brings the rook into play");
   else if (piece.role === "pawn" && CENTRE.includes(move.to)) parts.push("it takes space in the centre");
-  const centre = CENTRE.filter((s) => attacks(piece, move.to, after.board.occupied).has(s));
   const hits = targets(after, move.to);
-  if (hits.length && !victim) parts.push(`attacks ${theirs} ${NAMES[hits[0]]}`);
-  else if (centre.length && !(piece.role === "pawn" && CENTRE.includes(move.to))) parts.push("controls the centre");
-  if (!parts.length) return quietIdea(before, move, listener)?.clause ?? "it's a useful waiting move";
-  if (parts.length === 1 && !parts[0].startsWith("it ")) return `it ${parts[0]}`;
+  if (hits.length) parts.push(`${parts.length ? "" : "it "}attacks ${theirs} ${NAMES[hits[0]]}`);
+  // pressure on something they have to keep defending
+  const reach = attacks(piece, move.to, after.board.occupied);
+  const pressed = [...reach.intersect(after.board[them])].map((sq) => after.board.get(sq)!.role)
+    .filter((role) => role !== "king").sort((a, b) => PIECE_VALUES[b] - PIECE_VALUES[a])[0];
+  if (!hits.length && pressed && !parts.length) parts.push(`it puts pressure on ${theirs} ${NAMES[pressed]}`);
+  // the centre: only for a knight or bishop that now eyes two centre squares
+  const centre = CENTRE.filter((s) => reach.has(s));
+  if (!hits.length && !pressed && minor && centre.length >= 2) parts.push(`${parts.length ? "" : "it "}controls the centre`);
+  if (!parts.length) {
+    return quietIdea(before, move, listener)?.clause
+      ?? (piece.role === "pawn" ? "it makes room for the pieces behind it" : `it puts ${yours} ${name} on a better square`);
+  }
   return parts.join(" and ");
 }
 
@@ -341,7 +368,7 @@ export function quietIdea(before: Chess, move: NormalMove, listener: Color | nul
 export function moveInWords(before: Chess, move: NormalMove, listener: Color | null): string {
   const said = narrateMove(before, move, listener);
   const why = whyMove(before, move, listener);
-  const repeats = (before.board.get(move.to) && why.startsWith("it wins")) || (said.includes("check") && why === "it gives check")
+  const repeats = (before.board.get(move.to) && (why.startsWith("it wins") || why.startsWith("it takes"))) || (said.includes("check") && why === "it gives check")
     || said.includes("castle") || said.includes("Checkmate") || why === "it's a useful waiting move";
   return repeats || !why ? said : `${said} ${cap(why)}.`;
 }
@@ -361,6 +388,23 @@ export function ratingWords(rating: string): string {
 export type Danger = { level: "red" | "orange" | "amber" | "yellow"; text: string };
 
 export function dangerAfter(review: Review, before: Chess, after: Chess, beforeEval: Evaluation | undefined,
+  afterEval: Evaluation | undefined, inBook: boolean, viewer: Color | null = null): Danger | null {
+  const danger = rawDanger(review, before, after, beforeEval, afterEval, inBook);
+  if (!danger || viewer === null || viewer === before.turn) return danger;
+  // Their slip: say it as the chance it gives you
+  const SAID: Record<string, string> = {
+    "There's a checkmate coming.": "You have a checkmate coming.",
+    "They can win your queen.": "You can win their queen.",
+    "You can lose a pawn here.": "You can win a pawn here.",
+    "This is about to cost you a lot.": "This is about to cost them a lot.",
+    "You can lose a piece here.": "You can win a piece here.",
+    "They can take over the centre.": "You can take over the centre.",
+  };
+  const text = SAID[danger.text] ?? danger.text.replace(/^Your (\w+) can be taken\.$/, "You can take their $1.");
+  return { ...danger, text };
+}
+
+function rawDanger(review: Review, before: Chess, after: Chess, beforeEval: Evaluation | undefined,
   afterEval: Evaluation | undefined, inBook: boolean): Danger | null {
   if (!["Inaccuracy", "Mistake", "Miss", "Missed Win", "Blunder"].includes(review.rating)) return null;
   const mover = before.turn;
