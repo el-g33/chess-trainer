@@ -64,6 +64,7 @@ import { BANDS, likelyMoves, pickLikely, type Band, type LikelyMove } from "./ex
 import { chainOf, whatYouGet, type Mark } from "./outlook";
 import { fitsIn, readingTime, splitToFit, Typer } from "./talk";
 import { startLoadAnimation } from "./loading";
+import { styleAlternative, type Style } from "./style";
 import { runTour, tourOpen, type TourStep } from "./tour";
 import { readPgn, saveFile, today, writePgn, type Headers, type PgnGame } from "./pgn";
 import { addMisses, fenOf, formatScore, isDrawnPosition, isSacrifice, reviewMove, verdictWords, winningChance, type Review } from "./review";
@@ -2469,7 +2470,7 @@ function drawDemo() {
   for (const button of document.querySelectorAll<HTMLButtonElement>(".var-next")) button.disabled = demo.line + 1 >= demo.demo.lines.length;
 }
 
-const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
+const lowerFirst = (text: string) => (/^(White|Black)/.test(text) ? text : text.charAt(0).toLowerCase() + text.slice(1));
 const cap = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /** "London · Main", "London · Nf3 variation" */
@@ -2761,9 +2762,8 @@ async function startTask(kind: Task) {
 /** Which Plan ahead to make here: following your opening (if you're
  *  practising one, it's your move and the switch is on), or Stockfish's best. */
 function currentPlanMode(position: Chess): PlanMode {
-  const chosen = planModeBox.value as PlanMode;
-  if (chosen === "best" || !match?.myOpening || !book || position.turn !== match.user) return "best";
-  return chosen;
+  void position;
+  return "best";
 }
 
 const planModeOf = (plan: Plan): PlanMode => ("mode" in plan ? (plan as OpeningPlan).mode : "best");
@@ -3593,6 +3593,7 @@ interface CoachButton {
   label: string;
   run: () => void;
   kind?: "accent" | "soft" | "hazard" | `hazard ${string}`;
+  labelled?: boolean; // shows its label as well as the icon
 }
 
 interface CoachSay {
@@ -3698,6 +3699,18 @@ function coachSays(reviews: (Review | undefined)[]): CoachSay {
   const after = game.positionAt(ply);
   const text = verdict(review, before, after, analyser.evals.get(fenOf(after)), listener(), ply, watching());
   return { mood: moodForRating(review.rating), text, buttons: [TELL_MORE, STRATEGY] };
+}
+
+/** An icon button that also shows its words, when the button asks for it. */
+function labelledButton(button: CoachButton): HTMLButtonElement {
+  const element = iconButton(button);
+  if (button.labelled) {
+    const words = document.createElement("span");
+    words.textContent = button.label;
+    element.append(words);
+    element.classList.add("labelled");
+  }
+  return element;
 }
 
 function iconButton(button: CoachButton, size = 18): HTMLButtonElement {
@@ -4165,7 +4178,7 @@ function drawStepper() {
   $<HTMLButtonElement>("step-back").disabled = stepper.step <= 1;
   $<HTMLButtonElement>("step-next").disabled = stepper.step >= stepCount();
   // the extra button (e.g. "Try it") only on the last page of a lesson
-  const extra = stepper.extra && (!stepper.frames || stepper.step >= stepCount()) ? [iconButton(stepper.extra)] : [];
+  const extra = stepper.extra && (!stepper.frames || stepper.step >= stepCount()) ? [labelledButton(stepper.extra)] : [];
   $("step-extra").replaceChildren(...extra);
 }
 
@@ -4243,34 +4256,67 @@ function demoLineFrom(position: Chess): { moves: NormalMove[]; texts: string[]; 
 
 const QUIZ: CoachButton = { ico: "quiz", label: "Quiz me: spot their idea", run: () => { closeStepper(); void startTask("quiz"); }, kind: "accent" };
 
-/** Strategy: the opening's main line if we're in one, otherwise Stockfish's plan. */
+/** The playing style chosen in the settings (positional unless changed). */
+const playStyle = (): Style => (planModeBox.value === "attacking" ? "attacking" : "positional");
+
+/** Strategy: the opening's main line if we're in one, otherwise Stockfish's
+ *  plan - then, where there is one, a good alternative in your playing style. */
 async function openStrategy() {
   if (busy) return;
   const position = base();
+  const style = playStyle();
   const known = demoLineFrom(position);
-  if (known) {
-    const texts = [...known.texts];
-    texts[0] = `The ${known.name.replace(/ \(.*\)$/, "")} plan: ${texts[0].charAt(0).toLowerCase()}${texts[0].slice(1)}`;
-    const positions = [position];
-    for (const move of known.moves) positions.push(positionAfter(positions[positions.length - 1], move));
-    startStepper(positions, known.moves, texts, "talk", QUIZ);
-    return;
-  }
   setBusy(true, "Let me find the best plan...");
   try {
-    const plan = await planAhead(coachAnalysis, position);
-    const moves = plan.steps.slice(0, 4).map((step) => step.move);
-    const positions = plan.positions.slice(0, moves.length + 1);
-    const texts = moves.map((move, i) => narrateMove(positions[i], move, listener()));
-    if (moves.length && isSacrifice(positions[0], moves[0], positions[1])) texts[0] = `There's a brilliant idea here! ${texts[0]}`;
-    else if (texts.length) texts[0] = `The plan: ${texts[0].charAt(0).toLowerCase()}${texts[0].slice(1)}`;
+    const lines = await coachAnalysis.analyse(position, 1.5, 5);
+    const found = styleAlternative(position, lines, style);
+    let positions: Chess[];
+    let moves: NormalMove[];
+    let texts: string[];
+    if (known) {
+      moves = known.moves;
+      texts = [...known.texts];
+      texts[0] = `The ${known.name.replace(/ \(.*\)$/, "")} plan: ${lowerFirst(texts[0])}`;
+      positions = [position];
+      for (const move of moves) positions.push(positionAfter(positions[positions.length - 1], move));
+    } else {
+      const plan = await planAhead(coachAnalysis, position);
+      moves = plan.steps.slice(0, 4).map((step) => step.move);
+      positions = plan.positions.slice(0, moves.length + 1);
+      // spoken to the side to move, unless you've picked a side
+      const viewer = listener() ?? position.turn;
+      texts = moves.map((move, i) => narrateMove(positions[i], move, viewer));
+      if (moves.length && isSacrifice(positions[0], moves[0], positions[1])) texts[0] = `There's a brilliant idea here! ${texts[0]}`;
+      else if (texts.length) texts[0] = `The best plan: ${lowerFirst(texts[0])}`;
+    }
     setBusy(false);
-    startStepper(positions, moves, texts, "talk", QUIZ);
+    // (the plan's own first move isn't an alternative to itself)
+    const alternative = found && !(moves[0] && makeUci(found.move) === makeUci(moves[0])) ? found : undefined;
+    const extra: CoachButton = alternative
+      ? { ico: style === "attacking" ? "hazard" : "bulb", label: style === "attacking" ? "A sharper way" : "A more positional way",
+          kind: "accent", labelled: true, run: () => showStyleAlternative(position, alternative.pv, style) }
+      : QUIZ;
+    if (alternative && texts.length) texts[texts.length - 1] += ` There's also a ${style === "attacking" ? "sharper" : "more positional"} way that's nearly as good.`;
+    startStepper(positions, moves, texts, "talk", extra);
   } catch (error) {
     errorText = `Something went wrong: ${error}`;
     setBusy(false);
     refresh();
   }
+}
+
+/** The playing style's alternative, played out: nearly as strong as the best
+ *  move, and closer to how you like to play. */
+function showStyleAlternative(position: Chess, pv: NormalMove[], style: Style) {
+  const viewer = listener() ?? position.turn;
+  const line = wholeLine(position, pv, 3);
+  if (!line.length) return;
+  const story = talkLine(position, line, viewer);
+  const texts = [...story.texts];
+  texts[0] = style === "attacking"
+    ? `A sharper way: ${lowerFirst(moveInWords(position, line[0], viewer))} It's nearly as strong, and it puts more pressure on their king.`
+    : `A more positional way: ${lowerFirst(moveInWords(position, line[0], viewer))} It's nearly as strong, and it keeps your position solid.`;
+  startStepper(story.positions, line, texts, "talk", QUIZ);
 }
 
 // -- The move strip (phones) and the views (board, statistics, history) --------
