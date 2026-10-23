@@ -1592,10 +1592,12 @@ type PuzzleRow = [id: string, fen: string, moves: string, rating: number, themes
 let trainPhase: TrainPhase = "middlegame";
 let trainTab: "openings" | TrainPhase = "openings"; // the tab on screen (openings, or a phase)
 let puzzleLevel: PuzzleLevel = "club";
-const puzzleFiles = new Map<TrainPhase, Promise<Record<PuzzleLevel, PuzzleRow[]>>>();
+// The puzzle sets: opening traps, and the middlegame and endgame
+type PuzzleSet = "openings" | TrainPhase;
+const puzzleFiles = new Map<PuzzleSet, Promise<Record<PuzzleLevel, PuzzleRow[]>>>();
 
 interface PuzzleState {
-  phase: TrainPhase;
+  phase: PuzzleSet;
   level: PuzzleLevel;
   list: PuzzleRow[];
   index: number;
@@ -1624,7 +1626,7 @@ const AUTO_REPLY_DELAY = 1800; // ms: time to see your move's rating first
 let explore: ExploreState | null = null;
 let exploreBand: Band = "club";
 
-function loadPuzzles(phase: TrainPhase) {
+function loadPuzzles(phase: PuzzleSet) {
   if (!puzzleFiles.has(phase)) {
     puzzleFiles.set(phase, fetch(`${import.meta.env.BASE_URL}puzzles/${phase}.json`).then((r) => r.json()));
   }
@@ -1637,11 +1639,15 @@ function drawTrainScreen() {
     tab.classList.toggle("on", on);
     tab.setAttribute("aria-selected", String(on));
   }
-  // Openings: the lessons by colour; the phases: principles and puzzles. Your position is on every tab.
+  // Openings: the lessons by colour and the opening traps; the phases: principles
+  // and puzzles. Your position is on every tab.
   const openings = trainTab === "openings";
   $("train-openings").hidden = !openings;
   $("train-principles").hidden = openings;
-  $("train-puzzles").hidden = openings;
+  $("puzzles-title").textContent = openings ? "Opening traps" : "Puzzles";
+  $("puzzles-note").textContent = openings
+    ? "Tricks from the first moves of real games. Choose a level, then spot as many as you can."
+    : "Choose a level, then solve as many as you like.";
   const lessons = LESSONS[trainPhase];
   $("principles-note").textContent = lessons.length
     ? `${lessons.length} short lessons on how to play the ${trainPhase}.`
@@ -1670,7 +1676,7 @@ function setupTrain() {
       drawTrainScreen();
     });
   }
-  $("start-puzzles").addEventListener("click", () => void startPuzzles(trainPhase, puzzleLevel));
+  $("start-puzzles").addEventListener("click", () => void startPuzzles(trainTab, puzzleLevel));
   $("train-position").addEventListener("click", () => startEditor());
   $("train-principles").addEventListener("click", showLessonList);
   // The editor
@@ -1719,7 +1725,7 @@ function puzzleHint(themes: string[]): string {
   return THEME_HINTS.find(([theme]) => themes.includes(theme))?.[1] ?? "Look at checks, captures and threats first.";
 }
 
-async function startPuzzles(phase: TrainPhase, level: PuzzleLevel, themes: string[] = []) {
+async function startPuzzles(phase: PuzzleSet, level: PuzzleLevel, themes: string[] = []) {
   const all = await loadPuzzles(phase);
   let list = all[level];
   if (themes.length) {
@@ -3218,7 +3224,7 @@ function drawPlayerBars() {
   for (const [bar, colour] of bars) {
     const name = bar.querySelector<HTMLElement>(".pb-name")!;
     name.textContent = demo && bar.id === "bar-top" ? demoTitle()
-      : puzzle && bar.id === "bar-top" ? `Puzzle · ${PUZZLE_LEVELS.find(([v]) => v === puzzle!.level)?.[1]}${puzzle.streak ? ` · ${puzzle.streak} in a row` : ""}`
+      : puzzle && bar.id === "bar-top" ? `${puzzle.phase === "openings" ? "Opening trap" : "Puzzle"} · ${PUZZLE_LEVELS.find(([v]) => v === puzzle!.level)?.[1]}${puzzle.streak ? ` · ${puzzle.streak} in a row` : ""}`
       : editor && bar.id === "bar-top" ? "Set up a position"
       : lesson && bar.id === "bar-top" ? `Lesson ${lesson.index + 1}: ${LESSONS[lesson.phase][lesson.index].title}`
       : barName(colour);
