@@ -2475,44 +2475,13 @@ function openingShortName(name: string): string {
   return name.replace(/ \(.*\)$/, "").replace(/ (System|Opening|Game|Defence|setup)$/, "");
 }
 
-/** Where your pieces are heading in this line: from their first square to their last. */
-function setupArrows(): DrawShape[] {
-  const you = orientation;
-  const where = new Map<number, number>(); // first square -> square now
-  for (const square of game.positionAt(0).board[you]) where.set(square, square);
-  game.moves.forEach((played, i) => {
-    const before = game.positionAt(i);
-    const after = game.positionAt(i + 1);
-    const move = played.move;
-    if (before.turn !== you) {
-      for (const [first, now] of where) if (now === move.to) where.delete(first); // taken
-      return;
-    }
-    if (isCastling(before, move)) {
-      const king = after.board.kingOf(you)!;
-      const rookTo = (king & 7) === 6 ? (king & ~7) + 5 : (king & ~7) + 3;
-      for (const [first, now] of where) {
-        if (now === move.from) where.set(first, king);
-        else if (now === move.to) where.set(first, rookTo);
-      }
-      return;
-    }
-    for (const [first, now] of where) if (now === move.from) where.set(first, move.to);
-  });
-  const shapes: DrawShape[] = [];
-  for (const [first, now] of where) {
-    if (first !== now) shapes.push({ orig: makeSquare(first) as Key, dest: makeSquare(now) as Key, brush: "guess" });
-  }
-  return shapes;
-}
-
 /** On each move of a demo: what the piece now controls, the pawn chain it
  *  builds, and the square a quiet move takes away. At the start: where the
  *  pieces are heading. */
 function demoShapes(): DrawShape[] {
   if (!demo || demo.intro) return [];
   const ply = currentPly();
-  if (ply === 0) return setupArrows();
+  if (ply === 0) return []; // the start: nothing drawn (the introduction showed where the pieces go)
   const before = game.positionAt(ply - 1);
   const after = game.positionAt(ply);
   const move = game.moves[ply - 1].move;
