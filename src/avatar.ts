@@ -1,8 +1,9 @@
 // The coach: a flat cartoon of the app's author (rectangular glasses, full
 // beard), face to shoulders, with a hand gesture for each mood. The outfit
-// changes once a day (beanie and green tee, smart vest, hoodie with
-// headphones), and for the holidays: a Santa hat in December, a party hat over
-// New Year, bunny ears at Easter. Drawn in SVG so it stays sharp at any size.
+// changes once a day (beanie and green tee, smart vest, beanie and hoodie
+// with a gold chain), and for the holidays: a Santa hat in December, a party
+// hat over New Year, bunny ears at Easter. Drawn in SVG so it stays sharp at
+// any size.
 
 export type Mood = "happy" | "wow" | "worried" | "think" | "talk" | "wave";
 
@@ -72,13 +73,13 @@ const OUTFITS: Record<OutfitName, Outfit> = {
   tee: { hat: "beanie", top: "#2E4A3A", shade: "#22382B", sleeve: "#2E4A3A", front: crew("#22382B") },
   smart: { hat: "hair", top: "#4A505C", shade: "#3A3F49", sleeve: "#EEF0F3", front: SMART_FRONT },
   hoodie: {
-    hat: "hair", top: "#3C5A8A", shade: "#2F4870", sleeve: "#3C5A8A",
+    hat: "beanie", top: "#3C5A8A", shade: "#2F4870", sleeve: "#3C5A8A",
     behind: `<path d="M27 74 Q50 50 73 74 Q50 63 27 74Z" fill="#2F4870"/>`,
     front: `${crew("#2F4870")}
       <path d="M45.5 71 L44.5 85 M54.5 71 L55.5 85" stroke="#E9EEF5" stroke-width="1.4" stroke-linecap="round"/>
-      <path d="M35 64.5 Q50 77 65 64.5" stroke="#1B1B1F" stroke-width="3.2" fill="none" stroke-linecap="round"/>
-      <rect x="30" y="60.5" width="7.5" height="10" rx="3" fill="#232328"/><rect x="62.5" y="60.5" width="7.5" height="10" rx="3" fill="#232328"/>
-      <rect x="31.8" y="62.5" width="3.8" height="6" rx="1.6" fill="#3BC1A8"/><rect x="64.4" y="62.5" width="3.8" height="6" rx="1.6" fill="#3BC1A8"/>`,
+      <path d="M40 67.5 Q50 82 60 67.5" stroke="#B8860B" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+      <path d="M40 67.5 Q50 82 60 67.5" stroke="#F2C94C" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-dasharray="2 1.2"/>
+      <circle cx="50" cy="78.5" r="2.6" fill="#F2C94C" stroke="#B8860B" stroke-width="0.8"/>`,
   },
   christmas: {
     hat: "santa", top: "#B8322F", shade: "#962825", sleeve: "#B8322F",
