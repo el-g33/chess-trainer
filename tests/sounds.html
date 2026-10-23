@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Sound sampler</title>
+    <style>
+      :root { --bg: #f4efe9; --card: #fffaf4; --ink: #241d18; --muted: #7a6d62; --accent: #e8743b; --line: #e6dbcf; }
+      * { box-sizing: border-box; }
+      body { font-family: system-ui, sans-serif; margin: 0; padding: 16px; background: var(--bg); color: var(--ink); }
+      h1 { font-size: 1.3rem; margin: 0 0 4px; }
+      p.lead { margin: 0 0 12px; color: var(--muted); font-size: 0.92rem; }
+      .set { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px 14px; margin-bottom: 12px; }
+      .set h2 { font-size: 1.02rem; margin: 0; }
+      .set p { margin: 3px 0 10px; color: var(--muted); font-size: 0.86rem; }
+      .buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+      button { font: inherit; font-size: 0.88rem; border: 0; border-radius: 999px; padding: 8px 12px; background: var(--line); color: var(--ink); cursor: pointer; }
+      button:active { transform: scale(0.96); }
+      button.play { background: var(--accent); color: #fff; font-weight: 600; }
+      button.them { background: #d9cfc4; }
+      .pieces { margin-top: 8px; }
+      .controls { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; font-size: 0.88rem; color: var(--muted); }
+      .controls label { display: flex; align-items: center; gap: 8px; }
+      details > summary { cursor: pointer; font-weight: 600; margin: 18px 0 10px; }
+    </style>
+  </head>
+  <body>
+    <h1>Sound sampler</h1>
+    <p class="lead">Tap to hear each sound. "Play a game" runs through a short game: game start, moves by both sides, castling, a capture, check, a promotion and checkmate.</p>
+    <div class="controls">
+      <label>Volume <input id="volume" type="range" min="0" max="1" step="0.05" value="0.7" /></label>
+      <label>Their moves, pitched <select id="their-pitch">
+        <option value="0.84">lower (recommended)</option>
+        <option value="1.19">higher</option>
+        <option value="1">the same</option>
+      </select></label>
+    </div>
+    <div id="sets"></div>
+    <details>
+      <summary>The earlier versions, to compare</summary>
+      <div id="earlier"></div>
+    </details>
+    <script type="module">
+      let ctx = null;
+      let master = null;
+      let shift = 1; // their moves: the whole sound pitched up or down
+      const audio = () => {
+        if (!ctx) {
+          ctx = new AudioContext();
+          master = ctx.createGain();
+          master.gain.value = Number(document.getElementById("volume").value);
+          master.connect(ctx.destination);
+        }
+        if (ctx.state === "suspended") ctx.resume();
+        return ctx;
+      };
+      document.getElementById("volume").addEventListener("input", (e) => master && (master.gain.value = Number(e.target.value)));
+      const theirShift = () => Number(document.getElementById("their-pitch").value);
+      const vary = (f, amount = 0.04) => f * (1 + (Math.random() * 2 - 1) * amount);
+
+      // -- building blocks ------------------------------------------------------
+      function tone({ type = "sine", f, f2, t = 0, a = 0.004, d = 0.2, vol = 0.4, lp }) {
+        const c = audio();
+        const start = c.currentTime + t;
+        const osc = c.createOscillator();
+        const gain = c.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(f * shift, start);
+        if (f2) osc.frequency.exponentialRampToValueAtTime(f2 * shift, start + a + d);
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(vol, start + a);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + a + d);
+        let node = osc.connect(gain);
+        if (lp) {
+          const filter = c.createBiquadFilter();
+          filter.type = "lowpass";
+          filter.frequency.value = lp;
+          node = node.connect(filter);
+        }
+        node.connect(master);
+        osc.start(start);
+        osc.stop(start + a + d + 0.05);
+      }
+      let noiseBuffer = null;
+      function noise({ t = 0, d = 0.05, vol = 0.4, type = "bandpass", f = 2000, q = 1, f2 }) {
+        const c = audio();
+        if (!noiseBuffer) {
+          noiseBuffer = c.createBuffer(1, c.sampleRate, c.sampleRate);
+          const data = noiseBuffer.getChannelData(0);
+          for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+        }
+        const start = c.currentTime + t;
+        const src = c.createBufferSource();
+        src.buffer = noiseBuffer;
+        const filter = c.createBiquadFilter();
+        filter.type = type;
+        filter.frequency.setValueAtTime(f * shift, start);
+        if (f2) filter.frequency.exponentialRampToValueAtTime(f2 * shift, start + d);
+        filter.Q.value = q;
+        const gain = c.createGain();
+        gain.gain.setValueAtTime(vol, start);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + d);
+        src.connect(filter).connect(gain).connect(master);
+        src.start(start, Math.random() * 0.5);
+        src.stop(start + d + 0.02);
+      }
+      /** A plucked string or tine (Karplus-Strong): kalimba, harp, guitar. */
+      const plucks = new Map();
+      function pluck(f, t = 0, vol = 0.5, decay = 0.996, bright = 0.5, length = 1.2) {
+        const c = audio();
+        const freq = f * shift;
+        const key = `${Math.round(freq)}:${decay}:${bright}`;
+        if (!plucks.has(key)) {
+          const rate = c.sampleRate;
+          const buffer = c.createBuffer(1, Math.floor(rate * length), rate);
+          const data = buffer.getChannelData(0);
+          const period = Math.round(rate / freq);
+          const ring = new Float32Array(period).map(() => Math.random() * 2 - 1);
+          let prev = 0;
+          for (let i = 0; i < data.length; i++) {
+            const j = i % period;
+            const next = ring[j];
+            ring[j] = decay * (bright * next + (1 - bright) * prev);
+            prev = next;
+            data[i] = next;
+          }
+          plucks.set(key, buffer);
+        }
+        const src = c.createBufferSource();
+        src.buffer = plucks.get(key);
+        const gain = c.createGain();
+        gain.gain.value = vol;
+        src.connect(gain).connect(master);
+        src.start(c.currentTime + t);
+      }
+      function bell(f, t = 0, vol = 0.25, d = 1.2) {
+        [[1, 1], [2.0, 0.5], [2.76, 0.35], [5.4, 0.15]].forEach(([ratio, level]) =>
+          tone({ f: f * ratio, t, a: 0.003, d: d / ratio ** 0.5, vol: vol * level }));
+      }
+      function knock({ t = 0, pitch = 1, vol = 1, bright = 1 }) {
+        tone({ f: vary(190 * pitch), f2: 110 * pitch, t, d: 0.09, vol: 0.55 * vol });
+        tone({ type: "triangle", f: vary(820 * pitch * bright), t, a: 0.002, d: 0.035, vol: 0.25 * vol });
+        noise({ t, d: 0.035, vol: 0.5 * vol, f: vary(2300 * bright), q: 2.5 });
+      }
+      function mallet(f, t = 0, vol = 0.45, d = 0.5) {
+        tone({ f, t, a: 0.003, d, vol });
+        tone({ f: f * 4, t, a: 0.002, d: 0.06, vol: vol * 0.35 });
+        noise({ t, d: 0.015, vol: 0.12, f: 3000, q: 1 });
+      }
+      /** A soft, muffled thock: a piece put down on a felt-bottomed board. */
+      function thock({ t = 0, pitch = 1, vol = 1 }) {
+        tone({ f: vary(150 * pitch), f2: 85 * pitch, t, a: 0.003, d: 0.12, vol: 0.7 * vol });
+        tone({ type: "triangle", f: vary(420 * pitch), t, a: 0.002, d: 0.05, vol: 0.18 * vol, lp: 900 });
+        noise({ t, d: 0.05, vol: 0.45 * vol, type: "lowpass", f: vary(700 * pitch), q: 0.7 });
+      }
+      /** A hard click with a short ring: stone or marble. */
+      function clack({ t = 0, pitch = 1, vol = 1 }) {
+        noise({ t, d: 0.02, vol: 0.7 * vol, type: "highpass", f: 2600 * pitch, q: 0.8 });
+        tone({ f: vary(2900 * pitch, 0.03), t, a: 0.001, d: 0.09, vol: 0.12 * vol });
+        tone({ f: vary(1250 * pitch, 0.03), t, a: 0.001, d: 0.06, vol: 0.18 * vol });
+        tone({ f: 260 * pitch, f2: 160 * pitch, t, d: 0.05, vol: 0.35 * vol });
+      }
+      /** A glass tap: a few high, clean partials. */
+      function glass(f, t = 0, vol = 0.3, d = 0.35) {
+        [[1, 1], [2.32, 0.45], [4.25, 0.2]].forEach(([ratio, level]) => tone({ f: f * ratio, t, a: 0.001, d: d / ratio ** 0.4, vol: vol * level }));
+        noise({ t, d: 0.01, vol: 0.2, type: "highpass", f: 5000 });
+      }
+      /** A water drop: a quick upward "plip". */
+      function drop(f = 700, t = 0, vol = 0.45) {
+        tone({ f: vary(f), f2: vary(f * 2.4), t, a: 0.002, d: 0.06, vol });
+        tone({ f: f * 2.4, f2: f * 2.8, t: t + 0.05, a: 0.003, d: 0.08, vol: vol * 0.25 });
+      }
+      const NOTE = (n) => 440 * 2 ** ((n - 69) / 12);
+      const PENTA = [0, 2, 4, 7, 9];
+      const files = new Map();
+      /** One of the app's recorded sounds: sped up (higher) by rate, with the
+       *  top end lifted by bright (in dB). */
+      async function file(name, { rate = 1.8, vol = 0.9, bright = 0, t = 0 } = {}) {
+        const c = audio();
+        if (!files.has(name)) files.set(name, fetch(`/sounds/${name}.wav`).then((r) => r.arrayBuffer()).then((b) => c.decodeAudioData(b)));
+        const buffer = await files.get(name);
+        const src = c.createBufferSource();
+        const gain = c.createGain();
+        gain.gain.value = vol;
+        src.buffer = buffer;
+        src.playbackRate.value = rate * shift;
+        let node = src;
+        if (bright) {
+          const shelf = c.createBiquadFilter();
+          shelf.type = "highshelf";
+          shelf.frequency.value = 2500;
+          shelf.gain.value = bright;
+          const presence = c.createBiquadFilter();
+          presence.type = "peaking";
+          presence.frequency.value = 6000;
+          presence.Q.value = 0.9;
+          presence.gain.value = bright * 0.5;
+          node = node.connect(shelf).connect(presence);
+        }
+        node.connect(gain).connect(master);
+        src.start(c.currentTime + t);
+      }
+      /** A crisp tick on top: the "click" of a piece touching the board. */
+      const tick = ({ t = 0, vol = 0.25, f = 4500 } = {}) => noise({ t, d: 0.012, vol, type: "highpass", f });
+      const moveFile = () => `move${1 + Math.floor(Math.random() * 3)}`;
+
+      const SETS = [
+        {
+          name: "Original, livelier",
+          about: "Today's sounds, pitched higher, with the top end brought back and a crisp click on each move. Now with promotion, illegal move, game start and a proper checkmate.",
+          move: () => { file(moveFile(), { rate: vary(2.4, 0.03), bright: 10 }); tick({ vol: 0.22 }); },
+          capture: () => { file("capture", { rate: 2.3, bright: 10 }); tick({ vol: 0.32 }); },
+          check: () => { file("check", { rate: 2.1, bright: 8 }); tick({ vol: 0.2 }); },
+          castle: () => { file("castle", { rate: 2.3, bright: 9 }); tick({ vol: 0.22 }); tick({ t: 0.12, vol: 0.18 }); },
+          promote: () => { file(moveFile(), { rate: 2.4, bright: 10 }); tick({ vol: 0.22 }); file("right", { rate: 1.9, bright: 6, t: 0.07, vol: 0.8 }); },
+          illegal: () => file("wrong", { rate: 1.8, bright: 4, vol: 0.8 }),
+          start: () => file("gameover", { rate: 2.4, bright: 8, vol: 0.6 }),
+          mate: () => { file("check", { rate: 2.1, bright: 8 }); tick({ vol: 0.25 }); file("gameover", { rate: 1.8, bright: 8, t: 0.22 }); },
+        },
+        {
+          name: "Felt & walnut, livelier",
+          about: "The same heavy felt-based pieces, pitched up and with a crisp touch on the board, so they sound lively rather than muffled.",
+          move: () => { thock({ pitch: vary(1.45, 0.05) }); tick({ vol: 0.22 }); },
+          capture: () => { thock({ pitch: 1.6, vol: 1.1 }); clack({ t: 0.004, pitch: 0.8, vol: 0.5 }); thock({ t: 0.05, pitch: 1.2, vol: 0.8 }); tick({ vol: 0.3 }); },
+          check: () => { thock({ pitch: 1.45 }); tick({ vol: 0.22 }); mallet(NOTE(84), 0.07, 0.28, 0.4); mallet(NOTE(88), 0.15, 0.25, 0.55); },
+          castle: () => { thock({ pitch: 1.3 }); tick({ vol: 0.2 }); noise({ t: 0.04, d: 0.14, vol: 0.12, type: "bandpass", f: 1500, f2: 3500, q: 0.6 }); thock({ t: 0.16, pitch: 1.45 }); tick({ t: 0.16, vol: 0.2 }); },
+          promote: () => { thock({ pitch: 1.45 }); tick({ vol: 0.22 }); [76, 79, 84, 88].forEach((n, i) => mallet(NOTE(n), 0.06 + i * 0.06, 0.25, 0.4)); },
+          illegal: () => { tone({ f: 200, d: 0.09, vol: 0.4, lp: 900 }); tone({ f: 180, t: 0.1, d: 0.12, vol: 0.4, lp: 900 }); },
+          start: () => { mallet(NOTE(72), 0, 0.3, 0.5); mallet(NOTE(79), 0.12, 0.3, 0.7); },
+          mate: () => { thock({ pitch: 1.5, vol: 1.2 }); tick({ vol: 0.3 }); bell(NOTE(45), 0.1, 0.35, 2.4); [67, 72, 76, 79].forEach((n) => mallet(NOTE(n), 0.3, 0.2, 1.6)); },
+        },
+        {
+          name: "Crisp wood, livelier",
+          about: "Wooden knocks pitched higher and brighter, with a sharper click on top.",
+          move: () => { knock({ pitch: vary(1.35, 0.06), bright: 1.35 }); tick({ vol: 0.2 }); },
+          capture: () => { knock({ pitch: 1.5, vol: 1.1, bright: 1.6 }); knock({ t: 0.045, pitch: 1.15, vol: 0.9, bright: 1.3 }); noise({ t: 0.04, d: 0.08, vol: 0.3, f: 2000, q: 0.8 }); tick({ vol: 0.3 }); },
+          check: () => { knock({ pitch: 1.4, bright: 1.35 }); tick({ vol: 0.2 }); mallet(NOTE(86), 0.06, 0.3, 0.35); mallet(NOTE(91), 0.14, 0.3, 0.45); },
+          castle: () => { knock({ pitch: 1.1, bright: 1.3 }); tick({ vol: 0.2 }); noise({ t: 0.03, d: 0.16, vol: 0.18, type: "highpass", f: 2000, f2: 6000 }); knock({ t: 0.17, pitch: 1.3, bright: 1.3 }); tick({ t: 0.17, vol: 0.2 }); },
+          promote: () => { knock({ pitch: 1.35, bright: 1.35 }); tick({ vol: 0.2 }); [79, 84, 88, 91].forEach((n, i) => mallet(NOTE(n), 0.06 + i * 0.06, 0.25, 0.4)); },
+          illegal: () => { knock({ pitch: 0.8, bright: 0.7 }); knock({ t: 0.1, pitch: 0.75, bright: 0.7 }); },
+          start: () => { mallet(NOTE(79), 0, 0.3, 0.5); mallet(NOTE(86), 0.12, 0.3, 0.7); },
+          mate: () => { knock({ pitch: 1.4, vol: 1.1, bright: 1.4 }); tick({ vol: 0.3 }); bell(NOTE(47), 0.08, 0.35, 2.2); [72, 76, 79, 84].forEach((n, i) => mallet(NOTE(n), 0.2 + i * 0.09, 0.28, 0.9)); },
+        },
+        {
+          name: "Soft app",
+          about: "Modern and minimal, like a polished phone app: tiny taps and pops, a gentle two-note check and a soft chime at the end. Closest to Lichess's understated style.",
+          move: () => { tone({ f: vary(1150, 0.05), d: 0.03, vol: 0.51 }); noise({ d: 0.012, vol: 0.4, type: "highpass", f: 4000 }); },
+          capture: () => { tone({ f: 600, f2: 900, d: 0.05, vol: 0.64 }); tone({ f: 1300, t: 0.04, d: 0.04, vol: 0.4 }); noise({ d: 0.02, vol: 0.48, type: "bandpass", f: 2500 }); },
+          check: () => { tone({ f: NOTE(81), d: 0.12, vol: 0.4 }); tone({ f: NOTE(86), t: 0.1, d: 0.2, vol: 0.4 }); },
+          castle: () => { tone({ f: 900, d: 0.03, vol: 0.48 }); noise({ t: 0.02, d: 0.12, vol: 0.19, type: "highpass", f: 2000, f2: 6000 }); tone({ f: 1100, t: 0.13, d: 0.03, vol: 0.48 }); },
+          promote: () => [76, 81, 86, 88].forEach((n, i) => tone({ f: NOTE(n), t: i * 0.05, d: 0.15, vol: 0.32 })),
+          illegal: () => { tone({ type: "triangle", f: 180, d: 0.07, vol: 0.56 }); tone({ type: "triangle", f: 180, t: 0.1, d: 0.07, vol: 0.56 }); },
+          start: () => { tone({ f: NOTE(76), d: 0.15, vol: 0.35 }); tone({ f: NOTE(83), t: 0.1, d: 0.3, vol: 0.35 }); },
+          mate: () => [72, 76, 79, 84].forEach((n, i) => bell(NOTE(n), i * 0.09, 0.13, 1.4)),
+        },
+      ];
+
+      // -- the earlier versions, to compare -----------------------------------------
+      const EARLIER = [
+        {
+          name: "Original, as it is now",
+          about: "What the app uses today: recorded effects, pitched up.",
+          move: () => file(`move${1 + Math.floor(Math.random() * 3)}`),
+          capture: () => file("capture"),
+          check: () => file("check"),
+          castle: () => file("castle"),
+          mate: () => { file("check"); setTimeout(() => file("gameover"), 350); },
+        },
+        {
+          name: "Felt & walnut, as before",
+          about: "Premium and calm: heavy pieces with felt bases on a thick wooden board. Deep thocks, a firm double thock for captures, a soft wooden chime for check.",
+          move: () => thock({}),
+          capture: () => { thock({ pitch: 1.15, vol: 1.1 }); clack({ t: 0.004, pitch: 0.55, vol: 0.5 }); thock({ t: 0.055, pitch: 0.8, vol: 0.8 }); },
+          check: () => { thock({}); mallet(NOTE(79), 0.07, 0.28, 0.4); mallet(NOTE(84), 0.15, 0.25, 0.55); },
+          castle: () => { thock({ pitch: 0.85 }); noise({ t: 0.04, d: 0.14, vol: 0.12, type: "bandpass", f: 900, f2: 1800, q: 0.6 }); thock({ t: 0.16, pitch: 0.95 }); },
+          promote: () => { thock({}); [72, 76, 79, 84].forEach((n, i) => mallet(NOTE(n), 0.06 + i * 0.06, 0.25, 0.4)); },
+          illegal: () => { tone({ f: 140, d: 0.09, vol: 0.4, lp: 600 }); tone({ f: 120, t: 0.1, d: 0.12, vol: 0.4, lp: 600 }); },
+          start: () => { mallet(NOTE(67), 0, 0.3, 0.5); mallet(NOTE(72), 0.12, 0.3, 0.7); },
+          mate: () => { thock({ pitch: 1.1, vol: 1.2 }); bell(NOTE(40), 0.1, 0.35, 2.4); [55, 60, 64, 67].forEach((n) => mallet(NOTE(n), 0.3, 0.2, 1.6)); },
+        },
+        {
+          name: "Crisp wood, as before",
+          about: "Brighter wooden knocks with a little variety; a wooden bell for check, a gong for mate.",
+          move: () => knock({ pitch: vary(1, 0.06) }),
+          capture: () => { knock({ pitch: 1.15, vol: 1.1, bright: 1.3 }); knock({ t: 0.045, pitch: 0.85, vol: 0.9 }); noise({ t: 0.04, d: 0.08, vol: 0.35, f: 1200, q: 0.8 }); },
+          check: () => { knock({ pitch: 1.1 }); mallet(NOTE(84), 0.06, 0.3, 0.35); mallet(NOTE(88), 0.14, 0.3, 0.45); },
+          castle: () => { knock({ pitch: 0.75 }); noise({ t: 0.03, d: 0.16, vol: 0.18, type: "highpass", f: 1500, f2: 4500 }); knock({ t: 0.17, pitch: 0.9 }); },
+          mate: () => { knock({ pitch: 1.1, vol: 1.1 }); bell(NOTE(43), 0.08, 0.35, 2.2); [60, 64, 67, 72].forEach((n, i) => mallet(NOTE(n), 0.2 + i * 0.09, 0.28, 0.9)); },
+        },
+      ];
+
+      // A short game, your moves and theirs: start, moves, castling, a capture,
+      // check, a promotion and checkmate
+      const GAME = [["start"], ["move", "you"], ["move", "them"], ["move", "you"], ["move", "them"], ["castle", "you"],
+        ["capture", "them"], ["check", "you"], ["move", "them"], ["promote", "you"], ["move", "them"], ["mate", "you"]];
+
+      /** Play one of a set's sounds, as your move or theirs. */
+      function sound(set, kind, who = "you") {
+        audio();
+        const run = set[kind] ?? (kind === "start" || kind === "promote" || kind === "illegal" ? null : set.move);
+        if (!run) return;
+        shift = who === "them" ? theirShift() : 1;
+        run();
+        shift = 1;
+      }
+
+      function card(set, parent) {
+        const box = document.createElement("section");
+        box.className = "set";
+        box.innerHTML = `<h2>${set.name}</h2><p>${set.about}</p>`;
+        const row = document.createElement("div");
+        row.className = "buttons";
+        const add = (label, run, cls = "") => {
+          const b = document.createElement("button");
+          b.textContent = label;
+          if (cls) b.className = cls;
+          b.addEventListener("click", run);
+          row.append(b);
+        };
+        add("Play a game", () => GAME.forEach(([kind, who], i) => setTimeout(() => sound(set, kind, who), i * 620)), "play");
+        add("Your move", () => sound(set, "move", "you"));
+        add("Their move", () => sound(set, "move", "them"), "them");
+        add("Capture", () => sound(set, "capture"));
+        add("Check", () => sound(set, "check"));
+        add("Castle", () => sound(set, "castle"));
+        if (set.promote) add("Promotion", () => sound(set, "promote"));
+        if (set.illegal) add("Illegal move", () => sound(set, "illegal"));
+        if (set.start) add("Game start", () => sound(set, "start"));
+        add("Checkmate", () => sound(set, "mate"));
+        box.append(row);
+        parent.append(box);
+      }
+      for (const set of SETS) card(set, document.getElementById("sets"));
+      for (const set of EARLIER) card(set, document.getElementById("earlier"));
+    </script>
+  </body>
+</html>

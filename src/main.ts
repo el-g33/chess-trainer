@@ -50,7 +50,7 @@ import {
 } from "./openings";
 import { openingPlanAhead, reviewOpeningChoice, type OpeningPlan, type PlanMode } from "./openingPlan";
 import { FALL_ANGLES, fallenKing, loadPieces, PIECE_CHOICES, setPalette } from "./pieces";
-import { play, setSound, soundForMove, unlockSounds } from "./sounds";
+import { play, setSound, soundForMove, unlockSounds, SOUND_STYLES, type SoundStyle } from "./sounds";
 import { brilliantCandidates, findBrilliant, missedBrilliant, type Brilliant } from "./brilliant";
 import { accuracyRating, divide, estimateRating, gameAccuracy, phaseAccuracy, winPercent, type Phase } from "./accuracy";
 import type { Score } from "./coach";
@@ -163,6 +163,7 @@ const fenInput = $<HTMLInputElement>("fen");
 const themeBox = $<HTMLSelectElement>("board-theme");
 const soundOn = $<HTMLInputElement>("sound-on");
 const soundVolume = $<HTMLInputElement>("sound-volume");
+const soundStyleBox = $<HTMLSelectElement>("sound-style");
 const playerNameBox = $<HTMLInputElement>("player-name");
 const uiThemeBox = $<HTMLSelectElement>("ui-theme");
 const piecesBox = $<HTMLSelectElement>("pieces");
@@ -458,6 +459,7 @@ interface Settings {
   planMode?: string;
   soundOn?: boolean;
   soundVolume?: number;
+  soundStyle?: string;
   playerName?: string;
   uiTheme?: string;
   pieces?: string;
@@ -489,6 +491,7 @@ function saveSettings() {
     planMode: planModeBox.value,
     soundOn: soundOn.checked,
     soundVolume: Number(soundVolume.value),
+    soundStyle: soundStyleBox.value,
     playerName: playerNameBox.value.trim(),
     uiTheme: uiThemeBox.value,
     pieces: piecesBox.value,
@@ -547,6 +550,8 @@ function buildMenu() {
   if (planModeBox.selectedIndex < 0) planModeBox.selectedIndex = 0;
   if (saved.soundOn !== undefined) soundOn.checked = saved.soundOn;
   if (saved.soundVolume !== undefined) soundVolume.value = String(saved.soundVolume);
+  for (const [value, label] of Object.entries(SOUND_STYLES)) soundStyleBox.add(new Option(label, value));
+  soundStyleBox.value = saved.soundStyle && saved.soundStyle in SOUND_STYLES ? saved.soundStyle : "original";
   if (saved.playerName) playerNameBox.value = saved.playerName;
   if (saved.timeControl) timeControlBox.value = saved.timeControl;
   if (timeControlBox.selectedIndex < 0) timeControlBox.selectedIndex = 0;
@@ -579,10 +584,16 @@ function buildMenu() {
   enhanceSelects();
 }
 
-/** Sound effects on or off, and how loud. */
+/** Sound effects on or off, how loud, and in which style. */
 function applySound() {
-  setSound(soundOn.checked, Number(soundVolume.value) / 100);
+  setSound(soundOn.checked, Number(soundVolume.value) / 100, soundStyleBox.value as SoundStyle);
   soundVolume.disabled = !soundOn.checked;
+  soundStyleBox.disabled = !soundOn.checked;
+}
+
+/** A move's sound: a little lower when it's their move (the side at the top of the board). */
+function moveSound(san: string, mover: Color) {
+  void play(soundForMove(san), mover !== orientation);
 }
 
 /** The board theme: "wood" or "grey" (a class on the board). */
@@ -918,6 +929,7 @@ function startMatch() {
   if (colour === "Random") colour = Math.random() < 0.5 ? "White" : "Black";
   const user: Color = colour === "White" ? "white" : "black";
   resetBoard(new Game());
+  void play("start");
   const level = levelBox.selectedIndex;
   const sfOpening = pickOpening(sfOpeningBox.value, opposite(user), level);
   const myOpening = pickOpening(myOpeningBox.value, user, level);
@@ -982,8 +994,9 @@ function afterMove() {
     if (game.outcome()) clock.stop();
   }
   const last = game.moves[game.length - 1];
-  if (last) void play(soundForMove(last.san));
-  if (!match && game.outcome()) setTimeout(() => void play("gameover"), 350);
+  if (last) moveSound(last.san, opposite(game.position.turn));
+  // (checkmate has its own sound)
+  if (!match && game.outcome() && !last?.san.includes("#")) setTimeout(() => void play("gameover"), 350);
   viewPly = null;
   preview = null;
   analysis = null;
@@ -1113,7 +1126,7 @@ function onFlag(colour: Color) {
 function endMatch(text: string) {
   recordGame();
   clock?.stop();
-  void play("gameover");
+  if (!game.moves[game.length - 1]?.san.includes("#")) void play("gameover"); // (checkmate has its own sound)
   match = null;
   thinking = false;
   canReview = mode === "play" && game.length > 0;
@@ -1303,7 +1316,7 @@ function analysisMove(move: NormalMove) {
   }
   const played = analysis.line.play(move);
   analysis.ahead = []; // a new move replaces the ones stepped back over
-  void play(soundForMove(played.san));
+  moveSound(played.san, opposite(analysis.line.position.turn));
   preview = null;
   refresh();
 }
@@ -1327,7 +1340,7 @@ function analysisTakeBack() {
 function analysisForward() {
   if (!analysis || !analysis.ahead.length) return;
   const played = analysis.line.play(analysis.ahead.shift()!);
-  void play(soundForMove(played.san));
+  moveSound(played.san, opposite(analysis.line.position.turn));
   preview = null;
   refresh();
 }
@@ -1381,7 +1394,7 @@ function goTo(ply: number) {
   }
   if (replaying && !replayStepping) replaying = false;
   ply = Math.max(0, Math.min(ply, game.length));
-  if (ply === currentPly() + 1 && !analysis) void play(soundForMove(game.moves[ply - 1].san));
+  if (ply === currentPly() + 1 && !analysis) moveSound(game.moves[ply - 1].san, game.positionAt(ply - 1).turn);
   analysis = null; // moving through the game leaves any analysis line
   viewPly = ply === game.length ? null : ply;
   refresh();
@@ -1785,7 +1798,7 @@ function showPuzzle(index: number) {
   setTimeout(() => {
     if (!puzzle || puzzle.index !== index) return;
     const played = game.play(all[0]);
-    void play(soundForMove(played.san));
+    moveSound(played.san, opposite(game.position.turn));
     refresh();
   }, 600);
 }
@@ -1799,20 +1812,20 @@ function puzzleMove(move: NormalMove) {
   if (!right) {
     // Show the try, then take it back
     const played = game.play(move);
-    void play(soundForMove(played.san));
+    moveSound(played.san, opposite(game.position.turn));
     puzzle.missed = true;
     puzzle.streak = 0;
     puzzle.note = "Not quite. Try again, or tap the bulb for a hint.";
     refresh();
     setTimeout(() => {
       game.undo();
-      void play("wrong");
+      void play("illegal");
       refresh();
     }, 700);
     return;
   }
   const played = game.play(move);
-  void play(soundForMove(played.san));
+  moveSound(played.san, opposite(game.position.turn));
   puzzle.step++;
   if (puzzle.step >= puzzle.solution.length || after.isCheckmate()) {
     puzzleSolved();
@@ -1825,7 +1838,7 @@ function puzzleMove(move: NormalMove) {
   setTimeout(() => {
     if (!puzzle || puzzle.state !== "solving") return;
     const answered = game.play(reply);
-    void play(soundForMove(answered.san));
+    moveSound(answered.san, opposite(game.position.turn));
     puzzle.step++;
     if (puzzle.step >= puzzle.solution.length) puzzleSolved();
     else refresh();
@@ -2714,6 +2727,7 @@ function startDrill(chosen: Demo) {
     waiting: false, tries: 0, note: "", mood: "talk", scores: [newScore(), newScore()], token: 0,
   };
   if (menuOpen) hideMenu();
+  void play("start");
   startDrillLine(0, false, "Round 1: the main line. You play your moves, I'll play theirs.");
 }
 
@@ -2775,7 +2789,7 @@ async function drillTheirMove(token: number) {
     if (slip) [move, slipped] = [slip, true];
   }
   const played = game.play(move);
-  void play(soundForMove(played.san));
+  moveSound(played.san, opposite(game.position.turn));
   if (!slipped) {
     d.waiting = false;
     drillContinue(token);
@@ -2842,7 +2856,7 @@ function drillMove(move: NormalMove) {
     score.moves++;
     d.tries = 0;
     const played = game.play(move);
-    void play(soundForMove(played.san));
+    moveSound(played.san, opposite(game.position.turn));
     const goal = goalDone(before, move);
     d.note = goal ? `Right: ${goal}, that's ticked off.` : pickOne(["Right.", "That's the move.", "Yes, that's the lesson's move.", "Good."]);
     d.mood = "happy";
@@ -2859,7 +2873,7 @@ async function drillWrong(before: Chess, move: NormalMove, expected: NormalMove)
   d.tries++;
   d.waiting = true;
   const played = game.play(move);
-  void play(soundForMove(played.san));
+  moveSound(played.san, opposite(game.position.turn));
   d.note = "Let me check that...";
   d.mood = "think";
   refresh();
@@ -2878,7 +2892,7 @@ async function drillWrong(before: Chess, move: NormalMove, expected: NormalMove)
   setTimeout(() => {
     if (drill !== d || d.token !== token) return;
     game.undo();
-    void play("wrong");
+    void play("illegal");
     d.waiting = false;
     refresh();
   }, 900);
@@ -2891,7 +2905,7 @@ async function drillAnswer(move: NormalMove) {
   const before = game.position.clone();
   d.waiting = true;
   const played = game.play(move);
-  void play(soundForMove(played.san));
+  moveSound(played.san, opposite(game.position.turn));
   d.note = "Let me check that...";
   d.mood = "think";
   refresh();
@@ -2915,7 +2929,7 @@ async function drillAnswer(move: NormalMove) {
   setTimeout(() => {
     if (drill !== d || d.token !== token) return;
     game.undo();
-    void play("wrong");
+    void play("illegal");
     d.waiting = false;
     refresh();
   }, 900);
@@ -4543,7 +4557,7 @@ function startStepper(positions: Chess[], moves: NormalMove[], texts: string[], 
   if (!moves.length) return;
   closeOverlay(false);
   stepper = { positions, moves, texts, step: 1, mood, extra, illustration };
-  void play(soundForMove(makeSan(positions[0], moves[0])));
+  moveSound(makeSan(positions[0], moves[0]), positions[0].turn);
   refresh();
 }
 
@@ -4552,7 +4566,7 @@ const stepCount = () => (stepper?.frames ? stepper.frames.length : stepper?.move
 function stepTo(step: number) {
   if (!stepper) return;
   const next = Math.max(1, Math.min(step, stepCount()));
-  if (next > stepper.step && !stepper.frames) void play(soundForMove(makeSan(stepper.positions[next - 1], stepper.moves[next - 1])));
+  if (next > stepper.step && !stepper.frames) moveSound(makeSan(stepper.positions[next - 1], stepper.moves[next - 1]), stepper.positions[next - 1].turn);
   stepper.step = next;
   refresh();
 }
@@ -5605,6 +5619,11 @@ function wireButtons() {
     });
   }
   soundVolume.addEventListener("change", () => void play("move")); // let you hear the new volume
+  soundStyleBox.addEventListener("change", () => {
+    applySound();
+    saveSettings();
+    void play("move"); // let you hear the new style
+  });
   // Browsers only play sound after the page has been touched or clicked
   document.addEventListener("pointerdown", unlockSounds, { once: true });
   document.addEventListener("keydown", unlockSounds, { once: true });
