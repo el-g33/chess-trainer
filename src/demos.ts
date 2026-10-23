@@ -12,6 +12,7 @@ import type { NormalMove } from "chessops/types";
 export interface DemoLine {
   title: string; // "Main", or the variation's name, e.g. "Nf3 variation"
   about?: string; // a variation: how it differs, said first
+  key?: string; // a variation: the move that defines it, when its title doesn't name it
   // For a note that talks about a coming move: arrows on the board, by the
   // move's label. "e2e4" an idea (blue), "e2e4!" a threat (red), "@f7" a square.
   arrows?: Record<string, string[]>;
@@ -22,6 +23,7 @@ export interface DemoLine {
 export interface Demo {
   opening: string; // the REPERTOIRE name it belongs to
   intro: string;
+  setup: string; // the opening's basic position in SAN, shown while the coach introduces it
   lines: DemoLine[];
 }
 
@@ -29,6 +31,7 @@ export const DEMOS: Demo[] = [
   {
     opening: "London System",
     intro: "White sets up the same way against almost anything.",
+    setup: "d4 d5 Bf4",
     lines: [
       {
         title: "Main",
@@ -94,6 +97,7 @@ export const DEMOS: Demo[] = [
   {
     opening: "Rapport-Jobava System",
     intro: "Like the London, but the queen's knight comes out first, aiming to jump forward.",
+    setup: "d4 d5 Nc3 Nf6 Bf4",
     lines: [
       {
         title: "Main",
@@ -166,6 +170,7 @@ export const DEMOS: Demo[] = [
   {
     opening: "Italian Game",
     intro: "White aims the bishop at f7, then builds up slowly before striking in the centre.",
+    setup: "e4 e5 Nf3 Nc6 Bc4",
     lines: [
       {
         title: "Main",
@@ -282,6 +287,7 @@ export const DEMOS: Demo[] = [
   {
     opening: "Ruy Lopez",
     intro: "White puts pressure on the knight that defends Black's e-pawn, then builds up slowly.",
+    setup: "e4 e5 Nf3 Nc6 Bb5",
     lines: [
       {
         title: "Main",
@@ -370,6 +376,7 @@ export const DEMOS: Demo[] = [
   {
     opening: "Queen's Gambit",
     intro: "White offers the c-pawn to pull Black's d-pawn out of the centre.",
+    setup: "d4 d5 c4",
     lines: [
       {
         title: "Main",
@@ -469,6 +476,7 @@ export const DEMOS: Demo[] = [
   {
     opening: "Classical centre (...e5 / ...d5)",
     intro: "Meet White's centre pawn with your own, then develop and castle.",
+    setup: "e4 e5",
     lines: [
       {
         title: "Main",
@@ -592,6 +600,7 @@ export const DEMOS: Demo[] = [
   {
     opening: "Caro-Kann / Slav (...c6 and ...d5)",
     intro: "Support your centre pawn with the c-pawn, and get the light-squared bishop out before the e-pawn moves.",
+    setup: "e4 c6 d4 d5",
     lines: [
       {
         title: "Main",
@@ -673,6 +682,7 @@ export const DEMOS: Demo[] = [
   {
     opening: "King's Indian / Pirc setup",
     intro: "Let White build a big centre, then strike back at it.",
+    setup: "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6",
     lines: [
       {
         title: "Main",
@@ -748,6 +758,7 @@ export const DEMOS: Demo[] = [
   {
     opening: "Sicilian Defence",
     intro: "Fight for the centre from the side with the c-pawn, then develop and castle.",
+    setup: "e4 c5",
     lines: [
       {
         title: "Main",
@@ -794,6 +805,7 @@ export const DEMOS: Demo[] = [
       },
       {
         title: "Grand Prix variation",
+        key: "f4",
         about: "White pushes the f-pawn for a kingside attack. Black puts the bishop on the long diagonal and hits back.",
         moves: "e4 c5 Nc3 Nc6 f4 g6 Nf3 Bg7 Bb5 Nd4",
         notes: {
@@ -828,6 +840,7 @@ export const DEMOS: Demo[] = [
   {
     opening: "Catalan Opening",
     intro: "Like the Queen's Gambit, but the bishop goes on the long diagonal to press on the centre.",
+    setup: "d4 Nf6 c4 e6 Nf3 d5 g3",
     lines: [
       {
         title: "Main",
@@ -901,6 +914,7 @@ export const DEMOS: Demo[] = [
   {
     opening: "Stafford Gambit",
     intro: "Trap practice: Black gives up a pawn for quick threats on f2. It's unsound, so learn the traps and the refutation.",
+    setup: "e4 e5 Nf3 Nf6 Nxe5 Nc6",
     lines: [
       {
         title: "Main",
@@ -971,6 +985,7 @@ export const DEMOS: Demo[] = [
   {
     opening: "Black Lion (Philidor, Hanham)",
     intro: "A compact setup that holds the centre firmly. Watch out for attacks on f7.",
+    setup: "e4 d6 d4 Nf6 Nc3 Nbd7",
     lines: [
       {
         title: "Main",
@@ -1059,6 +1074,7 @@ export const DEMOS: Demo[] = [
   {
     opening: "Alien Gambit (vs the Caro-Kann)",
     intro: "Trap practice: White sacrifices a knight on f7 to drag Black's king out. It's unsound, so learn where Black goes wrong.",
+    setup: "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 h6 Nxf7",
     lines: [
       {
         title: "Main",
@@ -1112,6 +1128,38 @@ export const DEMOS: Demo[] = [
 ];
 
 export const demoFor = (opening: string | undefined) => DEMOS.find((d) => d.opening === opening);
+
+/** The moves to the position shown while the coach introduces a line: the
+ *  opening's basic setup for the main line, and for a variation the moment it
+ *  turns away from the lines before it (with at least a move each side). */
+export function introMoves(demo: Demo, lineIndex: number): NormalMove[] {
+  const sans = lineIndex === 0 ? demo.setup.split(" ") : demo.lines[lineIndex].moves.split(" ");
+  let count = sans.length;
+  if (lineIndex > 0) {
+    let shared = 0;
+    for (const earlier of demo.lines.slice(0, lineIndex)) {
+      const other = earlier.moves.split(" ");
+      let n = 0;
+      while (n < sans.length && n < other.length && sans[n] === other[n]) n++;
+      shared = Math.max(shared, n);
+    }
+    count = Math.max(shared + 1, 2);
+    // ...and on to the move it's named after ("...Qb6 variation", "Bc4 trap")
+    const line = demo.lines[lineIndex];
+    for (const word of [line.key ?? "", ...line.title.split(" ")]) {
+      const named = sans.indexOf(word.replace(/^\d*\.+/, ""), shared);
+      if (named >= 0) count = Math.max(count, named + 1);
+    }
+    count = Math.min(sans.length, count);
+  }
+  const position = Chess.default();
+  return sans.slice(0, count).map((san) => {
+    const move = parseSan(position, san) as NormalMove | undefined;
+    if (!move) throw new Error(`demo "${demo.opening}" setup: ${san} isn't legal`);
+    position.play(move);
+    return move;
+  });
+}
 
 export interface DemoStep {
   move: NormalMove;

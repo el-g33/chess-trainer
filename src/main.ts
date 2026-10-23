@@ -58,7 +58,7 @@ import { explainGuess, type GuessExplanation } from "./quizExplain";
 import {
   Clock, formatClock, parseTimeControl, PRESETS, thinkTime, timeControlTag, type TimeControl, type Times,
 } from "./clock";
-import { DEMOS, demoFor, demoSteps, type Demo, type DemoStep } from "./demos";
+import { DEMOS, demoFor, demoSteps, introMoves, type Demo, type DemoStep } from "./demos";
 import { LESSONS, type Lesson, type TrainPhase } from "./lessons";
 import { BANDS, likelyMoves, pickLikely, type Band, type LikelyMove } from "./explore";
 import { chainOf, whatYouGet, type Mark } from "./outlook";
@@ -1355,7 +1355,12 @@ function goTo(ply: number) {
     clearTimeout(demo.timer);
     if (demo.playing) demo.interrupted = true;
     demo.playing = false;
-    demo.intro = false;
+    if (demo.intro) {
+      // out of the introduction's setup and into the line itself
+      demo.intro = false;
+      game = new Game();
+      for (const step of demo.steps) game.play(step.move);
+    }
   }
   if (replaying && !replayStepping) replaying = false;
   ply = Math.max(0, Math.min(ply, game.length));
@@ -2376,7 +2381,8 @@ function loadDemoLine(index: number, intro = true) {
   demo.line = index;
   demo.steps = demoSteps(demo.demo, index);
   game = new Game();
-  for (const step of demo.steps) game.play(step.move);
+  // the introduction shows the opening's basic setup; play brings the whole line
+  for (const move of intro ? introMoves(demo.demo, index) : demo.steps.map((step) => step.move)) game.play(move);
   plyNotes = new Map();
   analysis = null;
   preview = null;
@@ -2384,7 +2390,7 @@ function loadDemoLine(index: number, intro = true) {
   demo.interrupted = false;
   demo.intro = intro;
   if (intro) {
-    // the setup the line ends in, while the coach introduces it; play starts it
+    // the basic setup, while the coach introduces it; play starts the line
     viewPly = null;
     demo.playing = false;
     refresh();
@@ -2402,6 +2408,8 @@ function startDemoLine() {
   demo.intro = false;
   demo.playing = true; // (before going back to the start, so the coach says "Here we go")
   demo.interrupted = false;
+  game = new Game();
+  for (const step of demo.steps) game.play(step.move);
   demoStepping = true;
   goTo(0);
   demoStepping = false;
@@ -3603,7 +3611,7 @@ function coachSays(reviews: (Review | undefined)[]): CoachSay {
     const count = lines.length === 1 ? "one line" : `${lines.length} lines`;
     const start = `The ${openingShortName(demo.demo.opening)} has ${count}. We'll go through all of them, starting with the main line.`;
     const text = demo.line === 0
-      ? `${start} ${demo.demo.intro} Here's where the pieces end up. Ready when you are: press play.`
+      ? `${start} ${demo.demo.intro} Here's how it starts. Ready when you are: press play.`
       : `${lines[demo.line].about ?? demo.demo.intro} When you're ready, let's go: press play.`;
     const play: CoachButton = { ico: "play", label: "Play the line", run: startDemoLine, kind: "accent" };
     return { mood: "talk", text, buttons: [play], key: `demo:${demo.line}:intro` };
