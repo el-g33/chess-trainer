@@ -421,6 +421,11 @@ function analysing(): boolean {
   return mode === "practice" && (analysis !== null || viewPly !== null || (reviewing && match === null));
 }
 
+/** An empty board to explore, where you move both sides (not a loaded game). */
+function freeBoard(): boolean {
+  return mode === "practice" && match === null && !reviewing && !explore && !editor && !puzzle && !demo && !drill;
+}
+
 /** True while a quiz question is on screen and not yet answered. */
 function quizWaiting(): boolean {
   return !!(quiz && quiz.threat && !quiz.answered);
@@ -1274,6 +1279,12 @@ function onBoardMove(from: Key, to: Key) {
     answerQuiz(move);
   } else if (explore) {
     exploreMove(given);
+  } else if (freeBoard() && viewPly !== null && !analysis) {
+    // An empty board to explore: going back and moving takes the later moves back
+    const from = currentPly();
+    while (game.length > from) game.undo();
+    game.play(given);
+    afterMove();
   } else if (analysing()) {
     analysisMove(given);
   } else {
