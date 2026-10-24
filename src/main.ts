@@ -4137,8 +4137,9 @@ function coachSays(reviews: (Review | undefined)[]): CoachSay {
   const before = game.positionAt(ply - 1);
   const after = game.positionAt(ply);
   const text = verdict(review, before, after, analyser.evals.get(fenOf(after)), listener(), ply, watching());
-  const best: CoachButton[] = notTheBest(ply, review) ? [{ ico: "bulb", label: "See the best move", run: () => void showBestLine(ply) }] : [];
-  return { mood: moodForRating(review.rating), text, buttons: [TELL_MORE, ...best, STRATEGY] };
+  // a good move that wasn't the best: the bulb (why it's good, then the best move) instead of Tell me more
+  const more: CoachButton = notTheBest(ply, review) ? { ico: "bulb", label: "See the best move", run: () => void showBestLine(ply) } : TELL_MORE;
+  return { mood: moodForRating(review.rating), text, buttons: [more, STRATEGY] };
 }
 
 /** An icon button that also shows its words, when the button asks for it. */
@@ -4337,16 +4338,14 @@ function explainMove(ply: number, review: Review) {
   if (review.rating === "Brilliant") return void explainBrilliant(ply);
   if (review.rating === "Great") return void explainGreat(ply);
   if (WORTH_SHOWING.has(review.rating) && review.bestSan) return void explainSlip(ply, review);
+  if (notTheBest(ply, review)) return void showBestLine(ply);
   const before = game.positionAt(ply - 1);
   const played = game.moves[ply - 1].move;
   const you = listener();
   const mine = !you || game.moverOf(ply) === you;
   const why = whyMove(before, played, mine ? game.moverOf(ply) : you);
   const text = `${review.rating === "Book" ? "A known opening move" : mine ? "Why it's good" : "Their idea"}: ${why}.`;
-  const extra: CoachButton | undefined = notTheBest(ply, review)
-    ? { ico: "bulb", label: "See the best move", kind: "accent", labelled: true, run: () => void showBestLine(ply) }
-    : undefined;
-  startStepper([before, positionAfter(before, played)], [played], [text], moodForRating(review.rating), extra, true);
+  startStepper([before, positionAfter(before, played)], [played], [text], moodForRating(review.rating), undefined, true);
 }
 
 /** A good move that wasn't Stockfish's top choice. */
@@ -4444,8 +4443,9 @@ async function explainSlip(ply: number, review: Review) {
   }
 }
 
-/** See the best move: for a good move that wasn't the top one, why the move
- *  is good, then the best move and how the game would go on. */
+/** See the best move: for a good move that wasn't the top one, a card that
+ *  says why the move is good, then (one tap on) the best move and how the
+ *  game would go on. */
 async function showBestLine(ply: number) {
   const review = ratingsOn() ? reviews()[ply - 1] : undefined;
   if (!review?.bestSan) return;
@@ -4459,19 +4459,15 @@ async function showBestLine(ply: number) {
   const why = `${cap(whyMove(before, played, viewer))}.`;
   const card = startStory({ position: positionAfter(before, played), shapes: moveShapes(before, played, viewer) }, why,
     moodForRating(review.rating), [mine ? "Why it's good" : "Their idea", "Best move"]);
-  setBusy(true, "Let me show you the best move...");
   try {
     const line = await coachLine(before, 1.5, [best]);
-    setBusy(false);
     const moves = wholeLine(before, line?.pv.length ? line.pv : [best], 3);
     const pages = linePages(before, moves, viewer);
     pages.texts[0] = cap(moveInWords(before, best, viewer));
     if (line && moves.length > 1) pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(before, moves, line.score, mover, viewer)}`;
     extendPages(card, pages.frames, pages.texts, 1);
-    if (stepper === card) stepTo(2);
   } catch (error) {
     errorText = `Something went wrong: ${error}`;
-    setBusy(false);
     refresh();
   }
 }
