@@ -423,10 +423,18 @@
             <option value="positional">Positional</option>
             <option value="attacking">Attacking</option>
           </select>
+          <button type="button" id="check-updates" class="wide settings-save"><span data-ico="replay" data-ico-size="18"></span> <span class="cu-label">Check for updates</span></button>
           <p id="app-version" class="app-version wide"></p>
         </div>
       </form>
     </dialog>
+
+    <!-- A new version has arrived in the background -->
+    <div id="update-toast" class="update-toast" role="status" hidden>
+      <span>New version ready</span>
+      <button type="button" id="update-restart" class="accent">Restart</button>
+      <button type="button" id="update-later" class="round soft" aria-label="Later"><span data-ico="close" data-ico-size="16"></span></button>
+    </div>
 
     <!-- Your position: which side the coach plays -->
     <dialog id="side-dialog" class="settings-dialog">

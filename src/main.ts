@@ -5355,6 +5355,62 @@ async function onNewGame() {
   drawTrainScreen();
 }
 
+// -- Updates: check for a new version, and restart into it -------------------------
+
+let checkingUpdates = false;
+
+/** Once a new version has finished downloading: true when it's ready to use. */
+function installed(worker: ServiceWorker): Promise<boolean> {
+  return new Promise((resolve) => {
+    const settled = () => {
+      if (worker.state === "activated") resolve(true);
+      else if (worker.state === "redundant") resolve(false);
+      else return false;
+      return true;
+    };
+    if (settled()) return;
+    worker.addEventListener("statechange", () => void settled());
+  });
+}
+
+/** Restart the app (or reload the page) into the new version - asking first
+ *  if a game is being played. */
+async function restartIntoUpdate() {
+  if (inProgress() && !(await message("Restart now?", "The new version is ready, but restarting ends this game.", true))) return;
+  location.reload();
+}
+
+/** Settings: check for a new version now; if there is one, it downloads and the app restarts into it. */
+async function checkForUpdates() {
+  const button = $<HTMLButtonElement>("check-updates");
+  const label = button.querySelector<HTMLElement>(".cu-label")!;
+  const registration = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration() : undefined;
+  if (!registration) {
+    void message("Updates", `Updates come by themselves on the website. This is version ${__BUILD__}.`);
+    return;
+  }
+  checkingUpdates = true;
+  button.disabled = true;
+  label.textContent = "Checking...";
+  try {
+    await registration.update();
+    const incoming = registration.installing ?? registration.waiting;
+    if (!incoming) {
+      void message("Updates", `You're up to date (version ${__BUILD__}).`);
+      return;
+    }
+    label.textContent = "Updating...";
+    if (await installed(incoming)) await restartIntoUpdate();
+    else void message("Updates", "The update didn't finish downloading. Try again in a moment.");
+  } catch {
+    void message("Updates", "Couldn't check for updates. Are you online? The app keeps working as it is.");
+  } finally {
+    checkingUpdates = false;
+    button.disabled = false;
+    label.textContent = "Check for updates";
+  }
+}
+
 /** Home: the coach's welcome. It ends whatever was on the board (asking
  *  first if a game is still being played). */
 async function onHome() {
@@ -5896,6 +5952,9 @@ function wireButtons() {
   for (const button of document.querySelectorAll(".var-prev")) button.addEventListener("click", () => demo && demo.line > 0 && loadDemoLine(demo.line - 1));
   for (const button of document.querySelectorAll(".var-next")) button.addEventListener("click", () => demo && demo.line + 1 < demo.demo.lines.length && loadDemoLine(demo.line + 1));
   $("home-button").addEventListener("click", () => void onHome());
+  $("check-updates").addEventListener("click", () => void checkForUpdates());
+  $("update-restart").addEventListener("click", () => void restartIntoUpdate());
+  $("update-later").addEventListener("click", () => { $("update-toast").hidden = true; });
   $("prep-back").addEventListener("click", () => { stopPreparing(); showMenu(); });
   $("stats-back").addEventListener("click", backToStats);
   for (const tab of document.querySelectorAll<HTMLButtonElement>(".view-tabs button")) {
@@ -5992,9 +6051,19 @@ wireButtons();
 refresh();
 showMenu();
 void loadPieces().then(refresh);
-// The built site keeps a copy of itself, so it works offline (see vite.config.ts)
+// The built site keeps a copy of itself, so it works offline (see vite.config.ts).
+// A new version downloads in the background; when it's in, a notice offers to restart into it.
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js").catch(() => {
+  const updating = navigator.serviceWorker.controller !== null; // (the very first copy isn't an update)
+  navigator.serviceWorker.register("./sw.js").then((registration) => {
+    registration.addEventListener("updatefound", () => {
+      const incoming = registration.installing;
+      if (!updating || !incoming) return;
+      void installed(incoming).then((ok) => {
+        if (ok && !checkingUpdates) $("update-toast").hidden = false;
+      });
+    });
+  }).catch(() => {
     // not possible here (e.g. not https): the site still works online
   });
 }
