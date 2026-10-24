@@ -1246,6 +1246,12 @@ let gradeJump = { key: "", next: 0 };
 let silentJump = false; // from the statistics: the top bubble says nothing, the card below does the talking
 let fromStats = false; // jumped to a move from the statistics: a bar leads back
 
+/** The move ratings with the opening's known moves rated Book, as the board's badges show them. */
+function withBook(list: (Review | undefined)[]): (Review | undefined)[] {
+  const info = openingInfo();
+  return list.map((review, i) => (review && info[i]?.book ? { ...review, rating: "Book" } : review));
+}
+
 /** From the statistics: the next move of this grade by this side, on the board, explained. */
 function jumpToGrade(colour: Color, grade: string, list: (Review | undefined)[]) {
   const plies = list.flatMap((review, i) => (review?.rating === grade && game.moverOf(i + 1) === colour ? [i + 1] : []));
@@ -3930,7 +3936,7 @@ function drawGameReport(reviews: (Review | undefined)[], info: OpeningInfo[]) {
     if (accuracy === undefined || Number.isNaN(accuracy)) {
       td.textContent = "-";
     } else {
-      td.textContent = `${Math.round(accuracy)}%`;
+      td.textContent = accuracy.toFixed(1); // (like chess.com: 96.3)
       td.className = `acc ${ratingClass(accuracyRating(accuracy))}`;
     }
     return td;
@@ -5037,7 +5043,7 @@ function drawStats() {
     if (pending) cell.textContent = "??";
     else if (value === undefined || Number.isNaN(value)) cell.textContent = "-";
     else {
-      cell.textContent = `${Math.round(value)}%`;
+      cell.textContent = value.toFixed(1); // (like chess.com: 96.3)
       cell.classList.add(ratingClass(accuracyRating(value)));
     }
     return cell;
@@ -5057,7 +5063,8 @@ function drawStats() {
   row(toggle, ["", ""]);
   if (statsMore) {
     const counts: Record<Color, Record<string, number>> = { white: {}, black: {} };
-    list.forEach((review, i) => {
+    const graded = withBook(list);
+    graded.forEach((review, i) => {
       if (!review) return;
       const colour = game.moverOf(i + 1);
       counts[colour][review.rating] = (counts[colour][review.rating] ?? 0) + 1;
@@ -5073,7 +5080,7 @@ function drawStats() {
           chip.classList.add("tappable");
           chip.setAttribute("role", "button");
           chip.tabIndex = 0;
-          chip.addEventListener("click", () => jumpToGrade(c, grade, list));
+          chip.addEventListener("click", () => jumpToGrade(c, grade, graded));
         }
         cell.append(chip);
         return cell;

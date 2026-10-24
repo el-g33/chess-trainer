@@ -207,9 +207,10 @@ export function accuracyRating(accuracy: number): string {
 const LOSS_CAP = 1000; // one blunder shouldn't count for more than this (centipawns)
 
 /** Roughly how strong each side played: from the average centipawn loss per
- *  move, using the relation seen across many engine-analysed games
- *  (about 2700 at 10, 2000 at 40, 1650 at 60, 1100 at 100):
- *  rating = 3000 x e^(-0.01 x average loss). Needs a few moves each. */
+ *  move, fitted to chess.com's Game Rating (about 2100 at 10, 1650 at 25,
+ *  1350 at 50, 1000 at 100, 650 at 250):
+ *  rating = 3000 x e^(-0.11 x the square root of the average loss).
+ *  Needs a few moves each. */
 export function estimateRating(startColor: Color, scores: (Score | undefined)[]): Partial<Record<Color, number>> {
   const cp = (score: Score) =>
     score.mate !== undefined ? (score.mate > 0 ? LOSS_CAP : -LOSS_CAP) : Math.max(-LOSS_CAP, Math.min(LOSS_CAP, score.cp));
@@ -226,7 +227,7 @@ export function estimateRating(startColor: Color, scores: (Score | undefined)[])
   for (const colour of ["white", "black"] as const) {
     if (losses[colour].length < 5) continue;
     const average = mean(losses[colour]);
-    const rating = 3000 * Math.exp(-0.01 * average);
+    const rating = 3000 * Math.exp(-0.11 * Math.sqrt(average));
     result[colour] = Math.round(Math.max(400, Math.min(2900, rating)) / 25) * 25;
   }
   return result;

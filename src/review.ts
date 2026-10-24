@@ -42,6 +42,7 @@ const RATINGS: [number, string, string][] = [
 ];
 
 const GREAT_GAP = 12; // "only good move": the next best is at least this much worse
+const AS_GOOD = 0.5; // a move this close to the top one (in winning chance) is as good: Best
 // A sacrifice is brilliant when it's this close to the best move (in winning
 // chance)... and leaves the mover at least roughly level - a little more
 // generous than "Excellent and never worse", nearer to how chess.com judges it
@@ -116,10 +117,14 @@ const sameMove = (a?: NormalMove, b?: NormalMove) =>
 function hangingPieces(position: Chess, colour: Color): Set<Square> {
   const found = new Set<Square>();
   const enemy = opposite(colour);
+  // (the enemy to move, so their captures can be checked for legality)
+  const theirs = position.clone();
+  theirs.turn = enemy;
+  theirs.epSquare = undefined;
   for (const square of position.board[colour]) {
     const piece = position.board.get(square)!;
     if (piece.role === "pawn" || piece.role === "king") continue;
-    const hitters = [...attackers(position, enemy, square)];
+    const hitters = [...attackers(position, enemy, square)].filter((from) => theirs.isLegal({ from, to: square }));
     if (!hitters.length) continue;
     const cheapest = Math.min(...hitters.map((a) => PIECE_VALUES[position.board.get(a)!.role] || 100));
     if (!attackers(position, colour, square).nonEmpty() || cheapest < PIECE_VALUES[piece.role]) {
@@ -172,7 +177,7 @@ export function reviewMove(before: Chess, move: NormalMove, evals: Map<string, E
   let rating: string;
   let symbol: string;
   if (legalMoveCount(before) === 1) [rating, symbol] = ["Forced", ""];
-  else if (sameMove(move, best)) [rating, symbol] = ["Best", ""];
+  else if (sameMove(move, best) || loss < AS_GOOD) [rating, symbol] = ["Best", ""];
   else [, rating, symbol] = RATINGS.find(([limit]) => loss < limit)!;
 
   // Special ratings for good moves
@@ -206,7 +211,7 @@ export function reviewMove(before: Chess, move: NormalMove, evals: Map<string, E
     lines.push(`${played}! - Great move. The only good move here.${others}`);
     lines.push(...bullets(playedIdeas));
   } else if (rating === "Best") {
-    lines.push(`${played} - Best move. This is exactly what Stockfish would play.`);
+    lines.push(sameMove(move, best) ? `${played} - Best move.` : `${played} - Best move: as good as any.`);
     lines.push(...bullets(playedIdeas));
   } else if (rating === "Excellent" || rating === "Good") {
     lines.push(`${played} - ${rating} move.`);
