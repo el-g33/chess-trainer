@@ -64,6 +64,7 @@ import {
   addMistakes, comesBack, dueMistakes, today as dayNumber, loadMistakes, MASTERED, mistakeCounts, mistakeId, recordAttempt,
   type Mistake, type MistakeKind, type MistakePhase,
 } from "./mistakes";
+import { backupDue, dataCounts, backupNote, makeBackup, noteBackup, readBackup, restoreBackup, snoozeReminder, type BackupContents } from "./backup";
 import { picture, PROGRESS_MIN, saveSummary, SLIP_THEMES, SLIP_WORDS, type GamePhase, type SlipKind } from "./progress";
 import { BANDS, likelyMoves, pickLikely, type Band, type LikelyMove } from "./explore";
 import { chainOf, whatYouGet, type Mark } from "./outlook";
@@ -5802,6 +5803,24 @@ function shortDate(iso: string): string {
 function drawHistory() {
   const box = $("history");
   box.replaceChildren();
+  const unsaved = backupDue();
+  if (unsaved) {
+    const note = element("div", "backup-note");
+    note.append(element("span", "", `${unsaved} new games since your last backup.`));
+    const now = element("button", "accent", "Back up");
+    now.type = "button";
+    now.addEventListener("click", () => void backUp().then(refresh));
+    const later = element("button", "round soft", "");
+    later.type = "button";
+    later.setAttribute("aria-label", "Not now");
+    later.innerHTML = icon("close", 16);
+    later.addEventListener("click", () => {
+      snoozeReminder();
+      refresh();
+    });
+    note.append(now, later);
+    box.append(note);
+  }
   const games = loadHistory();
   if (!games.length) {
     tabMessage(box, "No games yet. Play against Stockfish and your record builds up here.");
@@ -5957,6 +5976,112 @@ async function checkForUpdates() {
     button.disabled = false;
     label.textContent = "Check for updates";
   }
+}
+
+// -- Your data: back up and restore ---------------------------------------------------
+
+/** Settings: how much is kept, and when it was last backed up. */
+function drawDataCounts() {
+  const counts = dataCounts();
+  const made = backupNote().made;
+  const days = made ? Math.floor((Date.now() - made) / 86_400_000) : undefined;
+  const rows: [string, string][] = [
+    ["Games", String(counts.games)],
+    ["Saved reviews", String(counts.reviews)],
+    ["Your mistakes", String(counts.mistakes)],
+    ["Last backup", days === undefined ? "never" : days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`],
+  ];
+  $("data-counts").replaceChildren(...rows.map(([label, value]) => {
+    const row = element("div", "data-row");
+    row.append(element("span", "", label), element("span", "", value));
+    return row;
+  }));
+}
+
+/** Back up: the phone's share sheet (Drive, email...), or a download on a computer. */
+async function backUp() {
+  const { name, text } = makeBackup();
+  const file = new File([text], name, { type: "application/json" });
+  const phone = matchMedia("(pointer: coarse)").matches;
+  if (phone && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: "Chess Trainer backup" });
+      noteBackup();
+    } catch (error) {
+      if ((error as Error).name !== "AbortError") void message("Back up", "Sharing didn't work here, so the file is downloading instead.").then(() => download(file));
+    }
+  } else {
+    download(file);
+    noteBackup();
+  }
+  drawDataCounts();
+}
+
+function download(file: File) {
+  const url = URL.createObjectURL(file);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = file.name;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+/** Restore: read the chosen file, show what's in it, then add it or replace with it. */
+async function restoreFromFile() {
+  const input = $<HTMLInputElement>("data-file");
+  const chosen = input.files?.[0];
+  input.value = ""; // (the same file can be chosen again)
+  if (!chosen) return;
+  const backup = readBackup(await chosen.text());
+  if (typeof backup === "string") {
+    void message("Restore", backup);
+    return;
+  }
+  const how = await askRestore(backup);
+  if (!how) return;
+  if (!restoreBackup(backup, how)) {
+    void message("Restore", "There wasn't room on this device to restore it, so nothing was changed.");
+    return;
+  }
+  await message("Restore", how === "add" ? "Done: the backup has been added. The app restarts to load it." : "Done: this device now matches the backup. The app restarts to load it.");
+  location.reload();
+}
+
+/** The restore dialog: what's in the backup, and add or replace. */
+function askRestore(backup: BackupContents): Promise<"add" | "replace" | null> {
+  const dialog = $<HTMLDialogElement>("restore-dialog");
+  const rows: [string, string][] = [
+    ["From", backup.made.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })],
+    ["Games", `${backup.games}${backup.newGames ? ` (${backup.newGames} not on this device)` : ""}`],
+    ["Saved reviews", String(backup.reviews)],
+    ["Your mistakes", String(backup.mistakes)],
+  ];
+  $("restore-summary").replaceChildren(...rows.map(([label, value]) => {
+    const row = element("div", "data-row");
+    row.append(element("span", "", label), element("span", "", value));
+    return row;
+  }));
+  let how: "add" | "replace" = "add";
+  const buttons = [...dialog.querySelectorAll<HTMLButtonElement>("#restore-how button")];
+  const draw = () => {
+    for (const button of buttons) button.classList.toggle("on", button.dataset.how === how);
+    $("restore-note").textContent = how === "add"
+      ? "Adding keeps everything on this device and brings in what's missing."
+      : "Replacing makes this device match the backup exactly: anything not in it is gone.";
+  };
+  for (const button of buttons) {
+    button.onclick = () => {
+      how = button.dataset.how as "add" | "replace";
+      draw();
+    };
+  }
+  draw();
+  dialog.showModal();
+  return new Promise((resolve) => {
+    dialog.onclose = () => resolve(dialog.returnValue === "restore" ? how : null);
+  });
 }
 
 /** Home: the coach's welcome. It ends whatever was on the board (asking
@@ -6469,6 +6594,7 @@ function wireButtons() {
       const save = $("settings-save");
       save.hidden = !target;
       save.lastChild!.textContent = currentView === "history" ? " Save all your games (PGN)" : " Save this game (PGN)";
+      drawDataCounts();
       settingsDialog.showModal();
     });
   }
@@ -6501,6 +6627,9 @@ function wireButtons() {
   for (const button of document.querySelectorAll(".var-next")) button.addEventListener("click", () => demo && demo.line + 1 < demo.demo.lines.length && loadDemoLine(demo.line + 1));
   $("home-button").addEventListener("click", () => void onHome());
   $("check-updates").addEventListener("click", () => void checkForUpdates());
+  $("data-backup").addEventListener("click", () => void backUp());
+  $("data-restore").addEventListener("click", () => $<HTMLInputElement>("data-file").click());
+  $("data-file").addEventListener("change", () => void restoreFromFile());
   $("update-restart").addEventListener("click", () => void restartIntoUpdate());
   $("update-later").addEventListener("click", () => { $("update-toast").hidden = true; });
   $("prep-back").addEventListener("click", () => { stopPreparing(); showMenu(); });

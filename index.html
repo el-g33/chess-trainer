@@ -445,6 +445,16 @@
             <option value="positional">Positional</option>
             <option value="attacking">Attacking</option>
           </select>
+          <div class="your-data wide">
+            <h4>Your data</h4>
+            <div id="data-counts" class="data-counts"></div>
+            <div class="data-buttons">
+              <button type="button" id="data-backup" class="accent"><span data-ico="download" data-ico-size="18"></span> Back up</button>
+              <button type="button" id="data-restore"><span data-ico="upload" data-ico-size="18"></span> Restore</button>
+            </div>
+            <p class="setup-note">Everything stays on this device. A backup is one small file you can keep in Drive, email to yourself, or move to another device.</p>
+            <input type="file" id="data-file" accept=".json,application/json" hidden />
+          </div>
           <button type="button" id="check-updates" class="wide settings-save"><span data-ico="replay" data-ico-size="18"></span> <span class="cu-label">Check for updates</span></button>
           <p id="app-version" class="app-version wide"></p>
         </div>
@@ -540,6 +550,23 @@
           <button value="pgn" class="accent">The game (PGN)</button>
           <button value="fen">The position (FEN)</button>
           <button value="cancel">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Restore a backup: what's in it, and add or replace -->
+    <dialog id="restore-dialog" class="settings-dialog">
+      <form method="dialog">
+        <h3>Restore this backup?</h3>
+        <div id="restore-summary" class="data-counts"></div>
+        <div class="seg" id="restore-how">
+          <button type="button" data-how="add" class="on">Add to what's here</button>
+          <button type="button" data-how="replace">Replace everything</button>
+        </div>
+        <p id="restore-note" class="setup-note"></p>
+        <div class="dialog-buttons">
+          <button value="cancel">Cancel</button>
+          <button value="restore" class="accent">Restore</button>
         </div>
       </form>
     </dialog>
