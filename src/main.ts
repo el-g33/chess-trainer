@@ -4471,11 +4471,9 @@ async function explainSlip(ply: number, review: Review) {
   const info = openingInfo();
   const danger = dangerAfter(review, before, after, beforeEval, afterEval, !!info[ply - 1]?.book, viewer);
   const reply = after.isEnd() ? undefined : afterEval?.best;
-  // Why: what it costs, and their idea as an arrow
-  const swing = beforeEval && afterEval ? ` Before it, ${verdictWords(beforeEval.score)}; after it, ${verdictWords(afterEval.score)}.` : "";
-  const idea = reply ? ` The ${mine ? "red" : "blue"} arrow shows what it lets ${mine ? "them" : "you"} do.` : "";
+  // Why: what it costs in a few words; the arrow shows their idea, and Next plays it out
   // (the chips above the text name each part, so the text needn't)
-  const why = `${danger ? danger.text : "It's a small slip."}${swing}${idea}`;
+  const why = danger ? danger.text : "It's a small slip.";
   const shapes = moveShapes(before, played, viewer).slice(0, 1);
   if (reply) {
     shapes.push({ orig: makeSquare(reply.from) as Key, dest: arrowEnd(after, reply), brush: mine ? "them" : "you" });
