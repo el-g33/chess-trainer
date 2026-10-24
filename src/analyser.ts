@@ -34,6 +34,13 @@ const DEEP_LIMIT = 12.0;
 const POISON_DEPTH = 14;
 const POISON_LIMIT = 8.0;
 
+// A deep review looks this much deeper everywhere (about four times the work),
+// with time limits to match
+const DEEP_REVIEW_EXTRA = 4;
+const DEEP_REVIEW_TIME = 4;
+
+export type ReviewDepth = "quick" | "deep";
+
 // How many copies of Stockfish work at once: the spare cores, at most three
 const POOL = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 2) - 1));
 
@@ -60,6 +67,8 @@ export class Analyser {
   private deepWanted: Chess[] = [];
   private deepMoves: DeepMove[] = [];
   private readonly poisoned = new Set<string>(); // "fen uci" of moves offering a piece that can't be taken
+  private generation = 0; // goes up when the results are forgotten
+  private reviewDepth: ReviewDepth = "quick";
 
   /** Called after each position Stockfish finishes. */
   constructor(private onUpdate: () => void) {}
@@ -84,6 +93,35 @@ export class Analyser {
     // (both positions: one may have had its own second look while the other hasn't)
     this.deepMoves = moves.filter((m) => !m.after.isEnd() && !isDrawnPosition(m.after) && !(this.deepDone.has(fenOf(m.before)) && this.deepDone.has(fenOf(m.after))));
     this.start();
+  }
+
+  /** Quick (the usual) or deep: how hard Stockfish looks from now on. */
+  get depth(): ReviewDepth {
+    return this.reviewDepth;
+  }
+
+  set depth(depth: ReviewDepth) {
+    this.reviewDepth = depth;
+  }
+
+  /** Forget everything found so far (e.g. to look again at the other depth).
+   *  Searches still running finish, but their results are dropped. */
+  forget() {
+    this.generation++;
+    this.evals.clear();
+    this.deepDone.clear();
+    this.poisoned.clear();
+    this.onUpdate();
+  }
+
+  private limits() {
+    const extra = this.reviewDepth === "deep" ? DEEP_REVIEW_EXTRA : 0;
+    const time = this.reviewDepth === "deep" ? DEEP_REVIEW_TIME : 1;
+    return {
+      think: { depth: THINK_DEPTH + extra, time: THINK_LIMIT * time * 1000 },
+      deep: { depth: DEEP_DEPTH + extra, time: DEEP_LIMIT * time * 1000 },
+      poison: { depth: POISON_DEPTH + extra, time: POISON_LIMIT * time * 1000 },
+    };
   }
 
   /** The results for these positions, to keep. */
@@ -173,17 +211,22 @@ export class Analyser {
   }
 
   private async do(engine: Engine, job: Job) {
+    // (results from before forget() are dropped: they were for the other depth)
+    const generation = this.generation;
+    const live = () => generation === this.generation;
+    const { think, deep, poison } = this.limits();
     if (job.kind === "eval") {
       const fen = job.fens[0];
       await engine.newGame(); // a clean memory: the same answer whatever was looked at before
-      const lines = await engine.analyse(fen, THINK_LIMIT * 1000, 2, undefined, THINK_DEPTH);
-      if (!this.evals.has(fen) || !this.deepDone.has(fen)) this.evals.set(fen, toEvaluation(job.position, lines));
+      const lines = await engine.analyse(fen, think.time, 2, undefined, think.depth);
+      if (live() && (!this.evals.has(fen) || !this.deepDone.has(fen))) this.evals.set(fen, toEvaluation(job.position, lines));
       return;
     }
     if (job.kind === "deep") {
       const fen = job.fens[0];
       await engine.newGame();
-      const lines = await engine.analyse(fen, DEEP_LIMIT * 1000, 2, undefined, DEEP_DEPTH);
+      const lines = await engine.analyse(fen, deep.time, 2, undefined, deep.depth);
+      if (!live()) return;
       this.evals.set(fen, toEvaluation(job.position, lines));
       this.deepDone.add(fen);
       return;
@@ -192,18 +235,21 @@ export class Analyser {
     const [beforeFen, afterFen] = job.fens;
     if (!this.deepDone.has(beforeFen)) {
       await engine.newGame();
-      const lines = await engine.analyse(beforeFen, DEEP_LIMIT * 1000, 2, undefined, DEEP_DEPTH);
+      const lines = await engine.analyse(beforeFen, deep.time, 2, undefined, deep.depth);
+      if (!live()) return;
       this.evals.set(beforeFen, toEvaluation(pending.before, lines));
       this.deepDone.add(beforeFen);
     }
     // the played move, searched from the same position for the same time
     await engine.newGame();
-    const [played] = await engine.analyse(beforeFen, DEEP_LIMIT * 1000, 1, [standardUci(pending.before, pending.move)], DEEP_DEPTH);
+    const [played] = await engine.analyse(beforeFen, deep.time, 1, [standardUci(pending.before, pending.move)], deep.depth);
+    if (!live()) return;
     let previous = this.evals.get(afterFen);
     if (!previous?.best && !pending.after.isEnd()) {
       // the position after has no best move yet (its own look hasn't run): find it now
       await engine.newGame();
-      previous = toEvaluation(pending.after, await engine.analyse(afterFen, DEEP_LIMIT * 1000, 2, undefined, DEEP_DEPTH));
+      previous = toEvaluation(pending.after, await engine.analyse(afterFen, deep.time, 2, undefined, deep.depth));
+      if (!live()) return;
     }
     if (played) this.evals.set(afterFen, { ...(previous ?? { best: undefined }), score: lineScore(pending.before, played) });
     // A piece offered up: what happens if they take it?
@@ -217,7 +263,8 @@ export class Analyser {
       }
       if (takes.length) {
         await engine.newGame();
-        const [taking] = await engine.analyse(afterFen, POISON_LIMIT * 1000, 1, takes, POISON_DEPTH);
+        const [taking] = await engine.analyse(afterFen, poison.time, 1, takes, poison.depth);
+        if (!live()) return;
         const taker = pending.after.turn;
         const best = winningChance(previous.score, taker);
         if (taking && best - winningChance(lineScore(pending.after, taking), taker) >= POISON_DROP) {

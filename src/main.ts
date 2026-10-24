@@ -19,7 +19,7 @@ import "@lichess-org/chessground/assets/chessground.base.css";
 import "./style.css";
 import "./themes.css";
 import "./layout.css";
-import { Analyser, lineMove, lineScore, type DeepMove, type SavedAnalysis } from "./analyser";
+import { Analyser, lineMove, lineScore, type DeepMove, type ReviewDepth, type SavedAnalysis } from "./analyser";
 import { avatarSvg, moodForRating, type Mood } from "./avatar";
 import { drawIcons, icon } from "./icons";
 import { enhanceSelects, syncDropdowns } from "./dropdown";
@@ -173,6 +173,7 @@ const playerNameBox = $<HTMLInputElement>("player-name");
 const uiThemeBox = $<HTMLSelectElement>("ui-theme");
 const piecesBox = $<HTMLSelectElement>("pieces");
 const planModeBox = $<HTMLSelectElement>("plan-mode");
+const reviewDepthBox = $<HTMLSelectElement>("review-depth");
 const planModeRow = $("plan-mode-row");
 // « ‹ › » - above the move list, and (on phones) right under the board
 const navButtons = [...document.querySelectorAll<HTMLButtonElement>("button[data-nav]")];
@@ -462,6 +463,7 @@ interface Settings {
   evalBar?: boolean;
   boardTheme?: string;
   planMode?: string;
+  reviewDepth?: string;
   soundOn?: boolean;
   soundVolume?: number;
   soundStyle?: string;
@@ -494,6 +496,7 @@ function saveSettings() {
     evalBar: evalCheck.checked,
     boardTheme: themeBox.value,
     planMode: planModeBox.value,
+    reviewDepth: reviewDepthBox.value,
     soundOn: soundOn.checked,
     soundVolume: Number(soundVolume.value),
     soundStyle: soundStyleBox.value,
@@ -552,6 +555,7 @@ function buildMenu() {
   if (saved.evalBar !== undefined) evalCheck.checked = saved.evalBar;
   if (saved.boardTheme) themeBox.value = saved.boardTheme;
   if (saved.planMode) planModeBox.value = saved.planMode;
+  reviewDepthBox.value = saved.reviewDepth === "deep" ? "deep" : "quick";
   if (planModeBox.selectedIndex < 0) planModeBox.selectedIndex = 0;
   if (saved.soundOn !== undefined) soundOn.checked = saved.soundOn;
   if (saved.soundVolume !== undefined) soundVolume.value = String(saved.soundVolume);
@@ -895,6 +899,8 @@ function resetBoard(newGame: Game, headers: Headers = { White: "?", Black: "?", 
   puzzle = null;
   drill = null;
   practice = null;
+  deepening = null;
+  useDepth("quick");
   editor = null;
   lesson = null;
   explore = null;
@@ -1163,6 +1169,8 @@ let prepProgress = { key: "", since: 0 }; // the last progress seen, and when
 
 function startPreparing() {
   if (!rateMovesBox.checked) return;
+  deepening = null;
+  useDepth(reviewDepthBox.value === "deep" ? "deep" : "quick");
   restoreAnalysis();
   prepWorked = false;
   prepProgress = { key: "", since: performance.now() };
@@ -1199,8 +1207,9 @@ function drawPrep(list: (Review | undefined)[]) {
     // Stuck (no progress for a long time, or far too long): show what's ready rather than wait for ever
     const key = `${done}/${total}/${deepNeeded.length}/${deepMoves.length}/${list.filter(Boolean).length}`;
     if (key !== prepProgress.key) prepProgress = { key, since: performance.now() };
-    const stalled = performance.now() - prepProgress.since >= PREP_STALL_MS;
-    const tooLong = performance.now() - preparingSince >= PREP_MAX_MS;
+    const slower = analyser.depth === "deep" ? 4 : 1;
+    const stalled = performance.now() - prepProgress.since >= PREP_STALL_MS * slower;
+    const tooLong = performance.now() - preparingSince >= PREP_MAX_MS * slower;
     if (!stalled && !tooLong) return;
   }
   const wait = prepWorked ? PREP_MIN_MS - (performance.now() - preparingSince) : 0;
@@ -1247,15 +1256,26 @@ function savedAnalyses(): Record<string, SavedAnalysis> {
 /** A game reviewed before: what Stockfish found then. */
 function restoreAnalysis() {
   if (!game.length) return;
-  const saved = savedAnalyses()[gameKey()];
+  const saved = savedAnalyses()[analysisKey()];
   if (saved) analyser.restore(saved);
+}
+
+/** The game's key for its kept analysis: one for each depth. */
+const analysisKey = () => `${gameKey()}${analyser.depth === "deep" ? ":deep" : ""}`;
+
+/** Look at the game at this depth from now on (forgetting the other depth's results). */
+function useDepth(depth: ReviewDepth) {
+  if (analyser.depth === depth) return;
+  analyser.depth = depth;
+  analyser.forget();
+  reviewCache.clear();
 }
 
 /** Keep this game's analysis (the most recent games only). */
 function keepAnalysis() {
   if (!game.length) return;
   const all = savedAnalyses();
-  const key = gameKey();
+  const key = analysisKey();
   delete all[key];
   // the game's positions, and the ones after each best (and second best) move, which the ratings use too
   const fens = gameFens();
@@ -3560,6 +3580,93 @@ function drawProgress() {
     `Built from the last ${seen.recent.length} of the ${seen.games} games you've reviewed as a player, kept on your phone.`));
 }
 
+// -- A deeper review: every move checked again, with a longer search ------------------
+
+// Looking deeper at the game on the board: the ratings before, to say what changed
+let deepening: { before: string[]; done: boolean; changes: string[] } | null = null;
+
+/** Look deeper: the game's analysis again at the deep depth (kept, so it's quick next time). */
+function lookDeeper() {
+  deepening = { before: withBook(reviews()).map((r) => r?.rating ?? ""), done: false, changes: [] };
+  useDepth("deep");
+  restoreAnalysis();
+  refresh();
+}
+
+/** Stop: back to the quick review. */
+function stopDeeper() {
+  deepening = null;
+  useDepth("quick");
+  restoreAnalysis();
+  refresh();
+}
+
+/** Once the deeper look has finished: what changed, kept for next time. */
+function checkDeeper(list: (Review | undefined)[]) {
+  if (!deepening || deepening.done) return;
+  const { done, total } = analyser.progress();
+  if (done < total || deepNeeded.length || deepMoves.length || !list.every(Boolean)) return;
+  const graded = withBook(list);
+  deepening.done = true;
+  deepening.changes = graded.flatMap((review, i) => {
+    const was = deepening!.before[i];
+    if (!review || !was || was === review.rating) return [];
+    const position = game.positionAt(i);
+    return [`${position.fullmoves}${position.turn === "white" ? "." : "..."}${game.moves[i].san} ${was} → ${review.rating}`];
+  });
+  keepAnalysis();
+  saveGameMistakes(graded);
+  saveGameSummary(graded);
+}
+
+/** The statistics: which review this is, and the way to look deeper. */
+function depthCard(list: (Review | undefined)[], pending: boolean): HTMLElement {
+  const card = element("div", "stats-card depth-card");
+  const row = element("div", "stats-row");
+  row.append(element("span", "stats-label", "Checked with"));
+  const deep = analyser.depth === "deep";
+  const which = element("span", "depth-which", deep ? "Deep review" : "Quick review");
+  if (deep && !pending) which.append(element("span", "stats-tag done", "done"));
+  row.append(which);
+  card.append(row);
+  if (deepening && !deepening.done) {
+    const { done, total } = analyser.progress();
+    const rated = list.filter(Boolean).length;
+    card.append(element("p", "", "Looking deeper at every move..."));
+    const track = element("div", "depth-track");
+    const fill = element("div", "depth-fill");
+    fill.style.width = `${Math.round(100 * Math.min(1, total ? done / total : 0))}%`;
+    track.append(fill);
+    card.append(track, element("p", "stats-note", `${Math.min(done, total)} of ${total} positions · ${rated} of ${list.length} moves rated`));
+    const stop = element("button", "soft depth-button", "Stop and keep the quick review");
+    stop.type = "button";
+    stop.addEventListener("click", stopDeeper);
+    card.append(stop);
+  } else if (deep) {
+    const changes = deepening?.done ? deepening.changes : null;
+    // the changes that matter in full; Good / Excellent / Best swapping places just counted
+    const SMALL = /^\S+ (Best|Excellent|Good|Book|Forced) → (Best|Excellent|Good|Book|Forced)$/;
+    const big = (changes ?? []).filter((c) => !SMALL.test(c));
+    const small = (changes ?? []).length - big.length;
+    const smallWords = small ? `${small} small one${small === 1 ? "" : "s"} (Good, Excellent and Best swapping places)` : "";
+    card.append(element("p", "stats-note", changes === null
+      ? "Every move was checked with a longer search."
+      : !changes.length
+        ? "No ratings changed: the quick review had them right."
+        : big.length
+          ? `What changed: ${big.join(", ")}.${small ? ` Also ${smallWords}.` : ""}`
+          : `${cap(smallWords)}. None of the slips changed.`));
+  } else {
+    card.append(element("p", "stats-note",
+      "Your phone's Stockfish, at a quick depth. A longer look may rate a few moves a step differently."));
+    const button = element("button", "accent depth-button", "Look deeper (1-3 min)");
+    button.type = "button";
+    button.addEventListener("click", lookDeeper);
+    card.append(button);
+  }
+  return card;
+}
+
 /** Back to Training, on the tab you came from. */
 function leavePractice() {
   resetBoard(new Game());
@@ -3934,6 +4041,7 @@ function refresh() {
   drawCoach();
   drawDemo();
   drawPrep(reviews);
+  checkDeeper(reviews);
   drawStatsBack();
 }
 
@@ -5578,14 +5686,21 @@ function drawStats() {
   // The rating, in its own table
   const rating = element("div", "stats-card rating-card");
   const line = element("div", "stats-row");
-  line.append(element("span", "stats-label", "Rating"));
+  const ratingLabel = element("span", "stats-label", "Rating");
+  ratingLabel.append(element("span", "stats-tag", "estimate"));
+  line.append(ratingLabel);
   for (const colour of sides) {
     const cell = element("span", "stats-cell");
     cell.append(element("span", "rating-block", pending ? "??" : ratings[colour] ? String(ratings[colour]) : "-"));
     line.append(cell);
   }
   rating.append(line);
+  const fromRatings = ["WhiteElo", "BlackElo"].some((tag) => Number(gameHeaders[tag]) > 0);
+  rating.append(element("p", "stats-note",
+    `An estimate from how accurately each side played${fromRatings ? ", starting from their ratings" : ""}. ` +
+    "One game is a small sample: expect it to vary a few hundred points."));
   box.append(card, rating);
+  if (reviewing) box.append(depthCard(list, pending));
   updateHistoryAccuracy(overall);
 }
 
@@ -6413,6 +6528,7 @@ function wireButtons() {
     pgnText.value = await file.text();
     readPgnText();
   });
+  reviewDepthBox.addEventListener("change", saveSettings); // (used from the next review)
   planModeBox.addEventListener("change", () => {
     saveSettings();
     refresh();
