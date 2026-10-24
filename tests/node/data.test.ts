@@ -1,6 +1,6 @@
 // What the app keeps on the device: your mistakes and their schedule, the
 // Your progress summary, and backups (made, read back, added and replaced).
-import { addMistakes, dueMistakes, loadMistakes, MASTERED, recordAttempt, today } from "../../src/mistakes";
+import { addMistakes, dueMistakes, loadMistakes, MASTERED, recordAttempt, saveLines, today } from "../../src/mistakes";
 import { picture, saveSummary } from "../../src/progress";
 import { makeBackup, readBackup, restoreBackup } from "../../src/backup";
 
@@ -27,6 +27,12 @@ export default async function run() {
   expect("a mastered mistake isn't due", dueMistakes().length === 0);
   const wrong = recordAttempt(id, false)!;
   expect("a wrong answer starts it again tomorrow", wrong.stage === 0 && wrong.due - today() === 1);
+  // How the game got there: kept with a new one, and found later for an older one
+  const line = { start: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", moves: ["e2e4", "e7e5"] };
+  addMistakes([{ ...base, best: "b1c3", line }]);
+  expect("the moves before a mistake are kept", loadMistakes().find((m) => m.best === "b1c3")?.line?.moves.length === 2);
+  saveLines(new Map([[id, line]]));
+  expect("moves found for an older one are kept", loadMistakes().find((m) => m.id === id)?.line?.moves.join() === "e2e4,e7e5");
 
   // -- Your progress: the picture from game summaries
   const game = (key: string, accuracy: number, middlegame: number, slips: ("hanging" | "fork" | "other")[], result: "win" | "loss") =>

@@ -12,12 +12,19 @@ export interface Mistake {
   fen: string; // the position, your move to play
   best: string; // the better move (UCI)
   played?: string; // what you played (UCI), when it came from a game
+  line?: MistakeLine; // how the game got there, when known
   kind: MistakeKind;
   phase: MistakePhase;
   source: string; // "your game against brad12340987", "the London drill"
   added: number; // day numbers (days since 1970, local time)
   due: number;
   stage: number; // right answers in a row (5 = mastered)
+}
+
+/** The moves (UCI) from a starting position up to the puzzle's position. */
+export interface MistakeLine {
+  start: string; // FEN
+  moves: string[];
 }
 
 const KEY = "chess-trainer-mistakes";
@@ -67,6 +74,17 @@ export function addMistakes(found: Omit<Mistake, "id" | "added" | "due" | "stage
   }
   if (added) saveAll(list);
   return added;
+}
+
+/** Keep how older positions came about, once found (by id). */
+export function saveLines(found: Map<string, MistakeLine>) {
+  if (!found.size) return;
+  const list = loadMistakes();
+  for (const mistake of list) {
+    const line = found.get(mistake.id);
+    if (line) mistake.line = line;
+  }
+  saveAll(list);
 }
 
 /** After an attempt: right first time moves it on; anything else starts it again tomorrow. */

@@ -10,19 +10,19 @@ import { makeSquare, makeUci, opposite, parseUci } from "chessops/util";
 import { accuracyRating, divide, gameAccuracy, phaseAccuracy } from "../accuracy";
 import { type Mood, avatarSvg } from "../avatar";
 import { type Score, isCastling, afterMove as positionAfter } from "../coach";
-import { type Demo, demoFor, demoSteps, introMoves } from "../demos";
+import { DEMOS, type Demo, demoFor, demoSteps, introMoves } from "../demos";
 import { Game } from "../game";
 import { icon } from "../icons";
 import type { TrainPhase } from "../lessons";
 import { analyser, coachAnalysis, currentPly, gameMoves, ratingsOn } from "../main";
 import {
-  MASTERED, type Mistake, type MistakeKind, type MistakePhase, addMistakes, comesBack, today as dayNumber,
-  dueMistakes, loadMistakes, mistakeCounts, mistakeId, recordAttempt,
+  MASTERED, type Mistake, type MistakeKind, type MistakeLine, type MistakePhase, addMistakes, comesBack,
+  today as dayNumber, dueMistakes, loadMistakes, mistakeCounts, mistakeId, recordAttempt, saveLines,
 } from "../mistakes";
-import { controlledSquares, dangerAfter, moveInWords, quietIdea, ratingWords, targetsOf } from "../narrate";
+import { controlledSquares, dangerAfter, moveInWords, narrateMove, quietIdea, ratingWords, targetsOf } from "../narrate";
 import { type Opening, REPERTOIRE, firstMoveOf, goalWords, menuName, setupProgress, systemFor } from "../openings";
 import { type Mark, chainOf, whatYouGet } from "../outlook";
-import { today } from "../pgn";
+import { readPgn, today } from "../pgn";
 import {
   type GamePhase, PROGRESS_MIN, SLIP_THEMES, SLIP_WORDS, type SlipKind, picture, saveSummary,
 } from "../progress";
@@ -30,12 +30,12 @@ import { type Review, fenOf, winningChance } from "../review";
 import { play } from "../sounds";
 
 import {
-  type CoachButton, type CoachSay, type StepFrame, closeOverlay, closeStepper, element, listener, para, reviews,
-  showOverlay,
+  type CoachButton, type CoachSay, type StepFrame, closeOverlay, closeStepper, element, listener, loadHistory, para,
+  reviews, showOverlay,
 } from "./coach";
 import { $, colourBox, demoPick, menuCard, myOpeningBox, opponentBox } from "./dom";
 import { arrowEnd, refresh } from "./draw";
-import { gameKey, useDepth, watching, withBook, keepAnalysis, restoreAnalysis } from "./matches";
+import { gameKey, keepAnalysis, restoreAnalysis, savedAnalyses, useDepth, watching, withBook } from "./matches";
 import { goTo } from "./moves";
 import { gameScores, ratingClass } from "./playerBars";
 import { message } from "./popups";
@@ -44,7 +44,7 @@ import { moveSound, showMenu } from "./startMenu";
 import { hideMenu, resetBoard, showScreen } from "./startScreens";
 import {
   orientation, busy, deepMoves, deepNeeded, deepening, demo, drill, game, gameHeaders, lastReviews, match, menuOpen,
-  practice, puzzleLevel, replaying, reviewing, set, trainTab,
+  practice, puzzleLevel, replaying, reviewing, set, trainTab, viewPly,
 } from "./state";
 import { setBusy } from "./strategyCoach";
 import { PUZZLE_LEVELS, drawTrainScreen, showLessonList, startPuzzles } from "./train";
@@ -544,7 +544,7 @@ export async function drillWrong(before: Chess, move: NormalMove, expected: Norm
     ? `That's ${ratingWords(rating)} too, but it isn't the lesson's move.`
     : `That would be ${ratingWords(rating)}.`;
   if (d.tries === 1) {
-    addMistakes([{ fen: fenOf(before), best: makeUci(expected), kind: "drill", phase: "opening", source: `the ${openingShortName(d.demo.opening)} drill` }]);
+    addMistakes([{ fen: fenOf(before), best: makeUci(expected), line: lineTo(before), kind: "drill", phase: "opening", source: `the ${openingShortName(d.demo.opening)} drill` }]);
   }
   const goal = goalDone(before, expected);
   const hint = d.tries >= 2 ? "The arrow shows the lesson's move." : goal ? `Think about your setup: ${goal}.` : "Think back to the lesson.";
@@ -584,7 +584,7 @@ export async function drillAnswer(move: NormalMove) {
   }
   d.tries++;
   if (d.tries === 1 && d.best) {
-    addMistakes([{ fen: fenOf(before), best: makeUci(d.best.move), kind: "miss", phase: "opening", source: `the ${openingShortName(d.demo.opening)} drill` }]);
+    addMistakes([{ fen: fenOf(before), best: makeUci(d.best.move), line: lineTo(before), kind: "miss", phase: "opening", source: `the ${openingShortName(d.demo.opening)} drill` }]);
   }
   d.note = d.tries >= 2
     ? "Not that either. The arrow shows the way to make them pay."
@@ -812,6 +812,7 @@ export function saveGameMistakes(list: (Review | undefined)[]) {
     if (!best) return [];
     return [{
       fen: fenOf(before), best: makeUci(best), played: makeUci(game.moves[i].move),
+      line: { start: game.fenAt(0), moves: game.moves.slice(0, i).map((m) => makeUci(m.move)) },
       kind: (review.rating === "Miss" || review.rating === "Missed Win" ? "miss" : "mistake") as MistakeKind,
       phase: phaseOf(i), source,
     }];
@@ -823,6 +824,7 @@ export function saveGameMistakes(list: (Review | undefined)[]) {
 /** Practise these positions, one after another. */
 export function startPractice(list: Mistake[]) {
   if (!list.length) return;
+  findLines(list);
   resetBoard(new Game(), { White: "?", Black: "?", Event: "Your mistakes" });
   set.mode("play"); // no eval bar to give it away
   set.gameOrigin("train");
@@ -845,16 +847,130 @@ export function showPracticePosition(index: number) {
     refresh();
     return;
   }
-  set.game(new Game(mistake.fen));
-  set.viewPly(null);
+  // With the moves that led here: the moves to step back through, and it opens a
+  // move early so their last move is played for you
+  const line = mistake.line?.moves.length ? playLine(mistake.line) : null;
+  set.game(line ?? new Game(mistake.fen));
+  set.viewPly(line ? game.length - 1 : null);
   set.analysis(null);
   set.preview(null);
   set.orientation(game.position.turn);
   Object.assign(p, { index, tries: 0, hints: 0, state: "solving", waiting: false, mood: "talk" });
-  p.note = mistake.kind === "miss" ? `From ${mistake.source}. Their last move was a slip. Can you punish it this time?`
-    : mistake.kind === "drill" ? `From ${mistake.source}. What's the move here?`
-      : `From ${mistake.source}. Last time this went wrong. Find a better move.`;
+  const last = line ? `${narrateMove(game.positionAt(game.length - 1), game.moves[game.length - 1].move, game.position.turn)} ` : "";
+  p.note = `From ${mistake.source}. ${last}` + (mistake.kind === "miss" ? "That was a slip. Can you punish it this time?"
+    : mistake.kind === "drill" ? "What's the move here?"
+      : "Last time this went wrong. Find a better move.");
   refresh();
+  if (line) {
+    setTimeout(() => {
+      if (practice !== p || p.index !== index || viewPly !== game.length - 1) return;
+      set.viewPly(null);
+      moveSound(game.moves[game.length - 1].san, opposite(game.position.turn));
+      refresh();
+    }, PREVIOUS_MOVE_PAUSE);
+  }
+}
+
+const PREVIOUS_MOVE_PAUSE = 700; // ms on the position before, before their move is played
+
+/** A puzzle's game: its moves played from the start (null if they no longer lead to it). */
+function playLine(line: MistakeLine): Game | null {
+  try {
+    const played = new Game(line.start);
+    for (const uci of line.moves) {
+      const move = parseUci(uci) as NormalMove | undefined;
+      const legal = move && (normalizeMove(played.position, move) as NormalMove);
+      if (!legal || !played.position.isLegal(legal)) return null;
+      played.play(legal);
+    }
+    return played;
+  } catch {
+    return null;
+  }
+}
+
+/** The moves of the game on the board up to a position in it (for a drill's slip). */
+function lineTo(position: Chess): MistakeLine | undefined {
+  const key = samePosition(fenOf(position));
+  for (let ply = game.length; ply >= 0; ply--) {
+    if (samePosition(fenOf(game.positionAt(ply))) === key) {
+      return { start: game.fenAt(0), moves: game.moves.slice(0, ply).map((m) => makeUci(m.move)) };
+    }
+  }
+  return undefined;
+}
+
+/** The moves (UCI) from one position to another through known positions only
+ *  (breadth first, so the fewest moves), or undefined. */
+function pathThrough(from: string, to: string, known: Set<string>): string[] | undefined {
+  const target = samePosition(to);
+  const start = new Game(from).position;
+  const queue: [Chess, string[]][] = [[start, []]];
+  const visited = new Set([samePosition(from)]);
+  while (queue.length) {
+    const [position, moves] = queue.shift()!;
+    if (samePosition(fenOf(position)) === target) return moves;
+    if (moves.length > 300) continue;
+    for (const [from, dests] of position.allDests()) {
+      for (const to of dests) {
+        const promotes = position.board.get(from)?.role === "pawn" && (to < 8 || to >= 56);
+        const move: NormalMove = promotes ? { from, to, promotion: "queen" } : { from, to };
+        const next = position.clone();
+        next.play(move);
+        const key = samePosition(fenOf(next));
+        if (!known.has(key) || visited.has(key)) continue;
+        visited.add(key);
+        queue.push([next, [...moves, makeUci(move)]]);
+      }
+    }
+  }
+  return undefined;
+}
+
+const samePosition = (fen: string) => fen.split(" ").slice(0, 4).join(" ");
+
+/** Positions saved before the moves were kept: look for them in your saved games
+ *  your reviews and the opening lessons (and keep what's found). */
+function findLines(list: Mistake[]) {
+  const wanted = new Map(list.filter((m) => !m.line?.moves.length).map((m) => [samePosition(m.fen), m]));
+  if (!wanted.size) return;
+  const found = new Map<string, MistakeLine>();
+  const search = (start: string, moves: NormalMove[]) => {
+    const played = new Game(start);
+    const look = () => {
+      const mistake = wanted.get(samePosition(fenOf(played.position)));
+      if (mistake && !found.has(mistake.id)) found.set(mistake.id, { start, moves: played.moves.map((m) => makeUci(m.move)) });
+    };
+    look();
+    for (const move of moves) {
+      if (!played.position.isLegal(move)) return;
+      played.play(move);
+      look();
+    }
+  };
+  for (const saved of loadHistory()) {
+    try {
+      const loaded = readPgn(saved.pgn)[0]?.load().game;
+      if (loaded) search(loaded.fenAt(0), loaded.moves.map((m) => m.move));
+    } catch {
+      // a game that won't read is skipped
+    }
+  }
+  // Games reviewed but not saved (pasted in): their review keeps the positions;
+  // the shortest way through them from the first is the game's own moves
+  for (const saved of Object.values(savedAnalyses())) {
+    const left = [...wanted.values()].filter((m) => !found.has(m.id));
+    if (!left.length) break;
+    const seen = new Set(saved.evals.map(([fen]) => samePosition(fen)));
+    for (const mistake of left) {
+      const moves = seen.has(samePosition(mistake.fen)) && saved.evals[0] ? pathThrough(saved.evals[0][0], mistake.fen, seen) : undefined;
+      if (moves) found.set(mistake.id, { start: saved.evals[0][0], moves });
+    }
+  }
+  const startFen = new Game().fenAt(0);
+  for (const d of DEMOS) d.lines.forEach((_, i) => search(startFen, demoSteps(d, i).map((step) => step.move)));
+  for (const mistake of wanted.values()) mistake.line = found.get(mistake.id) ?? mistake.line;
+  saveLines(found);
 }
 
 /** Your move: the better move, or one nearly as good, solves it. */
@@ -912,6 +1028,7 @@ export function practiceShow() {
   const p = practice;
   if (!p || p.state !== "solving" || p.waiting) return;
   const mistake = p.list[p.index];
+  set.viewPly(null); // back to the puzzle, if stepping through the moves before it
   const before = game.position.clone();
   const best = normalizeMove(before, parseUci(mistake.best) as NormalMove) as NormalMove;
   if (!before.isLegal(best)) return;
@@ -935,6 +1052,7 @@ export function practiceSays(): CoachSay {
     return { mood: p.mood, text: p.note, key, buttons: [{ ico: "skipNext", label: last ? "Finish" : "Next puzzle", kind: "accent", run: () => showPracticePosition(p.index + 1) }] };
   }
   const hint: CoachButton = { ico: "bulb", label: "Hint", run: () => {
+    set.viewPly(null); // the hint is for the puzzle, not a move before it
     p.hints++;
     p.note = "This piece moves.";
     refresh();
