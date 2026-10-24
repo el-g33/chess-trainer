@@ -60,6 +60,10 @@ import {
 } from "./clock";
 import { DEMOS, demoFor, demoSteps, introMoves, type Demo, type DemoStep } from "./demos";
 import { LESSONS, type Lesson, type TrainPhase } from "./lessons";
+import {
+  addMistakes, comesBack, dueMistakes, loadMistakes, MASTERED, mistakeCounts, mistakeId, recordAttempt,
+  type Mistake, type MistakeKind, type MistakePhase,
+} from "./mistakes";
 import { BANDS, likelyMoves, pickLikely, type Band, type LikelyMove } from "./explore";
 import { chainOf, whatYouGet, type Mark } from "./outlook";
 import { fitsIn, readingTime, splitToFit, Typer } from "./talk";
@@ -885,6 +889,7 @@ function resetBoard(newGame: Game, headers: Headers = { White: "?", Black: "?", 
   currentGameId = null;
   puzzle = null;
   drill = null;
+  practice = null;
   editor = null;
   lesson = null;
   explore = null;
@@ -1199,6 +1204,7 @@ function drawPrep(list: (Review | undefined)[]) {
     return;
   }
   keepAnalysis();
+  saveGameMistakes(withBook(list));
   stopPreparing();
   currentView = "stats";
   applyView();
@@ -1344,6 +1350,7 @@ function movableColour(): Color | undefined {
   if (drill) {
     return drill.state === "playing" && !drill.waiting && viewPly === null && game.position.turn === drill.user ? drill.user : undefined;
   }
+  if (practice) return practice.state === "solving" && !practice.waiting && viewPly === null ? game.position.turn : undefined;
   if (puzzle) {
     return puzzle.state === "solving" && viewPly === null && game.length > 0 && game.position.turn === puzzle.side ? puzzle.side : undefined;
   }
@@ -1363,6 +1370,8 @@ function onBoardMove(from: Key, to: Key) {
   const move = normalizeMove(position, given) as NormalMove;
   if (drill) {
     drillMove(move);
+  } else if (practice) {
+    void practiceMove(move);
   } else if (puzzle) {
     puzzleMove(move);
   } else if (quizWaiting()) {
@@ -1751,6 +1760,7 @@ function drawTrainScreen() {
     tab.classList.toggle("on", on);
     tab.setAttribute("aria-selected", String(on));
   }
+  drawMistakesCard();
   // Openings: the lessons by colour and the opening traps; the phases: principles
   // and puzzles. Your position is on every tab.
   const openings = trainTab === "openings";
@@ -1789,6 +1799,7 @@ function setupTrain() {
     });
   }
   $("start-puzzles").addEventListener("click", () => void startPuzzles(trainTab, puzzleLevel));
+  $("start-mistakes").addEventListener("click", practiseMistakes);
   $("train-position").addEventListener("click", () => startEditor());
   $("train-principles").addEventListener("click", showLessonList);
   // The editor
@@ -2962,6 +2973,9 @@ async function drillWrong(before: Chess, move: NormalMove, expected: NormalMove)
   const verdictText = loss < 5
     ? `That's ${ratingWords(rating)} too, but it isn't the lesson's move.`
     : `That would be ${ratingWords(rating)}.`;
+  if (d.tries === 1) {
+    addMistakes([{ fen: fenOf(before), best: makeUci(expected), kind: "drill", phase: "opening", source: `the ${openingShortName(d.demo.opening)} drill` }]);
+  }
   const goal = goalDone(before, expected);
   const hint = d.tries >= 2 ? "The arrow shows the lesson's move." : goal ? `Think about your setup: ${goal}.` : "Think back to the lesson.";
   d.note = `${verdictText} ${hint}`;
@@ -2999,6 +3013,9 @@ async function drillAnswer(move: NormalMove) {
     return;
   }
   d.tries++;
+  if (d.tries === 1 && d.best) {
+    addMistakes([{ fen: fenOf(before), best: makeUci(d.best.move), kind: "miss", phase: "opening", source: `the ${openingShortName(d.demo.opening)} drill` }]);
+  }
   d.note = d.tries >= 2
     ? "Not that either. The arrow shows the way to make them pay."
     : "There's something better. What did their last move leave open, or what does it threaten?";
@@ -3187,6 +3204,219 @@ function backToTraining(name: string) {
   $("lesson-list").hidden = true;
   showScreen("train");
   drawTrainScreen();
+}
+
+// -- Your mistakes: positions from your own games and drills, as puzzles ------------
+
+interface Practice {
+  list: Mistake[];
+  index: number;
+  tries: number; // wrong tries at this one
+  hints: number;
+  state: "solving" | "solved" | "shown" | "done";
+  waiting: boolean; // checking a move
+  note: string;
+  mood: Mood;
+  right: number; // right first time, this session
+}
+
+let practice: Practice | null = null;
+// The last review's slips, saved as puzzles: for the note under the statistics
+let savedFromReview: { key: string; ids: string[]; added: number } | null = null;
+
+const SAVED_RATINGS = new Set(["Mistake", "Miss", "Missed Win", "Blunder"]);
+
+/** After a review: your mistakes, misses and blunders become puzzles. */
+function saveGameMistakes(list: (Review | undefined)[]) {
+  const you = listener();
+  if (!you || watching() || !game.length) return;
+  const positions = Array.from({ length: game.length + 1 }, (_, ply) => game.positionAt(ply));
+  const division = divide(positions);
+  const phaseOf = (ply: number): MistakePhase =>
+    division.middle === undefined || ply < division.middle ? "opening"
+      : division.end !== undefined && division.end <= ply ? "endgame" : "middlegame";
+  const opponent = gameHeaders[you === "white" ? "Black" : "White"];
+  const source = opponent && opponent !== "?" && opponent !== "Stockfish" ? `your game against ${opponent}` : "one of your games";
+  const found = list.flatMap((review, i) => {
+    if (!review || !SAVED_RATINGS.has(review.rating) || !review.bestSan || game.moverOf(i + 1) !== you) return [];
+    const before = positions[i];
+    const best = parseSan(before, review.bestSan) as NormalMove | undefined;
+    if (!best) return [];
+    return [{
+      fen: fenOf(before), best: makeUci(best), played: makeUci(game.moves[i].move),
+      kind: (review.rating === "Miss" || review.rating === "Missed Win" ? "miss" : "mistake") as MistakeKind,
+      phase: phaseOf(i), source,
+    }];
+  });
+  const added = addMistakes(found);
+  savedFromReview = { key: gameKey(), ids: found.map((m) => mistakeId(m.fen, m.best)), added };
+}
+
+/** Practise these positions, one after another. */
+function startPractice(list: Mistake[]) {
+  if (!list.length) return;
+  resetBoard(new Game(), { White: "?", Black: "?", Event: "Your mistakes" });
+  mode = "play"; // no eval bar to give it away
+  gameOrigin = "train";
+  currentView = "board";
+  practice = { list, index: -1, tries: 0, hints: 0, state: "solving", waiting: false, note: "", mood: "talk", right: 0 };
+  if (menuOpen) hideMenu();
+  showPracticePosition(0);
+}
+
+function showPracticePosition(index: number) {
+  const p = practice;
+  if (!p) return;
+  const mistake = p.list[index];
+  if (!mistake) {
+    p.state = "done";
+    p.note = p.right === p.list.length
+      ? `All ${p.list.length} right first time. Well done!`
+      : `That's all for now: ${p.right} of ${p.list.length} right first time. The others come back tomorrow.`;
+    p.mood = p.right === p.list.length ? "wow" : "happy";
+    refresh();
+    return;
+  }
+  game = new Game(mistake.fen);
+  viewPly = null;
+  analysis = null;
+  preview = null;
+  orientation = game.position.turn;
+  Object.assign(p, { index, tries: 0, hints: 0, state: "solving", waiting: false, mood: "talk" });
+  p.note = mistake.kind === "miss" ? `From ${mistake.source}. Their last move was a slip. Can you punish it this time?`
+    : mistake.kind === "drill" ? `From ${mistake.source}. What's the move here?`
+      : `From ${mistake.source}. Last time this went wrong. Find a better move.`;
+  refresh();
+}
+
+/** Your move: the better move, or one nearly as good, solves it. */
+async function practiceMove(move: NormalMove) {
+  const p = practice;
+  if (!p || p.state !== "solving" || p.waiting) return;
+  const mistake = p.list[p.index];
+  const before = game.position.clone();
+  const played = game.play(move);
+  moveSound(played.san, before.turn);
+  if (makeUci(move) === mistake.best) return practiceSolved(before, move);
+  p.waiting = true;
+  p.note = "Let me check that...";
+  p.mood = "think";
+  refresh();
+  const [best] = await coachAnalysis.analyse(before, 0.6, 1);
+  const score = await coachAnalysis.moveScore!(before, move, 0.6);
+  if (practice !== p) return;
+  if (best && winningChance(score, before.turn) >= winningChance(best.score, before.turn) - DRILL_ANSWER) {
+    p.waiting = false;
+    return practiceSolved(before, move);
+  }
+  p.tries++;
+  p.note = p.tries >= 2 ? "Not that either. Tap the bulb for a hint, or the eye to see it."
+    : mistake.kind === "drill" ? "Not quite. Think back to the lesson." : "Not quite. Have another look: what does their last move change?";
+  p.mood = "worried";
+  refresh();
+  setTimeout(() => {
+    if (practice !== p) return;
+    game.undo();
+    void play("illegal");
+    p.waiting = false;
+    refresh();
+  }, 900);
+}
+
+function practiceSolved(before: Chess, move: NormalMove) {
+  const p = practice!;
+  const mistake = p.list[p.index];
+  const firstTime = p.tries === 0 && p.hints === 0;
+  const updated = recordAttempt(mistake.id, firstTime);
+  if (firstTime) p.right++;
+  p.state = "solved";
+  void play("right");
+  const words = moveInWords(before, move, before.turn);
+  p.note = firstTime
+    ? `That's it! ${words} It comes back ${updated ? comesBack(updated) : "later"}.`
+    : `That's it. ${words} It took a few tries, so it comes back ${updated ? comesBack(updated) : "tomorrow"}.`;
+  p.mood = firstTime ? "wow" : "happy";
+  refresh();
+}
+
+/** Show me: the better move, played on the board. It comes back tomorrow. */
+function practiceShow() {
+  const p = practice;
+  if (!p || p.state !== "solving" || p.waiting) return;
+  const mistake = p.list[p.index];
+  const before = game.position.clone();
+  const best = normalizeMove(before, parseUci(mistake.best) as NormalMove) as NormalMove;
+  if (!before.isLegal(best)) return;
+  const played = game.play(best);
+  moveSound(played.san, before.turn);
+  recordAttempt(mistake.id, false);
+  p.state = "shown";
+  p.note = `This was the move: ${lowerFirst(moveInWords(before, best, before.turn))} It comes back tomorrow.`;
+  p.mood = "talk";
+  refresh();
+}
+
+function practiceSays(): CoachSay {
+  const p = practice!;
+  const key = `practice:${p.index}:${p.state}:${p.tries}:${p.hints}:${p.note.length}`;
+  if (p.state === "done") {
+    return { mood: p.mood, text: p.note, key, buttons: [{ ico: "school", label: "Back to Training", kind: "accent", run: leavePractice }] };
+  }
+  if (p.state !== "solving") {
+    const last = p.index + 1 >= p.list.length;
+    return { mood: p.mood, text: p.note, key, buttons: [{ ico: "skipNext", label: last ? "Finish" : "Next puzzle", kind: "accent", run: () => showPracticePosition(p.index + 1) }] };
+  }
+  const hint: CoachButton = { ico: "bulb", label: "Hint", run: () => {
+    p.hints++;
+    p.note = "This piece moves.";
+    refresh();
+  } };
+  const show: CoachButton = { ico: "eye", label: "Show me", kind: "soft", run: practiceShow };
+  return { mood: p.mood, text: p.note, key, buttons: p.waiting ? [] : [hint, show] };
+}
+
+/** Back to Training, on the tab you came from. */
+function leavePractice() {
+  resetBoard(new Game());
+  refresh();
+  showMenu();
+  homeChoice = "train";
+  $("lesson-list").hidden = true;
+  showScreen("train");
+  drawTrainScreen();
+}
+
+/** A hint circles the piece to move. */
+function practiceShapes(): DrawShape[] {
+  const p = practice;
+  if (!p || p.state !== "solving" || !p.hints) return [];
+  const move = parseUci(p.list[p.index].best) as NormalMove | undefined;
+  return move ? [{ orig: makeSquare(move.from) as Key, brush: "you" }] : [];
+}
+
+/** Training: the Your mistakes card, for the tab's phase. */
+function drawMistakesCard() {
+  const phase: MistakePhase = trainTab === "openings" ? "opening" : trainTab;
+  const counts = mistakeCounts(phase);
+  const total = counts.learning + counts.nearly + counts.mastered;
+  $("mistakes-due").textContent = counts.due ? `${counts.due} due today` : "";
+  $("mistakes-due").hidden = !counts.due;
+  $("mistakes-note").textContent = total
+    ? "Positions from your own games and drills. Get them right and they come back less often."
+    : `Mistakes from the games you review, and moves you miss in drills, come back here as puzzles.`;
+  $("mistakes-counts").textContent = total ? `Learning ${counts.learning} · Nearly there ${counts.nearly} · Mastered ${counts.mastered}` : "";
+  const waiting = counts.learning + counts.nearly;
+  const button = $<HTMLButtonElement>("start-mistakes");
+  button.hidden = !waiting;
+  button.textContent = counts.due ? `Practise ${counts.due}` : "Practise ahead";
+}
+
+/** The card's button: today's, or (when none are due) the next ones coming up. */
+function practiseMistakes() {
+  const phase: MistakePhase = trainTab === "openings" ? "opening" : trainTab;
+  const due = dueMistakes(phase);
+  const ahead = loadMistakes().filter((m) => m.phase === phase && m.stage < MASTERED).sort((a, b) => a.due - b.due).slice(0, 10);
+  startPractice(due.length ? due : ahead);
 }
 
 function onDemoExit() {
@@ -3663,7 +3893,7 @@ function drawBoard(reviews: (Review | undefined)[], info: OpeningInfo[]) {
   }
   const colour = movableColour();
   const movesFrom = quizWaiting() ? quiz!.threat!.passed! : position;
-  ground.setAutoShapes(stepper ? stepperShapes() : drill ? drillShapes() : puzzle ? puzzleShapes() : editor ? [] : demo ? demoShapes() : [...badgeShapes(reviews, info), ...arrowShapes(), ...replayShapes()]);
+  ground.setAutoShapes(stepper ? stepperShapes() : drill ? drillShapes() : practice ? practiceShapes() : puzzle ? puzzleShapes() : editor ? [] : demo ? demoShapes() : [...badgeShapes(reviews, info), ...arrowShapes(), ...replayShapes()]);
   if (editor || demo?.intro) last = undefined;
   ground.set({
     fen: fenOf(position),
@@ -3785,6 +4015,7 @@ function drawPlayerBars() {
   for (const [bar, colour] of bars) {
     const name = bar.querySelector<HTMLElement>(".pb-name")!;
     name.textContent = demo && bar.id === "bar-top" ? demoTitle()
+      : practice && bar.id === "bar-top" ? `Your mistakes · ${Math.min(practice.index + 1, practice.list.length)} of ${practice.list.length}`
       : drill && bar.id === "bar-top" ? `${openingShortName(drill.demo.opening)} drill · Round ${drill.round}`
       : puzzle && bar.id === "bar-top" ? `${puzzle.phase === "openings" ? "Opening trap" : "Puzzle"} · ${PUZZLE_LEVELS.find(([v]) => v === puzzle!.level)?.[1]}${puzzle.streak ? ` · ${puzzle.streak} in a row` : ""}`
       : editor && bar.id === "bar-top" ? "Set up a position"
@@ -4159,6 +4390,7 @@ function coachSays(reviews: (Review | undefined)[]): CoachSay {
     ? "Tap squares to place it, or tap it again to put it away. Done when you're ready."
     : "Drag pieces to move them (off the board to remove), or pick a piece below to add. Done when you're ready.", buttons: [] };
   if (drill) return drillSays();
+  if (practice) return practiceSays();
   if (puzzle) return puzzleSays();
   if (lesson) return { mood: "talk", text: LESSONS[lesson.phase][lesson.index].title, buttons: [] };
   if (demo?.intro) {
@@ -5133,6 +5365,22 @@ function drawStats() {
        division.end !== undefined ? `endgame from move ${moveNumber(division.end)}` : "no endgame"].join(" · ") +
       ". A phase needs 3 moves from a player to be scored.";
   card.append(element("p", "stats-note", phasesNote));
+  if (savedFromReview?.key === gameKey() && savedFromReview.ids.length) {
+    const saved = savedFromReview;
+    const count = saved.ids.length;
+    const note = element("div", "stats-saved");
+    note.append(element("p", "", saved.added
+      ? `I saved ${saved.added === 1 ? "one of your slips" : `${saved.added} of your slips`} as puzzles. They'll come back over the next few weeks until you've got them.`
+      : `Your ${count === 1 ? "slip" : `${count} slips`} from this game ${count === 1 ? "is" : "are"} already in your puzzles.`));
+    const button = iconButton({ ico: "target", label: "Try them now", run: () => {
+      const ids = new Set(saved.ids);
+      startPractice(loadMistakes().filter((m) => ids.has(m.id)));
+    } }, 16);
+    button.classList.add("labelled");
+    button.append(element("span", "", "Try them now"));
+    note.append(button);
+    card.append(note);
+  }
   if (reviewing) {
     const start = element("div", "stats-start");
     const button = iconButton({ ico: "play", label: "Start the review", run: startReview, kind: "accent" }, 18);
@@ -5329,7 +5577,7 @@ function newWhat(): string {
     case "practice": return "match";
     case "analysis": return "review";
     case "learn": return drill ? "drill" : "lesson";
-    case "train": return puzzle ? "puzzles" : lesson ? "lesson" : "position";
+    case "train": return puzzle || practice ? "puzzles" : lesson ? "lesson" : "position";
     default: return "game";
   }
 }

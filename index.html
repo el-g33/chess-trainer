@@ -164,6 +164,13 @@
             <button type="button" role="tab" data-train-tab="endgame">Endgame</button>
           </div>
           <div id="train-cards" class="train-cards">
+            <div class="train-card puzzles-card mistakes-card" id="train-mistakes">
+              <span class="tc-ico" data-ico="target" data-ico-size="24"></span>
+              <span class="pc-body"><b>Your mistakes <span id="mistakes-due" class="due-badge" hidden></span></b><small id="mistakes-note"></small>
+                <span id="mistakes-counts" class="mistakes-counts"></span>
+                <button type="button" id="start-mistakes" class="accent start-puzzles" hidden>Practise</button>
+              </span>
+            </div>
             <div id="train-openings" class="train-openings" hidden>
               <div class="seg" id="learn-colour">
                 <button type="button" data-colour="white"><span class="seg-icon">♔</span>White</button>

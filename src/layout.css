@@ -1994,3 +1994,42 @@ body.demo-intro .move-strip {
   min-height: 0;
   padding: 6px 14px;
 }
+
+/* Training: your mistakes, as puzzles */
+.due-badge {
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  vertical-align: 1px;
+}
+.due-badge[hidden] {
+  display: none;
+}
+.mistakes-counts {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.mistakes-counts:empty {
+  display: none;
+}
+#start-mistakes[hidden] {
+  display: none;
+}
+
+/* The statistics: the slips saved as puzzles */
+.stats-saved {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--button);
+  border: 1px solid var(--line);
+}
+.stats-saved p {
+  margin: 0 0 8px;
+}
