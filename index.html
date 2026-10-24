@@ -74,6 +74,13 @@
             <button type="button" class="mode-choice" data-choice="train" role="radio" aria-checked="false"><span class="mc-icon" data-ico="puzzle" data-ico-size="22"></span>Training</button>
           </div>
           <button type="button" id="home-next" class="home-next accent" disabled>Next</button>
+          <div id="level-check" class="level-check" hidden>
+            <b>First time here?</b> Find your level: five quick positions, from easy to hard. I'll set your puzzle level and Stockfish's strength to match.
+            <div class="level-check-buttons">
+              <button type="button" id="level-check-start" class="accent">Find my level</button>
+              <button type="button" id="level-check-skip">Skip</button>
+            </div>
+          </div>
           <button type="button" id="home-progress" class="link-button home-progress"><span data-ico="chart" data-ico-size="18"></span> Your progress</button>
           <p id="engine-status" class="engine-status">Loading Stockfish...</p>
         </section>
@@ -233,6 +240,7 @@
           </div>
         </div>
         <!-- Your opponent's bar above the board, yours below (they swap when the board flips) -->
+        <div class="board-col">
         <div class="player-bar" id="bar-top">
           <span class="pb-name"></span><span class="pb-captured"></span><span class="pb-diff"></span>
           <span class="pb-clock" hidden></span>
@@ -257,6 +265,7 @@
         <div class="player-bar" id="bar-bottom">
           <span class="pb-name"></span><span class="pb-captured"></span><span class="pb-diff"></span>
           <span class="pb-clock" hidden></span>
+        </div>
         </div>
         <!-- Setting up a position: the pieces to place -->
         <div id="editor-panel" class="editor-panel" hidden>
@@ -435,6 +444,18 @@
           <label class="check wide"><input type="checkbox" id="eval-check" checked /> Eval bar (practice)</label>
           <label class="check wide"><input type="checkbox" id="rate-moves" checked /> Rate moves (practice)</label>
           <button type="button" id="settings-save" class="wide settings-save"><span data-ico="download" data-ico-size="18"></span> Save this game (PGN)</button>
+          <label for="arrow-style">Arrow style</label>
+          <select id="arrow-style">
+            <option value="standard">Standard</option>
+            <option value="colourblind">Colour-blind friendly</option>
+          </select>
+          <label for="coach-speed">Coach speed</label>
+          <select id="coach-speed">
+            <option value="50">Relaxed</option>
+            <option value="33">Normal</option>
+            <option value="16">Fast</option>
+            <option value="0">Instant</option>
+          </select>
           <label for="review-depth">Review depth</label>
           <select id="review-depth">
             <option value="quick">Quick</option>

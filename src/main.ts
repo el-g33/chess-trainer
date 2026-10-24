@@ -68,7 +68,7 @@ import { backupDue, dataCounts, backupNote, makeBackup, noteBackup, readBackup, 
 import { picture, PROGRESS_MIN, saveSummary, SLIP_THEMES, SLIP_WORDS, type GamePhase, type SlipKind } from "./progress";
 import { BANDS, likelyMoves, pickLikely, type Band, type LikelyMove } from "./explore";
 import { chainOf, whatYouGet, type Mark } from "./outlook";
-import { fitsIn, readingTime, splitToFit, Typer } from "./talk";
+import { fitsIn, readingTime, setTypeSpeed, splitToFit, Typer } from "./talk";
 import { startLoadAnimation } from "./loading";
 import { styleAlternative, type Style } from "./style";
 import { runTour, tourOpen, type TourStep } from "./tour";
@@ -175,6 +175,8 @@ const uiThemeBox = $<HTMLSelectElement>("ui-theme");
 const piecesBox = $<HTMLSelectElement>("pieces");
 const planModeBox = $<HTMLSelectElement>("plan-mode");
 const reviewDepthBox = $<HTMLSelectElement>("review-depth");
+const arrowStyleBox = $<HTMLSelectElement>("arrow-style");
+const coachSpeedBox = $<HTMLSelectElement>("coach-speed");
 const planModeRow = $("plan-mode-row");
 // « ‹ › » - above the move list, and (on phones) right under the board
 const navButtons = [...document.querySelectorAll<HTMLButtonElement>("button[data-nav]")];
@@ -366,6 +368,33 @@ for (const kind of ["mousedown", "touchstart"]) {
   $("board").addEventListener(kind, () => ground.state.dom.bounds.clear(), { capture: true, passive: true });
 }
 
+/** Arrow style: standard colours, or colour-blind friendly - blue for your
+ *  ideas, dashed orange with a "!" for their threats (the shape says it too). */
+const CB_YOURS = "#1F5FA8";
+const CB_THEIRS = "#B26B00";
+
+function applyArrowStyle() {
+  const blind = arrowStyleBox.value === "colourblind";
+  document.body.classList.toggle("cb-arrows", blind);
+  const brushes = ground.state.drawable.brushes;
+  brushes.you.color = blind ? CB_YOURS : YOUR_ARROW;
+  brushes.control.color = blind ? CB_YOURS : YOUR_ARROW;
+  brushes.them.color = blind ? CB_THEIRS : OPPONENT_ARROW;
+  brushes.controlThem.color = blind ? CB_THEIRS : OPPONENT_ARROW;
+}
+
+/** Colour-blind friendly: a "!" on the square a threat arrow points at. */
+function markThreats(shapes: DrawShape[]): DrawShape[] {
+  if (arrowStyleBox.value !== "colourblind") return shapes;
+  const marks: DrawShape[] = shapes
+    .filter((s) => s.dest && (s.brush === "them" || s.brush === "threat"))
+    .map((s) => ({
+      orig: s.dest!,
+      customSvg: { html: `<circle cx="80" cy="20" r="15" fill="${CB_THEIRS}"/><text x="80" y="27" text-anchor="middle" font-size="22" font-weight="700" fill="#fff">!</text>` },
+    }));
+  return [...shapes, ...marks];
+}
+
 Object.assign(ground.state.drawable.brushes, {
   you: { key: "you", color: YOUR_ARROW, opacity: 0.85, lineWidth: 10 },
   them: { key: "them", color: OPPONENT_ARROW, opacity: 0.85, lineWidth: 10 },
@@ -465,6 +494,9 @@ interface Settings {
   boardTheme?: string;
   planMode?: string;
   reviewDepth?: string;
+  arrowStyle?: string;
+  coachSpeed?: string;
+  puzzleLevel?: string;
   soundOn?: boolean;
   soundVolume?: number;
   soundStyle?: string;
@@ -498,6 +530,9 @@ function saveSettings() {
     boardTheme: themeBox.value,
     planMode: planModeBox.value,
     reviewDepth: reviewDepthBox.value,
+    arrowStyle: arrowStyleBox.value,
+    coachSpeed: coachSpeedBox.value,
+    puzzleLevel,
     soundOn: soundOn.checked,
     soundVolume: Number(soundVolume.value),
     soundStyle: soundStyleBox.value,
@@ -557,6 +592,11 @@ function buildMenu() {
   if (saved.boardTheme) themeBox.value = saved.boardTheme;
   if (saved.planMode) planModeBox.value = saved.planMode;
   reviewDepthBox.value = saved.reviewDepth === "deep" ? "deep" : "quick";
+  arrowStyleBox.value = saved.arrowStyle === "colourblind" ? "colourblind" : "standard";
+  coachSpeedBox.value = ["50", "33", "16", "0"].includes(saved.coachSpeed ?? "") ? saved.coachSpeed! : "33";
+  if (PUZZLE_LEVELS.some(([v]) => v === saved.puzzleLevel)) puzzleLevel = saved.puzzleLevel as PuzzleLevel;
+  applyArrowStyle();
+  setTypeSpeed(Number(coachSpeedBox.value));
   if (planModeBox.selectedIndex < 0) planModeBox.selectedIndex = 0;
   if (saved.soundOn !== undefined) soundOn.checked = saved.soundOn;
   if (saved.soundVolume !== undefined) soundVolume.value = String(saved.soundVolume);
@@ -731,6 +771,7 @@ function drawHome() {
   // Welcome
   setFace($("home-face"), homeChoice ? "talk" : "wave", 96);
   $("home-bubble").textContent = homeChoice ? MODE_LINES[homeChoice] : greeting;
+  $("level-check").hidden = levelCheckDone() || homeChoice !== null;
   for (const button of menu.querySelectorAll<HTMLButtonElement>(".mode-choice")) {
     const on = button.dataset.choice === homeChoice;
     button.classList.toggle("on", on);
@@ -1785,6 +1826,7 @@ interface PuzzleState {
   themes: string[];
   streak: number;
   note: string; // what the coach says now
+  check?: boolean[]; // finding your level: right first time, puzzle by puzzle
 }
 
 let puzzle: PuzzleState | null = null;
@@ -1836,6 +1878,7 @@ function drawTrainScreen() {
     chip.classList.toggle("on", value === puzzleLevel);
     chip.addEventListener("click", () => {
       puzzleLevel = value;
+      saveSettings();
       drawTrainScreen();
     });
     return chip;
@@ -1989,6 +2032,7 @@ function puzzleMove(move: NormalMove) {
 
 function puzzleSolved() {
   if (!puzzle) return;
+  puzzle.check?.push(!puzzle.missed);
   puzzle.state = "solved";
   if (!puzzle.missed) puzzle.streak++;
   puzzle.note = puzzle.missed ? "Solved! Next one?" : puzzle.streak > 1 ? `Solved! That's ${puzzle.streak} in a row.` : "Solved! Well done.";
@@ -2024,14 +2068,70 @@ function puzzleShowSolution() {
 
 function nextPuzzle() {
   if (!puzzle) return;
+  if (puzzle.check) {
+    // finding your level: five puzzles, or stop after two misses
+    const misses = puzzle.check.filter((right) => !right).length;
+    if (puzzle.index + 1 >= puzzle.list.length || misses >= 2) return finishLevelCheck();
+  }
   showPuzzle(puzzle.index + 1);
+}
+
+// -- Find your level: five puzzles from easy to hard, the first time ----------------
+
+const LEVEL_CHECK_KEY = "chess-trainer-level-check";
+
+function levelCheckDone(): boolean {
+  try {
+    return localStorage.getItem(LEVEL_CHECK_KEY) !== null;
+  } catch {
+    return true;
+  }
+}
+
+function noteLevelCheck(how: "done" | "skipped") {
+  try {
+    localStorage.setItem(LEVEL_CHECK_KEY, how);
+  } catch {
+    // storage blocked: the offer may come again
+  }
+}
+
+/** One middlegame puzzle from each level, easiest first. */
+async function startLevelCheck() {
+  const all = await loadPuzzles("middlegame");
+  const list = PUZZLE_LEVELS.map(([level]) => all[level][Math.floor(Math.random() * all[level].length)]);
+  resetBoard(new Game());
+  puzzle = { phase: "middlegame", level: "beginner", list, index: -1, side: "white", solution: [], step: 0, state: "solving",
+    missed: false, hints: 0, themes: [], streak: 0, note: "", check: [] };
+  showPuzzle(0);
+}
+
+/** The result: puzzle level and Stockfish's strength to match. */
+function finishLevelCheck() {
+  const results = puzzle?.check ?? [];
+  const right = results.filter(Boolean).length;
+  const levels: PuzzleLevel[] = ["beginner", "beginner", "club", "advanced", "expert", "master"];
+  puzzleLevel = levels[right];
+  levelBox.selectedIndex = Math.min(LEVELS.length - 1, right);
+  noteLevelCheck("done");
+  saveSettings();
+  const puzzleName = PUZZLE_LEVELS.find(([v]) => v === puzzleLevel)?.[1] ?? "";
+  void message("Your level", `You solved ${right} of ${results.length} first time. I've set your puzzles to ${puzzleName} ` +
+    `and Stockfish to ${shortName(LEVELS[levelBox.selectedIndex])}. You can change both any time.`).then(() => {
+    resetBoard(new Game());
+    refresh();
+    showMenu();
+  });
 }
 
 function puzzleSays(): CoachSay {
   const p = puzzle!;
   const level = PUZZLE_LEVELS.find(([v]) => v === p.level)?.[1] ?? "";
   const hint: CoachButton = { ico: "bulb", label: "Hint", run: puzzleHintStep };
-  const show: CoachButton = { ico: "eye", label: "Show the solution", run: puzzleShowSolution, kind: "soft" };
+  const show: CoachButton = { ico: "eye", label: "Show the solution", run: () => {
+    if (p.state === "solving") p.check?.push(false);
+    puzzleShowSolution();
+  }, kind: "soft" };
   const next: CoachButton = { ico: "skipNext", label: "Next puzzle", run: nextPuzzle, kind: "accent" };
   void level;
   if (p.state === "solving") return { mood: p.missed ? "think" : "talk", text: p.note, buttons: [hint, show] };
@@ -4214,7 +4314,7 @@ function drawBoard(reviews: (Review | undefined)[], info: OpeningInfo[]) {
   }
   const colour = movableColour();
   const movesFrom = quizWaiting() ? quiz!.threat!.passed! : position;
-  ground.setAutoShapes(stepper ? stepperShapes() : drill ? drillShapes() : practice ? practiceShapes() : puzzle ? puzzleShapes() : editor ? [] : demo ? demoShapes() : [...badgeShapes(reviews, info), ...arrowShapes(), ...replayShapes()]);
+  ground.setAutoShapes(markThreats(stepper ? stepperShapes() : drill ? drillShapes() : practice ? practiceShapes() : puzzle ? puzzleShapes() : editor ? [] : demo ? demoShapes() : [...badgeShapes(reviews, info), ...arrowShapes(), ...replayShapes()]));
   if (editor || demo?.intro) last = undefined;
   ground.set({
     fen: fenOf(position),
@@ -4338,6 +4438,7 @@ function drawPlayerBars() {
     name.textContent = demo && bar.id === "bar-top" ? demoTitle()
       : practice && bar.id === "bar-top" ? `Your mistakes · ${Math.min(practice.index + 1, practice.list.length)} of ${practice.list.length}`
       : drill && bar.id === "bar-top" ? `${openingShortName(drill.demo.opening)} drill · Round ${drill.round}`
+      : puzzle?.check && bar.id === "bar-top" ? `Find your level · ${puzzle.index + 1} of ${puzzle.list.length}`
       : puzzle && bar.id === "bar-top" ? `${puzzle.phase === "openings" ? "Opening trap" : "Puzzle"} · ${PUZZLE_LEVELS.find(([v]) => v === puzzle!.level)?.[1]}${puzzle.streak ? ` · ${puzzle.streak} in a row` : ""}`
       : editor && bar.id === "bar-top" ? "Set up a position"
       : lesson && bar.id === "bar-top" ? `Lesson ${lesson.index + 1}: ${LESSONS[lesson.phase][lesson.index].title}`
@@ -6685,6 +6786,23 @@ function wireButtons() {
     readPgnText();
   });
   reviewDepthBox.addEventListener("change", saveSettings); // (used from the next review)
+  arrowStyleBox.addEventListener("change", () => {
+    applyArrowStyle();
+    saveSettings();
+    refresh();
+  });
+  coachSpeedBox.addEventListener("change", () => {
+    setTypeSpeed(Number(coachSpeedBox.value));
+    saveSettings();
+  });
+  // Tap the coach's bubble: the whole sentence at once
+  $("strip-text").addEventListener("click", () => stripTyper.finish());
+  $("step-text").addEventListener("click", () => stepTyper.finish());
+  $("level-check-start").addEventListener("click", () => void startLevelCheck());
+  $("level-check-skip").addEventListener("click", () => {
+    noteLevelCheck("skipped");
+    drawHome();
+  });
   planModeBox.addEventListener("change", () => {
     saveSettings();
     refresh();

@@ -1,7 +1,13 @@
 // The coach's words, typed out a letter at a time and cut into pieces that
 // fit the bubble, so a long note never needs "Tell me more" to be read.
 
-export const TYPE_MS = 33; // about 30 letters a second
+export const TYPE_MS = 33; // about 30 letters a second (Normal)
+let typeMs = TYPE_MS;
+
+/** How fast the coach types: ms per letter (0 shows every sentence at once). */
+export function setTypeSpeed(ms: number) {
+  typeMs = ms;
+}
 const reduceMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
 /** How long a piece stays up before the next one, once it's typed: enough to read it. */
@@ -86,7 +92,7 @@ export class Typer {
     if (text === this.full && !restart) return;
     clearInterval(this.timer);
     this.full = text;
-    this.shown = reduceMotion() ? text.length : 0;
+    this.shown = reduceMotion() || typeMs === 0 ? text.length : 0;
     this.element.textContent = text.slice(0, this.shown);
     if (this.typed) {
       this.onTyped?.();
@@ -99,7 +105,7 @@ export class Typer {
         clearInterval(this.timer);
         this.onTyped?.();
       }
-    }, TYPE_MS);
+    }, typeMs);
   }
 
   /** Show it all at once (e.g. stepping to a piece by hand). */

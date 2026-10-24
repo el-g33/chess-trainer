@@ -1,4 +1,3 @@
-import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -82,17 +81,15 @@ self.addEventListener("fetch", (event) => {
 // "./" keeps every link relative, so the built site works from any web
 // address (Netlify, GitHub Pages in a sub-folder) and later inside an
 // Android app.
-/** The commit being built (GitHub's build says it; locally, git does), and the day. */
+/** The version shown in Settings: package.json's number ("3.0", or "3.0.1"
+ *  for a fix) and the day it was built, e.g. "3.0 · 24 Oct 2026". Bump the
+ *  number with each publish: the minor part for new features, the last part
+ *  for fixes. */
 function buildVersion(): string {
-  let commit = process.env.GITHUB_SHA ?? "";
-  if (!commit) {
-    try {
-      commit = execSync("git rev-parse HEAD").toString().trim();
-    } catch {
-      commit = "local";
-    }
-  }
-  return `${commit.slice(0, 7)} · ${new Date().toISOString().slice(0, 10)}`;
+  const { version } = JSON.parse(readFileSync("package.json", "utf-8")) as { version: string };
+  const shown = version.replace(/\.0$/, "");
+  const day = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  return `${shown} · ${day}`;
 }
 
 export default defineConfig({

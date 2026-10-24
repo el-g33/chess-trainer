@@ -2257,3 +2257,59 @@ body.demo-intro .move-strip {
   font-weight: 700;
   vertical-align: 2px;
 }
+
+/* Colour-blind friendly arrows: their threats dashed (and marked "!" in code) */
+body.cb-arrows cg-container svg.cg-shapes line[stroke="#B26B00" i] {
+  stroke-dasharray: 0.18 0.11;
+}
+
+/* Home: find your level, the first time */
+.level-check {
+  margin: 4px 0 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--button);
+  border: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+.level-check[hidden] {
+  display: none;
+}
+.level-check-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.level-check-buttons button {
+  min-height: 0;
+  padding: 6px 14px;
+}
+
+/* The bubble can be tapped to show the whole sentence */
+#strip-text,
+#step-text {
+  cursor: pointer;
+}
+
+/* Phones on their side (and small tablets in landscape): the board and its
+   bars on the left, the coach and everything else on the right */
+@media (max-width: 1000px) and (orientation: landscape) and (max-height: 560px) {
+  html body #game,
+  html body.practice #game {
+    --board: calc(100dvh - var(--top) - 2 * var(--gutter) - 2 * 42px - 8px);
+  }
+  .board-area {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: repeat(14, auto) 1fr;
+    column-gap: 14px;
+    align-content: start;
+  }
+  .board-col {
+    grid-column: 1;
+    grid-row: 1 / -1;
+  }
+  .board-area > :not(.board-col) {
+    grid-column: 2;
+  }
+}
