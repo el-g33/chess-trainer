@@ -1952,3 +1952,19 @@ body.demo-intro .move-strip {
 .step-chapters button:disabled {
   opacity: 0.45;
 }
+
+/* Settings: which version this is (to tell whether an update has arrived) */
+.app-version {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-align: right;
+}
+
+/* The load screen: how far Stockfish has got */
+.prep-progress {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  min-height: 1.2em;
+}

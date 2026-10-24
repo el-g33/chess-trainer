@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -81,8 +82,22 @@ self.addEventListener("fetch", (event) => {
 // "./" keeps every link relative, so the built site works from any web
 // address (Netlify, GitHub Pages in a sub-folder) and later inside an
 // Android app.
+/** The commit being built (GitHub's build says it; locally, git does), and the day. */
+function buildVersion(): string {
+  let commit = process.env.GITHUB_SHA ?? "";
+  if (!commit) {
+    try {
+      commit = execSync("git rev-parse HEAD").toString().trim();
+    } catch {
+      commit = "local";
+    }
+  }
+  return `${commit.slice(0, 7)} · ${new Date().toISOString().slice(0, 10)}`;
+}
+
 export default defineConfig({
   base: "./",
+  define: { __BUILD__: JSON.stringify(buildVersion()) },
   server: { port: 5173 },
   preview: { port: 4173 },
   plugins: [offlineCopy()],

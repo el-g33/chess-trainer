@@ -81,6 +81,7 @@ document.documentElement.style.background = "";
 // Opening choices in the start menu (the openings themselves are in openings.ts)
 const STOCKFISH_DECIDES = "None (plays normally for its level)";
 const NO_OPENING = "None";
+declare const __BUILD__: string; // the commit and day this was built (see vite.config.ts)
 const SUGGESTED = "Suggested for this level";
 
 // Arrow colours (as the desktop app)
@@ -558,6 +559,7 @@ function buildMenu() {
   if (saved.tcIncrement !== undefined) tcIncrement.value = String(saved.tcIncrement);
   if (saved.clockTick !== undefined) clockTickBox.checked = saved.clockTick;
   applySound();
+  $("app-version").textContent = `Version ${__BUILD__}`;
   if (themeBox.selectedIndex < 0) themeBox.selectedIndex = 0;
   // Warm stone, with its walnut board and ivory-and-espresso pieces, for anyone
   // who hasn't chosen a theme yet
@@ -1144,6 +1146,7 @@ const watching = () => reviewing && reviewTitle !== "" && reviewSide === null;
 
 const PREP_MIN_MS = 2500; // long enough to see the animation once Stockfish has work to do
 const PREP_STALL_MS = 30000; // no progress for this long: show what's ready rather than wait for ever
+const PREP_MAX_MS = 90000; // ...and never longer than this, progress or not
 let prepWorked = false; // Stockfish had something to check (a game seen before opens at once)
 let prepWatch = 0; // a timer that checks on the progress
 let prepProgress = { key: "", since: 0 }; // the last progress seen, and when
@@ -1153,6 +1156,7 @@ function startPreparing() {
   restoreAnalysis();
   prepWorked = false;
   prepProgress = { key: "", since: performance.now() };
+  $("prep-progress").textContent = "";
   clearInterval(prepWatch);
   prepWatch = window.setInterval(refresh, 5000);
   preparing = true;
@@ -1178,10 +1182,16 @@ function drawPrep(list: (Review | undefined)[]) {
   const finished = done >= total && !deepNeeded.length && !deepMoves.length && list.every(Boolean);
   if (!finished) {
     prepWorked = true;
-    // Stuck (no progress for a long time): show what's ready rather than wait for ever
+    const closer = deepNeeded.length + deepMoves.length;
+    $("prep-progress").textContent = `Checked ${Math.min(done, total)} of ${total} positions` +
+      (closer ? ` · a closer look at ${closer} move${closer === 1 ? "" : "s"}` : "") +
+      ` · ${list.filter(Boolean).length} of ${list.length} moves rated`;
+    // Stuck (no progress for a long time, or far too long): show what's ready rather than wait for ever
     const key = `${done}/${total}/${deepNeeded.length}/${deepMoves.length}/${list.filter(Boolean).length}`;
     if (key !== prepProgress.key) prepProgress = { key, since: performance.now() };
-    if (performance.now() - prepProgress.since < PREP_STALL_MS) return;
+    const stalled = performance.now() - prepProgress.since >= PREP_STALL_MS;
+    const tooLong = performance.now() - preparingSince >= PREP_MAX_MS;
+    if (!stalled && !tooLong) return;
   }
   const wait = prepWorked ? PREP_MIN_MS - (performance.now() - preparingSince) : 0;
   if (wait > 0) {

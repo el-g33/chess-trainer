@@ -97,7 +97,8 @@ export class Analyser {
 
   /** Results kept from before: a game opened again. */
   restore(saved: SavedAnalysis) {
-    for (const [fen, evaluation] of saved.evals) this.evals.set(fen, evaluation);
+    // (a result with no best move is unfinished: Stockfish looks again)
+    for (const [fen, evaluation] of saved.evals) if (evaluation.best) this.evals.set(fen, evaluation);
     for (const fen of saved.deep) this.deepDone.add(fen);
     for (const key of saved.poisoned) this.poisoned.add(key);
   }
@@ -198,7 +199,12 @@ export class Analyser {
     // the played move, searched from the same position for the same time
     await engine.newGame();
     const [played] = await engine.analyse(beforeFen, DEEP_LIMIT * 1000, 1, [standardUci(pending.before, pending.move)], DEEP_DEPTH);
-    const previous = this.evals.get(afterFen);
+    let previous = this.evals.get(afterFen);
+    if (!previous?.best && !pending.after.isEnd()) {
+      // the position after has no best move yet (its own look hasn't run): find it now
+      await engine.newGame();
+      previous = toEvaluation(pending.after, await engine.analyse(afterFen, DEEP_LIMIT * 1000, 2, undefined, DEEP_DEPTH));
+    }
     if (played) this.evals.set(afterFen, { ...(previous ?? { best: undefined }), score: lineScore(pending.before, played) });
     // A piece offered up: what happens if they take it?
     if (pending.offered !== undefined && previous) {
