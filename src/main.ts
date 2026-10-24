@@ -1143,12 +1143,18 @@ const watching = () => reviewing && reviewTitle !== "" && reviewSide === null;
 // -- The load screen: Stockfish checks everything before the review --------------
 
 const PREP_MIN_MS = 2500; // long enough to see the animation once Stockfish has work to do
+const PREP_STALL_MS = 30000; // no progress for this long: show what's ready rather than wait for ever
 let prepWorked = false; // Stockfish had something to check (a game seen before opens at once)
+let prepWatch = 0; // a timer that checks on the progress
+let prepProgress = { key: "", since: 0 }; // the last progress seen, and when
 
 function startPreparing() {
   if (!rateMovesBox.checked) return;
   restoreAnalysis();
   prepWorked = false;
+  prepProgress = { key: "", since: performance.now() };
+  clearInterval(prepWatch);
+  prepWatch = window.setInterval(refresh, 5000);
   preparing = true;
   preparingSince = performance.now();
   stopLoading?.();
@@ -1158,6 +1164,7 @@ function startPreparing() {
 
 function stopPreparing() {
   preparing = false;
+  clearInterval(prepWatch);
   stopLoading?.();
   stopLoading = null;
   $("prep-screen").hidden = true;
@@ -1171,7 +1178,10 @@ function drawPrep(list: (Review | undefined)[]) {
   const finished = done >= total && !deepNeeded.length && !deepMoves.length && list.every(Boolean);
   if (!finished) {
     prepWorked = true;
-    return;
+    // Stuck (no progress for a long time): show what's ready rather than wait for ever
+    const key = `${done}/${total}/${deepNeeded.length}/${deepMoves.length}/${list.filter(Boolean).length}`;
+    if (key !== prepProgress.key) prepProgress = { key, since: performance.now() };
+    if (performance.now() - prepProgress.since < PREP_STALL_MS) return;
   }
   const wait = prepWorked ? PREP_MIN_MS - (performance.now() - preparingSince) : 0;
   if (wait > 0) {
@@ -3380,7 +3390,8 @@ function rateMove(before: Chess, move: NormalMove): Review | undefined {
     review = reviewMove(before, move, analyser.evals, analyser.isPoisoned(before, move));
     if (!review) return undefined;
     const after = positionAfter(before, move);
-    const checked = analyser.isDeep(before) && analyser.isDeep(after);
+    // (a move that ends the game needs no second look: the analyser skips those)
+    const checked = (analyser.isDeep(before) && analyser.isDeep(after)) || after.isEnd() || isDrawnPosition(after);
     // a piece offered up may be a brilliant sacrifice the quick look misjudged
     const offered = isSacrifice(before, move, after);
     const suspicious = HARSH.has(review.rating) || bigDrop(before, after) || offered !== undefined;

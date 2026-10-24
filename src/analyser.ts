@@ -81,7 +81,8 @@ export class Analyser {
    *  judged at the same depth. (Two separate searches - before and after -
    *  can disagree enough to turn a good move into an "inaccuracy".) */
   requestDeepMoves(moves: DeepMove[]) {
-    this.deepMoves = moves.filter((m) => !m.after.isEnd() && !isDrawnPosition(m.after) && !this.deepDone.has(fenOf(m.after)));
+    // (both positions: one may have had its own second look while the other hasn't)
+    this.deepMoves = moves.filter((m) => !m.after.isEnd() && !isDrawnPosition(m.after) && !(this.deepDone.has(fenOf(m.before)) && this.deepDone.has(fenOf(m.after))));
     this.start();
   }
 
@@ -145,7 +146,7 @@ export class Analyser {
     }
     for (const move of this.deepMoves) {
       const fens = [fenOf(move.before), fenOf(move.after)];
-      if (!this.deepDone.has(fens[1]) && free(fens)) return { kind: "move", move, fens };
+      if (!(this.deepDone.has(fens[0]) && this.deepDone.has(fens[1])) && free(fens)) return { kind: "move", move, fens };
     }
     for (const position of this.deepWanted) {
       const fen = fenOf(position);
