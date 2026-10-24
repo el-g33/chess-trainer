@@ -28,7 +28,7 @@ import { afterMove as positionAfter, colourName, isCastling, standardUci, variat
 import { Engine } from "./engine";
 import { Game, type Outcome } from "./game";
 import { explainIdeas } from "./ideas";
-import { controlledSquares, dangerAfter, moveInWords, narrateMove, quietIdea, ratingWords, targetsOf, verdict, whyMove, type Danger } from "./narrate";
+import { controlledSquares, dangerAfter, moveInWords, narrateMove, quietIdea, ratingWords, targetsOf, verdict, whyMove } from "./narrate";
 import { middlegameNotes } from "./middlegame";
 import { DEFAULT_LEVEL, LEVELS, OPPONENT_MIN_DELAY, shortName } from "./levels";
 import {
@@ -4137,7 +4137,8 @@ function coachSays(reviews: (Review | undefined)[]): CoachSay {
   const before = game.positionAt(ply - 1);
   const after = game.positionAt(ply);
   const text = verdict(review, before, after, analyser.evals.get(fenOf(after)), listener(), ply, watching());
-  return { mood: moodForRating(review.rating), text, buttons: [TELL_MORE, STRATEGY] };
+  const best: CoachButton[] = notTheBest(ply, review) ? [{ ico: "bulb", label: "See the best move", run: () => void showBestLine(ply) }] : [];
+  return { mood: moodForRating(review.rating), text, buttons: [TELL_MORE, ...best, STRATEGY] };
 }
 
 /** An icon button that also shows its words, when the button asks for it. */
@@ -4328,29 +4329,151 @@ function openMore() {
 // Ratings where the coach shows the better move
 const WORTH_SHOWING = new Set(["Inaccuracy", "Mistake", "Miss", "Missed Win", "Blunder"]);
 
-/** Tell me more about a move: one sentence, and the board shows it - the
- *  better move if there was one (with what that piece controls), or the
- *  move itself. A hazard button appears only when the move let something go,
- *  coloured by how much. */
+/** Tell me more about a move. A slip (inaccuracy, mistake, miss, blunder)
+ *  gets a story in three parts: why it isn't the best, what it allows (played
+ *  out), and the better move with how it goes on. A good move that isn't the
+ *  best says why it's good, with a button to see the best move and its line. */
 function explainMove(ply: number, review: Review) {
   if (review.rating === "Brilliant") return void explainBrilliant(ply);
   if (review.rating === "Great") return void explainGreat(ply);
+  if (WORTH_SHOWING.has(review.rating) && review.bestSan) return void explainSlip(ply, review);
   const before = game.positionAt(ply - 1);
-  const after = game.positionAt(ply);
   const played = game.moves[ply - 1].move;
   const you = listener();
   const mine = !you || game.moverOf(ply) === you;
-  const better = WORTH_SHOWING.has(review.rating) && review.bestSan ? parseSan(before, review.bestSan) as NormalMove | undefined : undefined;
-  const move = better ?? played;
-  const why = whyMove(before, move, mine ? game.moverOf(ply) : you);
-  const text = better
-    ? `${mine ? "Better was" : "Better for them was"}: ${lowerFirst(moveInWords(before, move, mine ? game.moverOf(ply) : you))}`
-    : `${review.rating === "Book" ? "A known opening move" : mine ? "Why it's good" : "Their idea"}: ${why}.`;
+  const why = whyMove(before, played, mine ? game.moverOf(ply) : you);
+  const text = `${review.rating === "Book" ? "A known opening move" : mine ? "Why it's good" : "Their idea"}: ${why}.`;
+  const extra: CoachButton | undefined = notTheBest(ply, review)
+    ? { ico: "bulb", label: "See the best move", kind: "accent", labelled: true, run: () => void showBestLine(ply) }
+    : undefined;
+  startStepper([before, positionAfter(before, played)], [played], [text], moodForRating(review.rating), extra, true);
+}
+
+/** A good move that wasn't Stockfish's top choice. */
+function notTheBest(ply: number, review: Review | undefined): boolean {
+  if (!review?.bestSan || !["Excellent", "Good"].includes(review.rating)) return false;
+  return makeSan(game.positionAt(ply - 1), game.moves[ply - 1].move) !== review.bestSan;
+}
+
+/** The arrow for a move (yours or theirs, from the viewer's side) and the
+ *  pieces it then attacks. */
+function moveShapes(before: Chess, move: NormalMove, viewer: Color | null): DrawShape[] {
+  const mover = before.board.get(move.from)?.color;
+  const shapes: DrawShape[] = [{ orig: makeSquare(move.from) as Key, dest: arrowEnd(before, move), brush: mover === (viewer ?? orientation) ? "you" : "them" }];
+  if (!isCastling(before, move)) {
+    const after = positionAfter(before, move);
+    for (const square of targetsOf(after, move.to)) shapes.push({ orig: makeSquare(square) as Key, brush: "threat" });
+  }
+  return shapes;
+}
+
+/** A line as pages: the board after each move, with its arrow and a sentence. */
+function linePages(start: Chess, line: NormalMove[], viewer: Color | null): { frames: StepFrame[]; texts: string[] } {
+  const story = talkLine(start, line, viewer);
+  const frames = line.map((move, i) => ({ position: story.positions[i + 1], shapes: moveShapes(story.positions[i], move, viewer) }));
+  return { frames, texts: story.texts };
+}
+
+/** More pages for a card that is still open (a line Stockfish has just found). */
+function extendPages(card: Stepper | null, frames: StepFrame[], texts: string[], chapter: number) {
+  if (!card || stepper !== card || !frames.length) return;
+  card.frames!.push(...frames);
+  card.texts.push(...texts);
+  card.chapterOf!.push(...frames.map(() => chapter));
+  refresh();
+}
+
+/** A card of pages in parts ("Why", "What it allows", ...), opening on its first page. */
+function startStory(first: StepFrame, text: string, mood: Mood, chapters: string[]): Stepper {
+  closeOverlay(false);
+  stepper = { positions: [], moves: [], texts: [text], step: 1, mood, frames: [first], chapters, chapterOf: [0] };
+  refresh();
+  return stepper;
+}
+
+/** A slip, in three parts: why it isn't the best, what it allows, better was. */
+async function explainSlip(ply: number, review: Review) {
+  const before = game.positionAt(ply - 1);
+  const after = game.positionAt(ply);
+  const played = game.moves[ply - 1].move;
+  const mover = game.moverOf(ply);
+  const viewer: Color | null = watching() ? null : listener() ?? mover;
+  const mine = viewer === null || mover === viewer;
+  const beforeEval = analyser.evals.get(fenOf(before));
+  const afterEval = analyser.evals.get(fenOf(after));
   const info = openingInfo();
-  const danger = dangerAfter(review, before, after, analyser.evals.get(fenOf(before)), analyser.evals.get(fenOf(after)), !!info[ply - 1]?.book,
-    watching() ? null : you ?? game.moverOf(ply));
-  const extra = danger && !after.isEnd() ? hazardButton(ply, danger) : undefined;
-  startStepper([before, positionAfter(before, move)], [move], [text], moodForRating(review.rating), extra, true);
+  const danger = dangerAfter(review, before, after, beforeEval, afterEval, !!info[ply - 1]?.book, viewer);
+  const reply = after.isEnd() ? undefined : afterEval?.best;
+  // Why: what it costs, and their idea as an arrow
+  const swing = beforeEval && afterEval ? ` Before it, ${verdictWords(beforeEval.score)}; after it, ${verdictWords(afterEval.score)}.` : "";
+  const idea = reply ? ` The ${mine ? "red" : "blue"} arrow shows what it lets ${mine ? "them" : "you"} do.` : "";
+  // (the chips above the text name each part, so the text needn't)
+  const why = `${danger ? danger.text : "It's a small slip."}${swing}${idea}`;
+  const shapes = moveShapes(before, played, viewer).slice(0, 1);
+  if (reply) {
+    shapes.push({ orig: makeSquare(reply.from) as Key, dest: arrowEnd(after, reply), brush: mine ? "them" : "you" });
+    if (after.board.get(reply.to)) shapes.push({ orig: makeSquare(reply.to) as Key, brush: "threat" });
+  }
+  const theirSlip = !mine && viewer !== null;
+  const card = startStory({ position: after, shapes }, why, moodForRating(review.rating),
+    theirSlip ? ["Why", "What you can do", "Better for them"] : ["Why", "What it allows", "Better was"]);
+  moveSound(makeSan(before, played), before.turn);
+  try {
+    // What it allows: Stockfish's best line after the move
+    if (reply) {
+      const punish = await coachLine(after, 1.5);
+      const line = wholeLine(after, punish?.pv ?? [], 3);
+      if (punish && line.length) {
+        const pages = linePages(after, line, viewer);
+        pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(after, line, punish.score, opposite(mover), viewer)}`;
+        extendPages(card, pages.frames, pages.texts, 1);
+      }
+    }
+    // Better was: the best move, and how it goes on
+    const best = parseSan(before, review.bestSan!) as NormalMove | undefined;
+    if (!best) return;
+    const better = await coachLine(before, 1.5, [best]);
+    const line = wholeLine(before, better?.pv.length ? better.pv : [best], 3);
+    const pages = linePages(before, line, viewer);
+    pages.texts[0] = cap(moveInWords(before, best, viewer));
+    if (better && line.length > 1) pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(before, line, better.score, mover, viewer)}`;
+    extendPages(card, pages.frames, pages.texts, 2);
+  } catch (error) {
+    errorText = `Something went wrong: ${error}`;
+    refresh();
+  }
+}
+
+/** See the best move: for a good move that wasn't the top one, why the move
+ *  is good, then the best move and how the game would go on. */
+async function showBestLine(ply: number) {
+  const review = ratingsOn() ? reviews()[ply - 1] : undefined;
+  if (!review?.bestSan) return;
+  const before = game.positionAt(ply - 1);
+  const best = parseSan(before, review.bestSan) as NormalMove | undefined;
+  if (!best) return;
+  const played = game.moves[ply - 1].move;
+  const mover = game.moverOf(ply);
+  const viewer: Color | null = watching() ? null : listener() ?? mover;
+  const mine = viewer === null || mover === viewer;
+  const why = `${cap(whyMove(before, played, viewer))}.`;
+  const card = startStory({ position: positionAfter(before, played), shapes: moveShapes(before, played, viewer) }, why,
+    moodForRating(review.rating), [mine ? "Why it's good" : "Their idea", "Best move"]);
+  setBusy(true, "Let me show you the best move...");
+  try {
+    const line = await coachLine(before, 1.5, [best]);
+    setBusy(false);
+    const moves = wholeLine(before, line?.pv.length ? line.pv : [best], 3);
+    const pages = linePages(before, moves, viewer);
+    pages.texts[0] = cap(moveInWords(before, best, viewer));
+    if (line && moves.length > 1) pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(before, moves, line.score, mover, viewer)}`;
+    extendPages(card, pages.frames, pages.texts, 1);
+    if (stepper === card) stepTo(2);
+  } catch (error) {
+    errorText = `Something went wrong: ${error}`;
+    setBusy(false);
+    refresh();
+  }
 }
 
 const MATERIAL: Record<string, number> = { pawn: 1, knight: 3, bishop: 3, rook: 5, queen: 9, king: 0 };
@@ -4521,11 +4644,6 @@ async function explainGreat(ply: number) {
   }
 }
 
-function hazardButton(ply: number, danger: Danger): CoachButton {
-  const theirSlip = !watching() && listener() !== null && game.moverOf(ply) !== listener();
-  return { ico: "hazard", label: `${theirSlip ? "What can you do now?" : "What can they do now?"} ${danger.text}`, kind: `hazard ${danger.level}` as CoachButton["kind"], run: () => void openThreatLine(ply, danger) };
-}
-
 /** The reviews of the game's moves (the same ones the move list shows). */
 function reviews(): (Review | undefined)[] {
   return moveReviews();
@@ -4542,6 +4660,8 @@ interface Stepper {
   extra?: CoachButton | CoachButton[];
   illustration?: boolean; // one move, with what the piece controls
   frames?: StepFrame[]; // lesson pages (or illustrations) instead of moves
+  chapters?: string[]; // the parts of the story ("Why", "What it allows", "Better was")
+  chapterOf?: number[]; // each page's part
 }
 
 interface StepFrame {
@@ -4595,6 +4715,20 @@ function drawStepper() {
   box.hidden = !stepper;
   if (!stepper) return;
   $("step-count").textContent = stepCount() > 1 ? `${stepper.step}/${stepCount()}` : "";
+  // the parts of the story, the current one lit (a tap jumps to it)
+  const chapters = $("step-chapters");
+  const card = stepper;
+  chapters.hidden = !card.chapters;
+  chapters.replaceChildren(...(card.chapters ?? []).map((label, i) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.textContent = label;
+    const first = card.chapterOf?.indexOf(i) ?? -1;
+    chip.classList.toggle("on", card.chapterOf?.[card.step - 1] === i);
+    chip.disabled = first < 0; // (still being worked out)
+    chip.addEventListener("click", () => stepTo(first + 1));
+    return chip;
+  }));
   for (const id of ["step-back", "step-next"]) $(id).hidden = stepCount() < 2;
   stepTyper.type(stepper.texts[stepper.step - 1] ?? "");
   const frame = stepper.frames?.[stepper.step - 1];
@@ -4641,26 +4775,6 @@ function stepperShapes(): DrawShape[] {
     for (const square of targetsOf(after, landing)) shapes.push({ orig: makeSquare(square) as Key, brush: "threat" });
   }
   return shapes;
-}
-
-/** What can they do now? Stockfish's best line for the opponent after the move. */
-async function openThreatLine(ply: number, danger?: Danger) {
-  closeOverlay(false);
-  const position = game.positionAt(ply);
-  setBusy(true, "Let me see what they can do...");
-  try {
-    const plan = await planAhead(coachAnalysis, position);
-    const moves = plan.steps.slice(0, 4).map((step) => step.move);
-    const positions = plan.positions.slice(0, moves.length + 1);
-    const texts = moves.map((move, i) => narrateMove(positions[i], move, watching() ? null : listener() ?? game.moverOf(ply)));
-    if (danger && texts.length) texts[0] = `${danger.text} ${texts[0]}`;
-    setBusy(false);
-    startStepper(positions, moves, texts, "worried");
-  } catch (error) {
-    errorText = `Something went wrong: ${error}`;
-    setBusy(false);
-    refresh();
-  }
 }
 
 // -- Strategy: straight to the main idea --------------------------------------

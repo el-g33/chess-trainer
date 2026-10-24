@@ -576,7 +576,7 @@ html body .board-area .board-controls {
   position: relative;
   display: grid;
   grid-template-columns: auto 1fr;
-  grid-template-areas: "face text" "face odds" "face actions";
+  grid-template-areas: "face chapters" "face text" "face odds" "face actions";
   gap: 4px 10px;
   margin-top: 6px;
   padding: 10px 12px;
@@ -1932,4 +1932,33 @@ body.demo-intro .move-strip {
 .setup-chip.done::after {
   content: "✓";
   font-weight: 700;
+}
+
+/* A move's story in parts: Why, What it allows, Better was */
+.step-chapters {
+  grid-area: chapters;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
+  padding-right: 36px; /* room for the page count */
+}
+.step-chapters[hidden] {
+  display: none;
+}
+.step-chapters button {
+  min-height: 0;
+  padding: 2px 9px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--line);
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.step-chapters button.on {
+  background: var(--accent);
+  color: #fff;
+}
+.step-chapters button:disabled {
+  opacity: 0.45;
 }
