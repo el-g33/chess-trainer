@@ -90,18 +90,14 @@ export function drawTrainScreen() {
   }
   drawMistakesCard();
   // Openings: the lessons by colour and the opening traps; the phases: principles
-  // and puzzles. Your position is on every tab.
+  // and puzzles. (Your position is on the Game review screen.)
   const openings = trainTab === "openings";
   $("train-openings").hidden = !openings;
   $("train-principles").hidden = openings;
   $("puzzles-title").textContent = openings ? "Opening traps" : "Puzzles";
-  $("puzzles-note").textContent = openings
-    ? "Tricks from the first moves of real games. Choose a level, then spot as many as you can."
-    : "Choose a level, then solve as many as you like.";
   const lessons = LESSONS[trainPhase];
-  $("principles-note").textContent = lessons.length
-    ? `${lessons.length} short lessons on how to play the ${trainPhase}.`
-    : `The ${trainPhase} lessons are being written.`;
+  $("principles-note").textContent = lessons.length ? `${lessons.length} short lessons` : "Being written";
+  // The puzzles row opens the levels; choosing one starts them
   const chips = $("puzzle-levels");
   chips.replaceChildren(...PUZZLE_LEVELS.map(([value, label]) => {
     const chip = document.createElement("button");
@@ -111,10 +107,18 @@ export function drawTrainScreen() {
     chip.addEventListener("click", () => {
       set.puzzleLevel(value);
       saveSettings();
-      drawTrainScreen();
+      showPuzzleLevels(false);
+      void startPuzzles(trainTab, value);
     });
     return chip;
   }));
+}
+
+/** Show or hide the level choice under the puzzles row. */
+function showPuzzleLevels(open: boolean) {
+  $("puzzle-pick").hidden = !open;
+  $("puzzles-open").setAttribute("aria-expanded", String(open));
+  $("train-puzzles").classList.toggle("open", open);
 }
 
 export function setupTrain() {
@@ -124,11 +128,12 @@ export function setupTrain() {
       if (trainTab !== "openings") set.trainPhase(trainTab);
       $("lesson-list").hidden = true;
       $("train-cards").hidden = false;
+      showPuzzleLevels(false);
       drawTrainScreen();
     });
   }
-  $("start-puzzles").addEventListener("click", () => void startPuzzles(trainTab, puzzleLevel));
-  $("start-mistakes").addEventListener("click", practiseMistakes);
+  $("puzzles-open").addEventListener("click", () => showPuzzleLevels($("puzzle-pick").hidden === true));
+  $("train-mistakes").addEventListener("click", practiseMistakes);
   $("train-position").addEventListener("click", () => startEditor());
   $("train-principles").addEventListener("click", showLessonList);
   // The editor

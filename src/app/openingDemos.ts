@@ -1227,21 +1227,18 @@ export function practiceShapes(): DrawShape[] {
   return move ? [{ orig: makeSquare(move.from) as Key, brush: "you" }] : [];
 }
 
-/** Training: the Your mistakes card, for the tab's phase. */
+/** Training: the Your mistakes row, for the tab's phase - only while some are
+ *  waiting, and marked when some are due today. */
 export function drawMistakesCard() {
   const phase: MistakePhase = trainTab === "openings" ? "opening" : trainTab;
   const counts = mistakeCounts(phase);
-  const total = counts.learning + counts.nearly + counts.mastered;
-  $("mistakes-due").textContent = counts.due ? `${counts.due} due today` : "";
-  $("mistakes-due").hidden = !counts.due;
-  $("mistakes-note").textContent = total
-    ? "Positions from your own games and drills. Get them right and they come back less often."
-    : `Mistakes from the games you review, and moves you miss in drills, come back here as puzzles.`;
-  $("mistakes-counts").textContent = total ? `Learning ${counts.learning} · Nearly there ${counts.nearly} · Mastered ${counts.mastered}` : "";
   const waiting = counts.learning + counts.nearly;
-  const button = $<HTMLButtonElement>("start-mistakes");
-  button.hidden = !waiting;
-  button.textContent = counts.due ? `Practise ${counts.due}` : "Practise ahead";
+  const row = $<HTMLButtonElement>("train-mistakes");
+  row.hidden = !waiting;
+  row.classList.toggle("due", counts.due > 0);
+  $("mistakes-title").textContent = counts.due ? `${counts.due} ${counts.due === 1 ? "mistake" : "mistakes"} due` : "Your mistakes";
+  $("mistakes-note").textContent = counts.due ? "" : "None due today";
+  $("mistakes-go").textContent = counts.due ? "Practise" : "Practise ahead";
 }
 
 /** The card's button: today's, or (when none are due) the next ones coming up. */

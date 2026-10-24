@@ -158,6 +158,7 @@
           <input id="fen" class="fen-input" type="text" autocomplete="off" spellcheck="false" placeholder="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" />
           <p id="fen-status" class="pgn-status"></p>
           <p class="setup-note"><button type="button" class="link-button" id="empty-board">Or explore on an empty board</button></p>
+          <p class="setup-note"><button type="button" class="link-button" id="train-position">Or set up a position and play it out with me</button></p>
         </section>
         <!-- 2d. Train: principles, puzzles and your own positions -->
         <section class="screen" data-screen="progress" hidden>
@@ -181,13 +182,12 @@
             <button type="button" role="tab" data-train-tab="endgame">Endgame</button>
           </div>
           <div id="train-cards" class="train-cards">
-            <div class="train-card puzzles-card mistakes-card" id="train-mistakes">
-              <span class="tc-ico" data-ico="target" data-ico-size="24"></span>
-              <span class="pc-body"><b>Your mistakes <span id="mistakes-due" class="due-badge" hidden></span></b><small id="mistakes-note"></small>
-                <span id="mistakes-counts" class="mistakes-counts"></span>
-                <button type="button" id="start-mistakes" class="accent start-puzzles" hidden>Practise</button>
-              </span>
-            </div>
+            <!-- Only there while some of your mistakes are waiting -->
+            <button type="button" class="train-row" id="train-mistakes" hidden>
+              <span class="tc-ico" data-ico="target" data-ico-size="20"></span>
+              <span class="tr-label"><b id="mistakes-title">Your mistakes</b><small id="mistakes-note"></small></span>
+              <span class="tr-go" id="mistakes-go">Practise</span>
+            </button>
             <div id="train-openings" class="train-openings" hidden>
               <div class="seg" id="learn-colour">
                 <button type="button" data-colour="white"><span class="seg-icon">♔</span>White</button>
@@ -195,21 +195,23 @@
               </div>
               <div class="tiles" id="opening-tiles"></div>
             </div>
-            <button type="button" class="train-card" id="train-principles">
-              <span class="tc-ico" data-ico="book" data-ico-size="24"></span>
-              <span><b>Principles</b><small id="principles-note"></small></span>
+            <button type="button" class="train-row" id="train-principles">
+              <span class="tc-ico" data-ico="book" data-ico-size="20"></span>
+              <span class="tr-label"><b>Principles</b><small id="principles-note"></small></span>
+              <span class="tr-go">Open</span>
             </button>
-            <div class="train-card puzzles-card" id="train-puzzles">
-              <span class="tc-ico" data-ico="puzzle" data-ico-size="24"></span>
-              <span class="pc-body"><b id="puzzles-title">Puzzles</b><small id="puzzles-note">Choose a level, then solve as many as you like.</small>
+            <!-- Puzzles (Opening traps on the Openings tab): tap, then choose the level -->
+            <div class="train-row-box" id="train-puzzles">
+              <button type="button" class="train-row" id="puzzles-open" aria-expanded="false">
+                <span class="tc-ico" data-ico="puzzle" data-ico-size="20"></span>
+                <span class="tr-label"><b id="puzzles-title">Puzzles</b></span>
+                <span class="tr-go">Start</span>
+              </button>
+              <div class="puzzle-pick" id="puzzle-pick" hidden>
+                <small>Choose a level</small>
                 <span class="chips" id="puzzle-levels"></span>
-                <button type="button" id="start-puzzles" class="accent start-puzzles">Start puzzles</button>
-              </span>
+              </div>
             </div>
-            <button type="button" class="train-card" id="train-position">
-              <span class="tc-ico" data-ico="board" data-ico-size="24"></span>
-              <span><b>Your position</b><small>Set up or paste any position and play it out with me.</small></span>
-            </button>
           </div>
           <div id="lesson-list" class="lesson-list" hidden></div>
         </section>

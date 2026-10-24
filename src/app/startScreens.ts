@@ -21,7 +21,7 @@ import { refresh } from "./draw";
 import { showTour } from "./featureTour";
 import { maybeOpponentMove, startMatch, useDepth } from "./matches";
 import { startAnalysis } from "./moves";
-import { drawProgress, startDemo } from "./openingDemos";
+import { drawProgress, openingShortName, startDemo } from "./openingDemos";
 import { saveSettings } from "./settings";
 import { menuMode } from "./startMenu";
 import {
@@ -152,17 +152,17 @@ export function drawHome() {
   }
   const tiles = $("opening-tiles");
   tiles.replaceChildren(...DEMOS.filter((d) => REPERTOIRE.find((o) => o.name === d.opening)?.colour === learnColour).map((d) => {
-    const opening = REPERTOIRE.find((o) => o.name === d.opening)!;
+    // The short name only ("Italian", "Caro-Kann / Slav"); the lesson's intro says the rest
     const tile = document.createElement("button");
     tile.type = "button";
     tile.className = "tile";
     tile.classList.toggle("on", d.opening === learnOpening);
-    tile.innerHTML = `<span class="tile-name"></span><span class="tile-note"></span>`;
-    tile.querySelector(".tile-name")!.textContent = d.opening.replace(/ \(.*\)$/, "");
-    const against = d.opening.match(/\((vs [^)]*)\)$/)?.[1]; // "Anti-English (vs 1.c4 and 1.Nf3)"
-    tile.querySelector(".tile-note")!.textContent = opening.gambit ? "Gambit and traps" : against ?? "";
+    tile.innerHTML = `<span class="tile-name"></span>`;
+    tile.querySelector(".tile-name")!.textContent = openingShortName(d.opening);
+    tile.title = d.opening;
     if (NEW_OPENINGS.has(d.opening) && !openingsSeen().includes(d.opening)) {
-      tile.querySelector(".tile-name")!.append(Object.assign(document.createElement("span"), { className: "new-badge", textContent: "New" }));
+      tile.querySelector(".tile-name")!.append(Object.assign(document.createElement("span"), { className: "new-dot", title: "New" }));
+      tile.setAttribute("aria-label", `${d.opening} (new)`);
     }
     tile.addEventListener("click", () => {
       markOpeningSeen(d.opening);

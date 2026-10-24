@@ -334,24 +334,15 @@ button.round:disabled {
 .tile {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 2px;
-  padding: 10px;
+  padding: 6px 10px;
   border-radius: var(--radius);
   text-align: left;
 }
 
 .tile-name {
   font-weight: 700;
-}
-
-.tile-note {
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-
-.tile.on .tile-note {
-  color: inherit;
-  opacity: 0.8;
 }
 
 .tile.on,
@@ -1109,8 +1100,8 @@ body.demo-on .board-controls [data-nav="last"] {
 
 /* The opening tiles keep the same space whether White or Black is chosen */
 .tiles {
-  grid-auto-rows: 58px;
-  min-height: calc(4 * 58px + 3 * 8px);
+  grid-auto-rows: 44px;
+  min-height: calc(5 * 44px + 4 * 8px);
   align-content: start;
 }
 
@@ -1501,23 +1492,73 @@ body {
   margin-top: 2px;
 }
 
-.pc-body {
+/* One-line rows: Your mistakes, Principles, Puzzles / Opening traps */
+.train-row {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 12px;
+  border-radius: var(--card-radius);
+  border: 1px solid var(--line);
+  background: var(--button);
+  color: var(--text);
+  text-align: left;
+}
+.train-row[hidden] {
+  display: none;
+}
+.tr-label {
   flex: 1;
   min-width: 0;
 }
-
-.pc-body .chips {
-  margin-top: 2px;
+.tr-label b {
+  font-size: 0.95rem;
 }
-
-.start-puzzles {
-  align-self: flex-start;
-  border-radius: 999px;
-  padding: 6px 16px;
+.tr-label small {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.tr-go {
+  flex: none;
+  color: var(--accent);
   font-weight: 700;
+  font-size: 0.9rem;
+}
+.tr-go::after {
+  content: " ›";
+}
+/* Mistakes due today: tinted, so it's the first thing you see */
+.train-row.due {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--button));
+}
+/* Puzzles: the row opens the levels underneath */
+.train-row-box.open .train-row {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.train-row-box.open .tr-go::after {
+  content: " ▾";
+}
+.puzzle-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px 12px;
+  border: 1px solid var(--line);
+  border-top: 0;
+  border-radius: 0 0 var(--card-radius) var(--card-radius);
+  background: var(--button);
+}
+.puzzle-pick[hidden] {
+  display: none;
+}
+.puzzle-pick small {
+  color: var(--muted);
+  font-size: 0.8rem;
 }
 
 .lesson-number {
@@ -1724,10 +1765,6 @@ body.replay-on .nav-play {
 }
 .strip-actions .piece-nav:disabled {
   opacity: 0.35;
-}
-
-.tile-note:empty {
-  display: none;
 }
 
 /* The load screen before a review: an animation, a caption, no numbers */
@@ -1995,33 +2032,6 @@ body.demo-intro .move-strip {
   padding: 6px 14px;
 }
 
-/* Training: your mistakes, as puzzles */
-.due-badge {
-  margin-left: 6px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 0.75rem;
-  font-weight: 600;
-  vertical-align: 1px;
-}
-.due-badge[hidden] {
-  display: none;
-}
-.mistakes-counts {
-  display: block;
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-.mistakes-counts:empty {
-  display: none;
-}
-#start-mistakes[hidden] {
-  display: none;
-}
-
 /* The statistics: the slips saved as puzzles */
 .stats-saved {
   margin-top: 10px;
@@ -2246,15 +2256,14 @@ body.demo-intro .move-strip {
   padding: 5px 12px;
 }
 
-/* Training: openings added lately */
-.new-badge {
+/* Training: openings added lately (until their lesson is opened) */
+.new-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
   margin-left: 6px;
-  padding: 0 7px;
-  border-radius: 999px;
+  border-radius: 50%;
   background: var(--accent);
-  color: #fff;
-  font-size: 0.7rem;
-  font-weight: 700;
   vertical-align: 2px;
 }
 
