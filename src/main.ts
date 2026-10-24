@@ -52,7 +52,7 @@ import { openingPlanAhead, reviewOpeningChoice, type OpeningPlan, type PlanMode 
 import { FALL_ANGLES, fallenKing, loadPieces, PIECE_CHOICES, setPalette } from "./pieces";
 import { play, setSound, soundForMove, unlockSounds, SOUND_STYLES, type SoundStyle } from "./sounds";
 import { brilliantCandidates, findBrilliant, missedBrilliant, type Brilliant } from "./brilliant";
-import { accuracyRating, divide, estimateRating, gameAccuracy, phaseAccuracy, winPercent, type Phase } from "./accuracy";
+import { accuracyRating, divide, estimateRating, gameAccuracy, phaseAccuracy, ratingFromAccuracy, winPercent, type Phase } from "./accuracy";
 import type { Score } from "./coach";
 import { explainGuess, type GuessExplanation } from "./quizExplain";
 import {
@@ -3411,7 +3411,18 @@ function moveReviews(): (Review | undefined)[] {
   deepNeeded = [];
   deepMoves = [];
   if (!ratingsOn()) return game.moves.map(() => undefined);
-  const reviews = addMisses(game.moves.map((played, i) => rateMove(game.positionAt(i), played.move)));
+  const rated = game.moves.map((played, i) => rateMove(game.positionAt(i), played.move));
+  // A slip gets a deeper look at the move before it too: if that was really a
+  // mistake, the slip is a Miss (the quick look can take a mistake for a small slip)
+  // (the slip's own second look covers the position after that move)
+  rated.forEach((review, i) => {
+    if (i === 0 || !review || !HARSH.has(review.rating)) return;
+    const before = game.positionAt(i - 1);
+    if (analyser.isDeep(before)) return;
+    reviewCache.delete(`${fenOf(before)} ${makeUci(game.moves[i - 1].move)}`); // rated again once it's in
+    if (!deepNeeded.some((p) => fenOf(p) === fenOf(before))) deepNeeded.push(before);
+  });
+  const reviews = addMisses(rated);
   // A Miss is decided after the ratings, so make sure its positions get the second look too
   reviews.forEach((review, i) => {
     if (review?.rating === "Miss" && !(analyser.isDeep(game.positionAt(i)) && analyser.isDeep(game.positionAt(i + 1)))) {
@@ -5011,6 +5022,12 @@ function drawStats() {
   const overall = gameAccuracy(start, scores);
   const phases = phaseAccuracy(start, positions, scores);
   const ratings = estimateRating(start, scores);
+  // With the players' ratings in the game's details: from those and the accuracy (as chess.com does)
+  for (const colour of ["white", "black"] as const) {
+    const elo = Number(gameHeaders[colour === "white" ? "WhiteElo" : "BlackElo"]);
+    const accuracy = overall[colour];
+    if (elo > 0 && accuracy !== undefined && !Number.isNaN(accuracy)) ratings[colour] = ratingFromAccuracy(elo, accuracy);
+  }
   const { done, total } = analyser.progress();
   // Until Stockfish has checked every move, show ?? rather than numbers that keep changing
   const pending = done < total || scores.some((score) => !score) || list.some((review) => !review);

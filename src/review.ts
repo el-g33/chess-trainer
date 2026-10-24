@@ -251,18 +251,19 @@ export function addMisses(reviews: (Review | undefined)[]): (Review | undefined)
     const previous = reviews[i - 1];
     const review = reviews[i];
     if (!previous || !review) continue;
-    if (
-      ["Mistake", "Blunder"].includes(previous.rating) &&
-      ["Inaccuracy", "Mistake", "Blunder"].includes(review.rating) &&
-      review.chanceBefore >= WINNING &&
-      review.chanceAfter < WINNING
-    ) {
+    // After their slip, a slip of yours that throws the chance away: you end
+    // up worse off than before their slip (or no longer winning)
+    const theirs = ["Inaccuracy", "Mistake", "Blunder"].includes(previous.rating);
+    const yours = ["Inaccuracy", "Mistake", "Blunder"].includes(review.rating);
+    const givenBack = review.chanceAfter < 100 - previous.chanceBefore;
+    const noLongerWinning = review.chanceBefore >= WINNING && review.chanceAfter < WINNING;
+    if (theirs && yours && (givenBack || noLongerWinning)) {
       const newline = review.text.indexOf("\n");
       const heading = newline < 0 ? review.text : review.text.slice(0, newline);
       const rest = newline < 0 ? "" : review.text.slice(newline + 1);
       const played = heading.split(" ")[0].replace(/[?!]+$/, "");
       const text =
-        `${played} - Miss. Your opponent's last move was a mistake, and ` +
+        `${played} - Miss. Your opponent's last move was ${previous.rating === "Inaccuracy" ? "a slip" : "a mistake"}, and ` +
         `${review.bestSan} would have punished it.\n${rest}`;
       result[i] = { ...review, rating: "Miss", symbol: "?", text };
     }
