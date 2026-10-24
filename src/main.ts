@@ -572,10 +572,10 @@ function buildMenu() {
   applyUiTheme();
   applyTheme();
 
-  // The practice match: the first choice of "your opening" is a prompt
-  const prompt = myOpeningBox.options[0];
-  prompt.value = NO_OPENING;
-  prompt.text = "Choose your opening...";
+  // The practice match: "None" plays without an opening of your own
+  const none = myOpeningBox.options[0];
+  none.value = NO_OPENING;
+  none.text = "None - just play";
   menuCard.addEventListener("change", updateMenu);
   menuCard.addEventListener("submit", (event) => event.preventDefault());
   backButton.addEventListener("click", hideMenu);
@@ -774,8 +774,7 @@ function drawHome() {
     if (box.selectedOptions[0]?.hidden) box.selectedIndex = 0;
   }
   $("practice-note").textContent = stickinessNote();
-  const practiceReady = myOpeningBox.value !== NO_OPENING;
-  menu.querySelector<HTMLButtonElement>('[data-start="practice"]')!.disabled = !practiceReady;
+  menu.querySelector<HTMLButtonElement>('[data-start="practice"]')!.disabled = false;
 
   // Analysis
   menu.querySelector<HTMLButtonElement>('[data-start="analysis"]')!.disabled = !pgnGames.length && !fenPosition;
