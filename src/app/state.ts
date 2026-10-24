@@ -13,9 +13,11 @@ import type { TrainPhase } from "../lessons";
 import type { OpeningBook, OpeningInfo } from "../openings";
 import type { Headers, PgnGame } from "../pgn";
 import type { Review } from "../review";
-import type {
-  Mode, Match, Analysis, DemoState, Quiz, HomeChoice, PuzzleState, ExploreState, EditorState, LessonState, DrillState, Practice, Speech, CoachButton, Stepper, PuzzleLevel,
-} from "../main";
+import type { Mode, Match, Analysis, DemoState, Quiz } from "../main";
+import type { DrillState, Practice } from "./openingDemos";
+import type { EditorState, ExploreState, LessonState, PuzzleLevel, PuzzleState } from "./train";
+import type { CoachButton, Speech, Stepper } from "./coach";
+import type { HomeChoice } from "./startScreens";
 
 export let coachEngine: Engine | null = null;
 export let mode: Mode = "practice";
