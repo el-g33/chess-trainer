@@ -652,6 +652,28 @@ let learnOpening: string | null = null;
 // Where the game on screen came from, so New game goes back to that setup
 let gameOrigin: HomeChoice | "learn" | null = null;
 
+// Openings added lately: marked New until their lesson has been opened
+const NEW_OPENINGS = new Set(["French Defence", "Scandinavian Defence", "Nimzo-Indian Defence",
+  "Anti-English (vs 1.c4 and 1.Nf3)", "English Opening", "Scotch Game"]);
+const SEEN_KEY = "chess-trainer-openings-seen";
+
+function openingsSeen(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(SEEN_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+function markOpeningSeen(name: string) {
+  if (!NEW_OPENINGS.has(name) || openingsSeen().includes(name)) return;
+  try {
+    localStorage.setItem(SEEN_KEY, JSON.stringify([...openingsSeen(), name]));
+  } catch {
+    // storage blocked: the badge just stays
+  }
+}
+
 /** Five ways to say hello, so it doesn't feel the same every time. */
 function pickGreeting(): string {
   const name = playerNameBox.value.trim();
@@ -754,8 +776,13 @@ function drawHome() {
     tile.classList.toggle("on", d.opening === learnOpening);
     tile.innerHTML = `<span class="tile-name"></span><span class="tile-note"></span>`;
     tile.querySelector(".tile-name")!.textContent = d.opening.replace(/ \(.*\)$/, "");
-    tile.querySelector(".tile-note")!.textContent = opening.gambit ? "Gambit and traps" : "";
+    const against = d.opening.match(/\((vs [^)]*)\)$/)?.[1]; // "Anti-English (vs 1.c4 and 1.Nf3)"
+    tile.querySelector(".tile-note")!.textContent = opening.gambit ? "Gambit and traps" : against ?? "";
+    if (NEW_OPENINGS.has(d.opening) && !openingsSeen().includes(d.opening)) {
+      tile.querySelector(".tile-name")!.append(Object.assign(document.createElement("span"), { className: "new-badge", textContent: "New" }));
+    }
     tile.addEventListener("click", () => {
+      markOpeningSeen(d.opening);
       learnOpening = d.opening;
       gameOrigin = "learn";
       startDemo(d);

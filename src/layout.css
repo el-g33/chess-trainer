@@ -2245,3 +2245,15 @@ body.demo-intro .move-strip {
   min-height: 0;
   padding: 5px 12px;
 }
+
+/* Training: openings added lately */
+.new-badge {
+  margin-left: 6px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  vertical-align: 2px;
+}

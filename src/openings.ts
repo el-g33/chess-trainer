@@ -352,6 +352,94 @@ export const REPERTOIRE: Opening[] = [
         setup: [["P", ["e4"]], ["N", ["f3"]], ["B", ["c4"]], "O-O", ["P", ["d3"]], ["P", ["c3"]]] },
     ],
   },
+  // ---- Added with fix 5 ----
+  {
+    name: "French Defence", colour: "black", tier: 2,
+    plan: "Answer 1.e4 with ...e6 and ...d5. If White pushes e5, attack the pawn chain " +
+      "at its base with ...c5, adding ...Nc6 and ...Qb6 against d4. The light-squared " +
+      "bishop is the problem piece: free it later with ...f6 or by trading it.",
+    systems: [
+      { when: ["e4"], label: "French Defence", families: ["French Defense"],
+        setup: [["P", ["e6"]], ["P", ["d5"]], ["P", ["c5"]], ["N", ["c6"]], ["N", ["f6", "d7", "e7", "f5"]],
+          ["B", ["e7", "d6", "c5", "b4"]], "O-O"] },
+      { when: null, label: "Queen's Gambit Declined (...d5)",
+        families: ["Queen's Gambit Declined", "Queen's Pawn Game", "English Opening", "Zukertort Opening",
+          "Réti Opening"],
+        setup: [["P", ["d5"]], ["P", ["e6"]], ["N", ["f6"]], ["B", ["e7"]], "O-O", ["N", ["d7"]]] },
+    ],
+  },
+  {
+    name: "Scandinavian Defence", colour: "black", tier: 1,
+    plan: "Hit e4 at once with 1...d5 and take back with the queen (or the knight). " +
+      "Put the queen on a5 or d6, develop the bishop to f5 or g4 before ...e6, add " +
+      "...c6 for a safe queen retreat, then ...Nbd7 and castle.",
+    systems: [
+      { when: ["e4"], label: "Scandinavian Defence", families: ["Scandinavian Defense"],
+        setup: [["Q", ["a5", "d6"]], ["N", ["f6"]], ["B", ["f5", "g4"]], ["P", ["c6"]], ["P", ["e6"]],
+          ["N", ["d7", "c6"]], "castled"] },
+      { when: null, label: "Queen's Gambit Declined (...d5)",
+        families: ["Queen's Gambit Declined", "Queen's Pawn Game", "English Opening", "Zukertort Opening",
+          "Réti Opening"],
+        setup: [["P", ["d5"]], ["P", ["e6"]], ["N", ["f6"]], ["B", ["e7"]], "O-O", ["N", ["d7"]]] },
+    ],
+  },
+  {
+    name: "Nimzo-Indian Defence", colour: "black", tier: 3,
+    plan: "Against 1.d4: ...Nf6, ...e6 and, after Nc3, ...Bb4 to pin the knight so " +
+      "White can't push e4. Castle, then fight for the centre with ...d5 or ...c5; " +
+      "taking on c3 gives White doubled pawns to aim at. Without Nc3, play ...b6 " +
+      "(the Queen's Indian). Against 1.e4, play ...e5.",
+    systems: [
+      { when: ["e4"], label: "Open Game (...e5)",
+        families: ["Italian Game", "Ruy Lopez", "Scotch Game", "Four Knights Game", "Three Knights Opening",
+          "King's Knight Opening", "King's Pawn Game", "Bishop's Opening", "Vienna Game", "Ponziani Opening"],
+        setup: [["P", ["e5"]], ["N", ["c6"]], ["N", ["f6"]], ["B", ["c5", "e7"]], ["P", ["d6"]], "O-O"] },
+      { when: null, label: "Nimzo-Indian Defence",
+        families: ["Nimzo-Indian Defense", "Queen's Indian Defense", "Bogo-Indian Defense", "Indian Defense",
+          "Queen's Pawn Game"],
+        setup: [["N", ["f6"]], ["P", ["e6"]], ["B", ["b4", "e7", "b7", "a6"]], "O-O", ["P", ["d5", "c5"], "break"]] },
+    ],
+  },
+  {
+    name: "Anti-English (vs 1.c4 and 1.Nf3)", menu: "vs English / Réti", colour: "black", tier: 2,
+    plan: "Against 1.c4, take the centre with ...e5 - a Sicilian with the colours " +
+      "reversed: ...Nf6, ...d5 or ...Nc6, ...Be7 and castle. Against 1.Nf3, ...d5 " +
+      "with ...Nf6, ...e6, ...Be7 and castle, adding ...c5 for space. Against 1.e4 " +
+      "and 1.d4, the classical ...e5 and ...d5.",
+    systems: [
+      { when: ["c4"], label: "Reversed Sicilian (...e5)", families: ["English Opening"],
+        setup: [["P", ["e5"]], ["N", ["f6", "c6"]], ["N", ["c6", "b6", "d5"]], ["B", ["e7", "g7", "b4", "c5"]], "O-O"] },
+      { when: ["e4"], label: "Open Game (...e5)",
+        families: ["Italian Game", "Ruy Lopez", "Scotch Game", "Four Knights Game", "Three Knights Opening",
+          "King's Knight Opening", "King's Pawn Game", "Bishop's Opening", "Vienna Game", "Ponziani Opening"],
+        setup: [["P", ["e5"]], ["N", ["c6"]], ["N", ["f6"]], ["B", ["c5", "e7"]], ["P", ["d6"]], "O-O"] },
+      { when: null, label: "Queen's Gambit Declined (...d5)",
+        families: ["Queen's Gambit Declined", "Queen's Pawn Game", "English Opening", "Zukertort Opening",
+          "Réti Opening"],
+        setup: [["P", ["d5"]], ["P", ["e6"]], ["N", ["f6"]], ["B", ["e7"]], "O-O", ["N", ["d7"]]] },
+    ],
+  },
+  {
+    name: "English Opening", colour: "white", tier: 2,
+    plan: "1.c4 controls d5 from the side. Nc3, g3 and Bg2 aim the bishop down the " +
+      "long diagonal; Nf3 and castle. Then expand on the queenside with a3 and b4 " +
+      "(or Rb1 and b4), or open the centre with d4 when it suits you.",
+    systems: [{ when: null, label: "English Opening", families: ["English Opening"],
+      setup: [["P", ["c4"]], ["N", ["c3"]], ["P", ["g3"]], ["B", ["g2"]], ["N", ["f3"]], "O-O"] }],
+  },
+  {
+    name: "Scotch Game", colour: "white", tier: 2,
+    plan: "After 1.e4 e5 2.Nf3 Nc6, open the centre at once with 3.d4 and take back " +
+      "with the knight. Develop quickly - Nc3, Bd3 or Be2, castle - and use the open " +
+      "lines; after Nxc6 bxc6, Black's split pawns are targets. Against other replies " +
+      "to 1.e4, develop the Italian way.",
+    systems: [
+      { when: ["e4 e5"], label: "Scotch Game", families: ["Scotch Game"],
+        setup: [["P", ["e4"]], ["N", ["f3", "d4"]], ["N", ["c3"]], ["B", ["d3", "e2", "c4"]], "O-O"] },
+      { when: null, label: "Italian Game", families: ["Italian Game"],
+        setup: [["P", ["e4"]], ["N", ["f3"]], ["B", ["c4"]], "O-O", ["P", ["d3"]], ["P", ["c3"]]] },
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -608,6 +696,30 @@ const GRAND_PRIX: Adaptation = {
   source: "lichess: Sicilian Defense: Grand Prix Attack",
 };
 
+const FRENCH_ADVANCE: Adaptation = {
+  name: "Advance Variation (e5)",
+  moves: ["c5"],
+  when: (p, me) => early(p, 6) && has(p, opp(me), "P", "e5", "d4") && has(p, me, "P", "d5", "e6", "c7"),
+  why: "White's pawn chain d4-e5 is strong at the front, so attack its base: ...c5 hits d4, and ...Nc6 and ...Qb6 can add more pressure.",
+  source: "lichess: French Defense: Advance Variation 3...c5",
+};
+
+const FRENCH_EXCHANGE: Adaptation = {
+  name: "exchange on d5",
+  moves: ["exd5"],
+  when: (p, me) => early(p, 4) && has(p, me, "P", "e6") && has(p, opp(me), "P", "d5"),
+  why: "They've exchanged on d5: take back with the e-pawn (...exd5). It keeps a pawn in the centre and frees your light-squared bishop.",
+  source: "lichess: French Defense: Exchange Variation 3...exd5",
+};
+
+const SCANDINAVIAN_TAKE: Adaptation = {
+  name: "exd5",
+  moves: ["Qxd5", "Nf6"],
+  when: (p, me) => early(p, 3) && has(p, opp(me), "P", "d5") && !has(p, me, "P", "d5", "e6", "c6"),
+  why: "White took your d-pawn: win it back with ...Qxd5 (the main line), or prepare ...Nxd5 with ...Nf6.",
+  source: "lichess: Scandinavian Defense 2...Qxd5 / 2...Nf6",
+};
+
 function opp(colour: Color): Color {
   return colour === "white" ? "black" : "white";
 }
@@ -631,6 +743,12 @@ const ADAPTATIONS: Record<string, Adaptation[]> = {
   "Old Indian (Lion setup)": [],
   "Stafford Gambit": [SCOTCH, WAYWARD_QUEEN, KINGS_GAMBIT],
   "Alien Gambit": [],
+  "French Defence": [FRENCH_ADVANCE, FRENCH_EXCHANGE],
+  "Scandinavian Defence": [SCANDINAVIAN_TAKE],
+  "Nimzo-Indian Defence": [],
+  "Reversed Sicilian (...e5)": [],
+  "English Opening": [],
+  "Scotch Game": [PHILIDOR, PETROV, LATVIAN],
 };
 
 /** The adaptation moves that fit this position for the side to move. */
