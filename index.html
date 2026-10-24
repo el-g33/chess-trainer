@@ -74,6 +74,7 @@
             <button type="button" class="mode-choice" data-choice="train" role="radio" aria-checked="false"><span class="mc-icon" data-ico="puzzle" data-ico-size="22"></span>Training</button>
           </div>
           <button type="button" id="home-next" class="home-next accent" disabled>Next</button>
+          <button type="button" id="home-progress" class="link-button home-progress"><span data-ico="chart" data-ico-size="18"></span> Your progress</button>
           <p id="engine-status" class="engine-status">Loading Stockfish...</p>
         </section>
 
@@ -152,6 +153,15 @@
           <p class="setup-note"><button type="button" class="link-button" id="empty-board">Or explore on an empty board</button></p>
         </section>
         <!-- 2d. Train: principles, puzzles and your own positions -->
+        <section class="screen" data-screen="progress" hidden>
+          <div class="setup-head">
+            <button type="button" class="home-link setup-back"><span data-ico="home" data-ico-size="18"></span> Home</button>
+            <h2>Your progress</h2>
+            <span></span>
+          </div>
+          <div id="progress" class="progress"></div>
+        </section>
+
         <section class="screen" data-screen="train" hidden>
           <div class="setup-head">
             <button type="button" class="home-link setup-back"><span data-ico="home" data-ico-size="18"></span> Home</button>

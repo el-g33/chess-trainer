@@ -61,9 +61,10 @@ import {
 import { DEMOS, demoFor, demoSteps, introMoves, type Demo, type DemoStep } from "./demos";
 import { LESSONS, type Lesson, type TrainPhase } from "./lessons";
 import {
-  addMistakes, comesBack, dueMistakes, loadMistakes, MASTERED, mistakeCounts, mistakeId, recordAttempt,
+  addMistakes, comesBack, dueMistakes, today as dayNumber, loadMistakes, MASTERED, mistakeCounts, mistakeId, recordAttempt,
   type Mistake, type MistakeKind, type MistakePhase,
 } from "./mistakes";
+import { picture, PROGRESS_MIN, saveSummary, SLIP_THEMES, SLIP_WORDS, type GamePhase, type SlipKind } from "./progress";
 import { BANDS, likelyMoves, pickLikely, type Band, type LikelyMove } from "./explore";
 import { chainOf, whatYouGet, type Mark } from "./outlook";
 import { fitsIn, readingTime, splitToFit, Typer } from "./talk";
@@ -635,7 +636,7 @@ function showMenu() {
 // The start screens: the coach's welcome, then the setup for each mode
 // ---------------------------------------------------------------------------
 
-type HomeScreen = "welcome" | "play" | "practice" | "analysis" | "train";
+type HomeScreen = "welcome" | "play" | "practice" | "analysis" | "train" | "progress";
 type HomeChoice = "play" | "practice" | "analysis" | "train";
 
 let homeChoice: HomeChoice | null = null;
@@ -787,6 +788,10 @@ function setupHome() {
     });
   }
   $("home-next").addEventListener("click", () => homeChoice && showScreen(homeChoice));
+  $("home-progress").addEventListener("click", () => {
+    showScreen("progress");
+    drawProgress();
+  });
   setupTrain();
   for (const button of menu.querySelectorAll<HTMLButtonElement>(".setup-back")) {
     button.addEventListener("click", () => showScreen("welcome"));
@@ -1205,6 +1210,7 @@ function drawPrep(list: (Review | undefined)[]) {
   }
   keepAnalysis();
   saveGameMistakes(withBook(list));
+  saveGameSummary(withBook(list));
   stopPreparing();
   currentView = "stats";
   applyView();
@@ -3373,6 +3379,185 @@ function practiceSays(): CoachSay {
   } };
   const show: CoachButton = { ico: "eye", label: "Show me", kind: "soft", run: practiceShow };
   return { mood: p.mood, text: p.note, key, buttons: p.waiting ? [] : [hint, show] };
+}
+
+// -- Your progress: what your reviewed games add up to ------------------------------
+
+/** What kind of slip a move was, from what it let the opponent do. */
+function slipKind(ply: number, review: Review): SlipKind {
+  if (review.rating === "Miss" || review.rating === "Missed Win") return "miss";
+  const before = game.positionAt(ply - 1);
+  const after = game.positionAt(ply);
+  const mover = before.turn;
+  const beforeEval = analyser.evals.get(fenOf(before));
+  const afterEval = analyser.evals.get(fenOf(after));
+  const mateFor = (score: Score | undefined, side: Color) =>
+    score?.mate !== undefined && (side === "white" ? score.mate > 0 : score.mate < 0);
+  if (mateFor(beforeEval?.score, mover) && !mateFor(afterEval?.score, mover)) return "missed-mate";
+  if (mateFor(afterEval?.score, opposite(mover))) return "mated";
+  const reply = afterEval?.best;
+  if (reply && after.isLegal(reply) && targetsOf(positionAfter(after, reply), reply.to).length >= 2) return "fork";
+  const danger = dangerAfter(review, before, after, beforeEval, afterEval, false, mover);
+  if (danger && /queen|piece|can be taken/.test(danger.text)) return "hanging";
+  if (danger && /pawn/.test(danger.text)) return "pawn";
+  return "other";
+}
+
+/** After a review: a summary of the game for Your progress. */
+function saveGameSummary(list: (Review | undefined)[]) {
+  const you = listener();
+  if (!you || watching() || game.length < 6) return;
+  const positions = Array.from({ length: game.length + 1 }, (_, ply) => game.positionAt(ply));
+  const scores = gameScores();
+  const start = positions[0].turn;
+  const phases = phaseAccuracy(start, positions, scores);
+  const result = gameHeaders.Result;
+  const outcome = game.outcome();
+  const winner = result === "1-0" ? "white" : result === "0-1" ? "black" : result ? undefined : outcome?.winner;
+  const info = openingInfo();
+  const named = [...info].reverse().find((i) => i.opening)?.opening;
+  const opponent = gameHeaders[you === "white" ? "Black" : "White"] ?? "";
+  saveSummary({
+    key: gameKey(),
+    day: dayNumber(),
+    colour: you,
+    opponent: opponent === "?" ? "" : opponent,
+    result: winner ? (winner === you ? "win" : "loss") : result === "1/2-1/2" || (outcome && !outcome.winner) ? "draw" : "unknown",
+    accuracy: gameAccuracy(start, scores)[you],
+    phases: { opening: phases.opening[you], middlegame: phases.middlegame[you], endgame: phases.endgame[you] },
+    slips: list.flatMap((review, i) => (review && SAVED_RATINGS.has(review.rating) && game.moverOf(i + 1) === you ? [slipKind(i + 1, review)] : [])),
+    opening: named ? named[1].split(":")[0] : undefined,
+  });
+}
+
+const PHASE_WORDS: Record<GamePhase, string> = { opening: "opening", middlegame: "middlegame", endgame: "endgame" };
+
+/** The Your progress screen. */
+function drawProgress() {
+  const box = $("progress");
+  box.replaceChildren();
+  const seen = picture();
+  const say = (text: string) => {
+    const card = element("div", "progress-card progress-say");
+    const face = element("div", "coach-face small");
+    face.innerHTML = avatarSvg("talk", 34);
+    card.append(face, element("p", "", text));
+    box.append(card);
+  };
+  if (seen.games < PROGRESS_MIN) {
+    say(`Review ${PROGRESS_MIN} of your own games and your progress appears here: how your accuracy is going, ` +
+      `your strongest and weakest phase, and what to practise next. So far: ${seen.games}.`);
+    return;
+  }
+  // The coach's summing up
+  const top = seen.slips[0];
+  const parts: string[] = [];
+  if (seen.strongest) parts.push(`Your ${PHASE_WORDS[seen.strongest]} is your strongest phase.`);
+  if (seen.weakest) parts.push(`Most of your points slip away in the ${PHASE_WORDS[seen.weakest]}` +
+    (top && top.kind !== "other" ? `, usually from ${lowerFirst(SLIP_WORDS[top.kind]).replace(/ \(a miss\)$/i, "")}.` : "."));
+  say(parts.join(" ") || "Here's how your recent games add up.");
+
+  // The trend
+  const trend = element("div", "progress-card");
+  trend.append(element("h3", "", "Accuracy"));
+  if (seen.trend.length >= 2) {
+    const width = 200;
+    const height = 50;
+    const low = Math.min(...seen.trend) - 5;
+    const high = Math.max(...seen.trend) + 5;
+    const points = seen.trend.map((value, i) =>
+      `${(5 + (i * (width - 10)) / (seen.trend.length - 1)).toFixed(1)},${(height - 5 - ((value - low) / (high - low)) * (height - 10)).toFixed(1)}`);
+    const last = points[points.length - 1].split(",");
+    trend.insertAdjacentHTML("beforeend",
+      `<svg class="progress-trend" viewBox="0 0 ${width} ${height}" role="img" aria-label="Accuracy over your last ${seen.trend.length} games">` +
+      `<polyline points="${points.join(" ")}"/><circle cx="${last[0]}" cy="${last[1]}" r="3"/></svg>`);
+    const first = seen.trend[0];
+    const now = seen.trend[seen.trend.length - 1];
+    const change = Math.round(now - first);
+    const line = element("p", "progress-sub", `${first.toFixed(1)} → ${now.toFixed(1)} over your last ${seen.trend.length} games`);
+    if (change) line.append(element("span", `progress-chip ${change > 0 ? "up" : "down"}`, `${change > 0 ? "up" : "down"} ${Math.abs(change)}`));
+    trend.append(line);
+  } else {
+    trend.append(element("p", "progress-sub", "The trend shows once a few more games are reviewed."));
+  }
+  box.append(trend);
+
+  // By phase
+  const phases = element("div", "progress-card");
+  phases.append(element("h3", "", "By phase"));
+  for (const phase of ["opening", "middlegame", "endgame"] as GamePhase[]) {
+    const value = seen.phases[phase];
+    const row = element("div", "progress-bar");
+    row.append(element("span", "", cap(PHASE_WORDS[phase])));
+    const track = element("span", "progress-track");
+    const fill = element("span", `progress-fill ${ratingClass(accuracyRating(value ?? 0))}`);
+    fill.style.width = `${Math.max(0, Math.min(100, value ?? 0))}%`;
+    track.append(fill);
+    row.append(track, element("span", "progress-value", value === undefined ? "-" : value.toFixed(1)));
+    phases.append(row);
+  }
+  box.append(phases);
+
+  // Your most common slips
+  if (seen.slips.length) {
+    const slips = element("div", "progress-card");
+    slips.append(element("h3", "", "Your most common slips"));
+    for (const slip of seen.slips.slice(0, 4)) {
+      const row = element("div", "progress-row");
+      row.append(element("span", "", SLIP_WORDS[slip.kind]), element("span", "", `${slip.games} game${slip.games === 1 ? "" : "s"}`));
+      slips.append(row);
+    }
+    box.append(slips);
+  }
+
+  // Your openings
+  const openings = element("div", "progress-card");
+  openings.append(element("h3", "", "Your openings"));
+  for (const opening of seen.openings.slice(0, 4)) {
+    const row = element("div", "progress-row");
+    const side = opening.colour === "white" ? "White" : "Black";
+    row.append(element("span", "", `${opening.name} (${side})`),
+      element("span", "", `${opening.games} game${opening.games === 1 ? "" : "s"} · ${opening.wins} win${opening.wins === 1 ? "" : "s"}` +
+        (opening.accuracy === undefined ? "" : ` · ${opening.accuracy.toFixed(1)}`)));
+    openings.append(row);
+  }
+  box.append(openings);
+
+  // What to do next
+  const next = element("div", "progress-card");
+  next.append(element("h3", "", "Recommended for you"));
+  const suggest = (title: string, detail: string, label: string, run: () => void) => {
+    const row = element("div", "progress-row");
+    row.append(element("span", "", title), element("span", "", detail));
+    const button = element("button", "accent progress-go", label);
+    button.type = "button";
+    button.addEventListener("click", run);
+    next.append(row, button);
+  };
+  const due = dueMistakes();
+  if (due.length) suggest("Your mistakes", `${due.length} due today`, `Practise ${due.length}`, () => startPractice(due));
+  const themes = top ? SLIP_THEMES[top.kind] : [];
+  if (top && themes.length) {
+    const phase: TrainPhase = seen.weakest === "endgame" ? "endgame" : "middlegame";
+    const level = PUZZLE_LEVELS.find(([v]) => v === puzzleLevel)?.[1] ?? "";
+    suggest(`Puzzles: ${lowerFirst(SLIP_WORDS[top.kind]).replace(/ \(a miss\)$/i, "")}`, `${level} level`, "Start puzzles",
+      () => void startPuzzles(phase, puzzleLevel, themes));
+  }
+  if (seen.weakest) {
+    const weakest = seen.weakest;
+    suggest(`Lessons: the ${PHASE_WORDS[weakest]}`, weakest === "opening" ? "Your openings" : cap(PHASE_WORDS[weakest]), "Open lessons", () => {
+      trainTab = weakest === "opening" ? "openings" : weakest;
+      if (weakest !== "opening") trainPhase = weakest;
+      showScreen("train");
+      $("lesson-list").hidden = true;
+      $("train-cards").hidden = false;
+      drawTrainScreen();
+      if (weakest !== "opening") showLessonList();
+    });
+  }
+  box.append(next);
+  box.append(element("p", "progress-sub progress-foot",
+    `Built from the last ${seen.recent.length} of the ${seen.games} games you've reviewed as a player, kept on your phone.`));
 }
 
 /** Back to Training, on the tab you came from. */
