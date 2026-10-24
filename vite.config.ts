@@ -28,7 +28,7 @@ function offlineCopy(): Plugin {
       const hash = createHash("sha256").update(SERVICE_WORKER);
       for (const file of files) hash.update(file).update(readFileSync(join(outDir, file)));
       const version = hash.digest("hex").slice(0, 12);
-      const worker = SERVICE_WORKER.replace("__VERSION__", version).replace(
+      const worker = SERVICE_WORKER.replaceAll("__VERSION__", version).replace(
         "__FILES__",
         JSON.stringify(["./", ...files.filter((f) => f !== "index.html")]),
       );
@@ -44,7 +44,11 @@ const CACHE = "chess-trainer-__VERSION__";
 const FILES = __FILES__;
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(FILES)).then(() => self.skipWaiting()));
+  // Each file fetched with this version in its address, past any copy the
+  // host's servers still hold from before (GitHub Pages can serve the old
+  // start page for minutes after an update); found again with ignoreSearch
+  const fresh = FILES.map((file) => new Request(file + "?v=__VERSION__", { cache: "reload" }));
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(fresh)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (event) => {
