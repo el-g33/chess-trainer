@@ -12,6 +12,8 @@
     "preview": "vite preview",
     "preview:phone": "vite preview --host",
     "check": "tsc --noEmit",
+    "test": "node tests/node/run.mjs",
+    "test:update": "node tests/node/run.mjs --update",
     "copy-engine": "node scripts/copy-engine.mjs",
     "postinstall": "node scripts/copy-engine.mjs"
   },
