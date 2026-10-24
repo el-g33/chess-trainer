@@ -42,6 +42,14 @@ type Job =
   | { kind: "move"; move: DeepMove; fens: string[] }
   | { kind: "deep"; position: Chess; fens: string[] };
 
+/** What Stockfish found for a game's positions, kept so the game opens at
+ *  once next time (the searches are fixed-depth, so the results are the same). */
+export interface SavedAnalysis {
+  evals: [string, Evaluation][];
+  deep: string[];
+  poisoned: string[];
+}
+
 export class Analyser {
   readonly evals = new Map<string, Evaluation>();
   private readonly deepDone = new Set<string>();
@@ -75,6 +83,22 @@ export class Analyser {
   requestDeepMoves(moves: DeepMove[]) {
     this.deepMoves = moves.filter((m) => !m.after.isEnd() && !isDrawnPosition(m.after) && !this.deepDone.has(fenOf(m.after)));
     this.start();
+  }
+
+  /** The results for these positions, to keep. */
+  save(fens: Set<string>): SavedAnalysis {
+    return {
+      evals: [...this.evals].filter(([fen]) => fens.has(fen)),
+      deep: [...this.deepDone].filter((fen) => fens.has(fen)),
+      poisoned: [...this.poisoned].filter((key) => fens.has(key.slice(0, key.lastIndexOf(" ")))),
+    };
+  }
+
+  /** Results kept from before: a game opened again. */
+  restore(saved: SavedAnalysis) {
+    for (const [fen, evaluation] of saved.evals) this.evals.set(fen, evaluation);
+    for (const fen of saved.deep) this.deepDone.add(fen);
+    for (const key of saved.poisoned) this.poisoned.add(key);
   }
 
   /** Does this move offer a piece the opponent can't safely take? */

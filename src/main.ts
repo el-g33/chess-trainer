@@ -19,7 +19,7 @@ import "@lichess-org/chessground/assets/chessground.base.css";
 import "./style.css";
 import "./themes.css";
 import "./layout.css";
-import { Analyser, lineMove, lineScore, type DeepMove } from "./analyser";
+import { Analyser, lineMove, lineScore, type DeepMove, type SavedAnalysis } from "./analyser";
 import { avatarSvg, moodForRating, type Mood } from "./avatar";
 import { drawIcons, icon } from "./icons";
 import { enhanceSelects, syncDropdowns } from "./dropdown";
@@ -121,7 +121,6 @@ const clockTickBox = $<HTMLInputElement>("clock-tick");
 const sfOpeningBox = $<HTMLSelectElement>("sf-opening");
 const myOpeningBox = $<HTMLSelectElement>("my-opening");
 const engineStatus = $("engine-status");
-const backButton = $<HTMLButtonElement>("back-to-game");
 const moveList = $("move-list");
 const viewLabel = $("view-label");
 const openingLabel = $("opening-label");
@@ -578,7 +577,6 @@ function buildMenu() {
   none.text = "None - just play";
   menuCard.addEventListener("change", updateMenu);
   menuCard.addEventListener("submit", (event) => event.preventDefault());
-  backButton.addEventListener("click", hideMenu);
   setupHome();
   updateMenu();
   enhanceSelects();
@@ -621,7 +619,6 @@ function updateMenu() {
 
 function showMenu() {
   menuOpen = true;
-  backButton.hidden = game.length === 0 && match === null && !demo;
   homeChoice = null;
   greeting = pickGreeting();
   showScreen("welcome");
@@ -706,14 +703,6 @@ function drawHome() {
     button.setAttribute("aria-checked", String(on));
   }
   $<HTMLButtonElement>("home-next").disabled = !homeChoice;
-  // A game still loaded for analysis: a way back to it
-  const resumable = analysedGame && reviewing && game.length > 0 && !preparing;
-  $("home-resume").hidden = !resumable;
-  if (resumable) {
-    const white = gameHeaders.White && gameHeaders.White !== "?" ? gameHeaders.White : "White";
-    const black = gameHeaders.Black && gameHeaders.Black !== "?" ? gameHeaders.Black : "Black";
-    $("home-resume").textContent = `Back to your game analysis: ${white} vs ${black}`;
-  }
   syncDropdowns();
 
   // Play
@@ -897,7 +886,6 @@ function resetBoard(newGame: Game, headers: Headers = { White: "?", Black: "?", 
   editor = null;
   lesson = null;
   explore = null;
-  analysedGame = false;
   fromStats = false;
   stepper = null;
   closeOverlay(false);
@@ -1144,6 +1132,7 @@ function onReviewGame() {
   canReview = false;
   reviewing = true;
   currentView = "stats"; // the statistics first, then the review from move 1
+  viewPly = game.length ? 0 : null;
   startPreparing();
   refresh();
 }
@@ -1153,11 +1142,13 @@ const watching = () => reviewing && reviewTitle !== "" && reviewSide === null;
 
 // -- The load screen: Stockfish checks everything before the review --------------
 
-const PREP_MIN_MS = 2500; // long enough to see the animation, even for a game already checked
+const PREP_MIN_MS = 2500; // long enough to see the animation once Stockfish has work to do
+let prepWorked = false; // Stockfish had something to check (a game seen before opens at once)
 
 function startPreparing() {
-  analysedGame = true;
   if (!rateMovesBox.checked) return;
+  restoreAnalysis();
+  prepWorked = false;
   preparing = true;
   preparingSince = performance.now();
   stopLoading?.();
@@ -1178,21 +1169,82 @@ function drawPrep(list: (Review | undefined)[]) {
   if (!preparing) return;
   const { done, total } = analyser.progress();
   const finished = done >= total && !deepNeeded.length && !deepMoves.length && list.every(Boolean);
-  if (!finished) return;
-  const wait = PREP_MIN_MS - (performance.now() - preparingSince);
+  if (!finished) {
+    prepWorked = true;
+    return;
+  }
+  const wait = prepWorked ? PREP_MIN_MS - (performance.now() - preparingSince) : 0;
   if (wait > 0) {
     setTimeout(refresh, wait);
     return;
   }
+  keepAnalysis();
   stopPreparing();
   currentView = "stats";
   applyView();
 }
 
+// -- Games reviewed before: their analysis is kept, so they open at once -----------
+
+const ANALYSIS_KEY = "chess-trainer-analysis"; // { game key: SavedAnalysis }, oldest first
+const ANALYSIS_KEEP = 40; // games
+
+/** The positions of the game on the board. */
+function gameFens(): Set<string> {
+  const fens = new Set<string>();
+  for (let ply = 0; ply <= game.length; ply++) fens.add(fenOf(game.positionAt(ply)));
+  return fens;
+}
+
+/** A short key for the game: its positions, hashed. */
+function gameKey(): string {
+  let hash = 2166136261;
+  const text = [...gameFens()].join("|");
+  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
+  return `g${(hash >>> 0).toString(36)}-${game.length}`;
+}
+
+function savedAnalyses(): Record<string, SavedAnalysis> {
+  try {
+    return JSON.parse(localStorage.getItem(ANALYSIS_KEY) ?? "{}");
+  } catch {
+    return {};
+  }
+}
+
+/** A game reviewed before: what Stockfish found then. */
+function restoreAnalysis() {
+  if (!game.length) return;
+  const saved = savedAnalyses()[gameKey()];
+  if (saved) analyser.restore(saved);
+}
+
+/** Keep this game's analysis (the most recent games only). */
+function keepAnalysis() {
+  if (!game.length) return;
+  const all = savedAnalyses();
+  const key = gameKey();
+  delete all[key];
+  // the game's positions, and the ones after each best (and second best) move, which the ratings use too
+  const fens = gameFens();
+  for (let ply = 0; ply <= game.length; ply++) {
+    const position = game.positionAt(ply);
+    const found = analyser.evals.get(fenOf(position));
+    for (const move of [found?.best, found?.second]) if (move && position.isLegal(move)) fens.add(fenOf(positionAfter(position, move)));
+  }
+  all[key] = analyser.save(fens);
+  const keys = Object.keys(all);
+  for (const old of keys.slice(0, Math.max(0, keys.length - ANALYSIS_KEEP))) delete all[old];
+  try {
+    localStorage.setItem(ANALYSIS_KEY, JSON.stringify(all));
+  } catch {
+    // storage full or blocked: the game just takes a moment to check next time
+  }
+}
+
 let gradeJump = { key: "", next: 0 };
 let silentJump = false; // from the statistics: the top bubble says nothing, the card below does the talking
 let fromStats = false; // jumped to a move from the statistics: a bar leads back
-let analysedGame = false; // the board holds a game loaded for review (Home offers a way back)
 
 /** From the statistics: the next move of this grade by this side, on the board, explained. */
 function jumpToGrade(colour: Color, grade: string, list: (Review | undefined)[]) {
@@ -1512,7 +1564,7 @@ const PRACTICE_TOUR: TourStep[] = [
   { target: ".game-top .gear-button", title: "Settings",
     text: "Theme, board, pieces, sounds, your name, and more." },
   { target: "#new-game", title: "New game",
-    text: "Play, practise or analyse a game. The feature tour is in the settings if you'd like to see it again." },
+    text: "Start again in the mode you're in: a new game, match, review or lesson. The feature tour is in the settings if you'd like to see it again." },
 ];
 
 const DEMO_TOUR: TourStep[] = [
@@ -5221,18 +5273,31 @@ function openSavedGame(saved: SavedGame) {
   orientation = saved.user;
   gameOrigin = saved.mode === "play" ? "play" : "practice";
   viewPly = loaded.length ? 0 : null;
+  restoreAnalysis();
   currentView = "board";
   refresh();
 }
 
 const inProgress = () => match !== null && game.length > 0 && !game.outcome();
 
-/** New game: the setup screen of the mode you're in. */
+/** What New starts again, in the mode you're in: "game", "match", "review"... */
+function newWhat(): string {
+  switch (gameOrigin) {
+    case "practice": return "match";
+    case "analysis": return "review";
+    case "learn": return drill ? "drill" : "lesson";
+    case "train": return puzzle ? "puzzles" : lesson ? "lesson" : "position";
+    default: return "game";
+  }
+}
+
+/** New game (or match, review...): the setup screen of the mode you're in. */
 async function onNewGame() {
-  if (inProgress() && !(await message("New game?", "Are you sure? This game will end.", true))) return;
+  if (inProgress() && !(await message(`New ${newWhat()}?`, "Are you sure? This game will end.", true))) return;
   const learning = demo ? demo.demo.opening : drill ? drill.demo.opening : null;
   const screen: HomeChoice | null = gameOrigin === "learn" ? "train" : gameOrigin;
   if (screen === "train") $("lesson-list").hidden = true;
+  endGame();
   showMenu();
   if (!screen) return;
   homeChoice = screen;
@@ -5247,10 +5312,20 @@ async function onNewGame() {
   drawTrainScreen();
 }
 
-/** Home: the coach's welcome. */
+/** Home: the coach's welcome. It ends whatever was on the board (asking
+ *  first if a game is still being played). */
 async function onHome() {
   if (inProgress() && !(await message("Leave this game?", "Are you sure? This game will end.", true))) return;
+  endGame();
   showMenu();
+}
+
+/** Leave the game for good: the clock stops and the board is cleared. */
+function endGame() {
+  if (preparing) stopPreparing();
+  clock?.stop();
+  resetBoard(new Game());
+  refresh();
 }
 
 function drawTurn() {
@@ -5334,6 +5409,9 @@ function drawButtons() {
   // No take-backs while looking back or previewing: Undo only works on the live game.
   undoButton.disabled = waiting || looking || quizOpen || !game.length;
   newButton.disabled = busy;
+  const what = newWhat();
+  newButton.querySelector(".ng-long")!.textContent = ` ${what}`;
+  newButton.setAttribute("aria-label", `New ${what}`);
 
   resignButton.hidden = !(match && !analysis);
   resignButton.disabled = busy;
@@ -5478,7 +5556,7 @@ const pgnPick = $<HTMLSelectElement>("pgn-pick");
 const pgnStatus = $("pgn-status");
 let pgnGames: PgnGame[] = [];
 
-/** "Open PGN": the Game analysis screen. */
+/** "Open PGN": the Game review screen. */
 function openPgnDialog() {
   showMenu();
   homeChoice = "analysis";
@@ -5777,11 +5855,6 @@ function wireButtons() {
   $("home-button").addEventListener("click", () => void onHome());
   $("prep-back").addEventListener("click", () => { stopPreparing(); showMenu(); });
   $("stats-back").addEventListener("click", backToStats);
-  // Home: straight back to a game that's still loaded for analysis
-  $("home-resume").addEventListener("click", () => {
-    hideMenu();
-    refresh();
-  });
   for (const tab of document.querySelectorAll<HTMLButtonElement>(".view-tabs button")) {
     tab.addEventListener("click", () => {
       currentView = tab.dataset.view as typeof currentView;

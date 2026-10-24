@@ -1877,16 +1877,6 @@ body.replay-on .nav-play {
   font-weight: 700;
 }
 
-/* Home: back to a game that's still loaded for analysis */
-.home-resume {
-  margin-top: 8px;
-  width: 100%;
-  font-weight: 600;
-}
-.home-resume[hidden] {
-  display: none;
-}
-
 /* An opening's introduction: just the finished setup, no move list yet */
 body.demo-intro .move-strip {
   visibility: hidden;

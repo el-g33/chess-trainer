@@ -61,7 +61,6 @@
         <!-- 1. Welcome -->
         <section class="screen" data-screen="welcome">
           <div class="home-top">
-            <button type="button" id="back-to-game" class="home-link"><span data-ico="back" data-ico-size="16"></span> Back to game</button>
             <span class="home-gap"></span>
             <button type="button" class="icon-button help-button" aria-label="Help" title="Help"><span data-ico="quiz"></span></button>
             <button type="button" class="icon-button gear-button" aria-label="Settings" title="Settings"><span data-ico="gear"></span></button>
@@ -71,11 +70,10 @@
           <div class="mode-choices" role="radiogroup" aria-label="What would you like to do?">
             <button type="button" class="mode-choice" data-choice="play" role="radio" aria-checked="false"><span class="mc-icon" data-ico="knight" data-ico-size="22"></span>Play against the computer</button>
             <button type="button" class="mode-choice" data-choice="practice" role="radio" aria-checked="false"><span class="mc-icon" data-ico="school" data-ico-size="22"></span>Practice match</button>
-            <button type="button" class="mode-choice" data-choice="analysis" role="radio" aria-checked="false"><span class="mc-icon" data-ico="search" data-ico-size="22"></span>Game analysis</button>
+            <button type="button" class="mode-choice" data-choice="analysis" role="radio" aria-checked="false"><span class="mc-icon" data-ico="search" data-ico-size="22"></span>Game review</button>
             <button type="button" class="mode-choice" data-choice="train" role="radio" aria-checked="false"><span class="mc-icon" data-ico="puzzle" data-ico-size="22"></span>Training</button>
           </div>
           <button type="button" id="home-next" class="home-next accent" disabled>Next</button>
-          <button type="button" id="home-resume" class="home-resume" hidden></button>
           <p id="engine-status" class="engine-status">Loading Stockfish...</p>
         </section>
 
@@ -130,11 +128,11 @@
           </div>
         </section>
 
-        <!-- 2c. Game analysis: a game from a PGN -->
+        <!-- 2c. Game review: a game from a PGN -->
         <section class="screen" data-screen="analysis" hidden>
           <div class="setup-head">
             <button type="button" class="home-link setup-back"><span data-ico="home" data-ico-size="18"></span> Home</button>
-            <h2>Game analysis</h2>
+            <h2>Game review</h2>
             <button type="button" class="setup-start accent" data-start="analysis" disabled>Start</button>
           </div>
           <p class="setup-note">Paste a game in PGN format (from lichess, chess.com or anywhere), or open a .pgn file.</p>
@@ -501,7 +499,7 @@
       </form>
     </dialog>
 
-    <!-- Game analysis with both a game and a position filled in: which one? -->
+    <!-- Game review with both a game and a position filled in: which one? -->
     <dialog id="load-choice" class="settings-dialog">
       <form method="dialog">
         <h3>What shall we load?</h3>
