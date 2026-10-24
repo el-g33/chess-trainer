@@ -3,6 +3,8 @@
 //   Practice mode - eval bar, live move ratings, opening coaching, Undo, FEN
 //                   positions, a free board, "what if" analysis moves and the
 //                   strategy coach (threat check, plan ahead, quiz, ideas)
+// This file holds the board, the shared types and the start-up; each part of
+// the page is a module in src/app (the shared state is src/app/state.ts).
 import { Chessground } from "@lichess-org/chessground";
 import type { Api } from "@lichess-org/chessground/api";
 import type { DrawShape } from "@lichess-org/chessground/draw";
