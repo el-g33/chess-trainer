@@ -15,11 +15,24 @@ import type { Color, NormalMove, Role } from "chessops/types";
 import { makeSquare, makeUci, opposite, parseSquare, parseUci } from "chessops/util";
 
 import "@fontsource/permanent-marker/latin-400.css";
+import {
+  coachEngine, mode, game, match, matchCounter, viewPly, analysis, preview,
+  orientation, thinking, result, menuOpen, clock, clockTimes, clockHistory, lastTickSecond,
+  demo, demoStepping, canReview, reviewing, reviewTitle, reviewSide, preparing, preparingSince,
+  stopLoading, showReply, plyNotes, gameHeaders, quiz, busy, busySince, statusMessage,
+  errorText, lastFraction, book, openingCache, homeChoice, greeting, learnColour, matchColour,
+  learnOpening, gameOrigin, prepWorked, prepWatch, prepProgress, gradeJump, silentJump, fromStats,
+  fenPosition, trainPhase, trainTab, puzzleLevel, puzzle, explore, exploreBand, editor,
+  lesson, replaying, replayStepping, drill, practice, savedFromReview, deepening, busyTimer,
+  deepNeeded, deepMoves, fall, speech, stripButtons, lastReviews, stepper, currentView,
+  statsMore, currentGameId, historyColour, checkingUpdates, pgnGames, answerDialog,
+  set,
+} from "./app/state";
 import "@lichess-org/chessground/assets/chessground.base.css";
 import "./style.css";
 import "./themes.css";
 import "./layout.css";
-import { Analyser, lineMove, lineScore, type DeepMove, type ReviewDepth, type SavedAnalysis } from "./analyser";
+import { Analyser, lineMove, lineScore, type ReviewDepth, type SavedAnalysis } from "./analyser";
 import { avatarSvg, moodForRating, type Mood } from "./avatar";
 import { drawIcons, icon } from "./icons";
 import { enhanceSelects, syncDropdowns } from "./dropdown";
@@ -56,7 +69,7 @@ import { accuracyRating, divide, estimateRating, gameAccuracy, phaseAccuracy, ra
 import type { Score } from "./coach";
 import { explainGuess, type GuessExplanation } from "./quizExplain";
 import {
-  Clock, formatClock, parseTimeControl, PRESETS, thinkTime, timeControlTag, type TimeControl, type Times,
+  Clock, formatClock, parseTimeControl, PRESETS, thinkTime, timeControlTag, type TimeControl,
 } from "./clock";
 import { DEMOS, demoFor, demoSteps, introMoves, type Demo, type DemoStep } from "./demos";
 import { LESSONS, type Lesson, type TrainPhase } from "./lessons";
@@ -72,7 +85,7 @@ import { fitsIn, readingTime, setTypeSpeed, splitToFit, Typer } from "./talk";
 import { startLoadAnimation } from "./loading";
 import { styleAlternative, type Style } from "./style";
 import { runTour, tourOpen, type TourStep } from "./tour";
-import { readPgn, saveFile, today, writePgn, type Headers, type PgnGame } from "./pgn";
+import { readPgn, saveFile, today, writePgn, type Headers } from "./pgn";
 import { addMisses, fenOf, formatScore, isDrawnPosition, isSacrifice, reviewMove, verdictWords, winningChance, type Review } from "./review";
 import { gradeGuess, planAhead, threatCheck, type CoachEngine, type Plan, type Threat } from "./strategy";
 import { Board } from "chessops/board";
@@ -185,9 +198,9 @@ const navButtons = [...document.querySelectorAll<HTMLButtonElement>("button[data
 // State
 // ---------------------------------------------------------------------------
 
-type Mode = "play" | "practice";
+export type Mode = "play" | "practice";
 
-interface Match {
+export interface Match {
   id: number;
   user: Color; // the side you play
   level: number; // index into LEVELS
@@ -199,7 +212,7 @@ interface Match {
 }
 
 /** "What if" moves from a position of the game: the game itself never changes. */
-interface Analysis {
+export interface Analysis {
   fromPly: number;
   line: Game; // starts at the game position, holds the analysis moves
   ahead: NormalMove[]; // moves stepped back over (forward replays them)
@@ -212,7 +225,7 @@ interface Insight {
   ideas?: string;
 }
 
-interface Quiz {
+export interface Quiz {
   fen: string;
   threat?: Threat;
   answered: boolean;
@@ -227,25 +240,9 @@ interface Quiz {
 // one to play against you, one for the eval bar and move ratings (in the
 // Analyser), and one for the strategy coach (started when first needed).
 const engine = new Engine();
-let coachEngine: Engine | null = null;
 
-let mode: Mode = "practice";
-let game = new Game();
-let match: Match | null = null; // the game against Stockfish, while it goes on
-let matchCounter = 0;
-let viewPly: number | null = null; // looking back at this move; null = the live position
-let analysis: Analysis | null = null;
-let preview: { baseFen: string; step: number } | null = null; // stepping through Stockfish's line
-let orientation: Color = "white";
-let thinking = false; // Stockfish is choosing its move
-let result = ""; // how the last match ended, e.g. "You resigned - Stockfish wins"
-let menuOpen = true;
-let clock: Clock | null = null; // the chess clock, in a match with a time control
-let clockTimes: number[] = []; // each move's time left afterwards (for the PGN)
-let clockHistory: Times[] = []; // the clocks after each move (for Undo)
-let lastTickSecond = -1;
 // An opening demo: Stockfish plays a line, pausing at the notes
-interface DemoState {
+export interface DemoState {
   demo: Demo;
   line: number;
   steps: DemoStep[];
@@ -254,40 +251,20 @@ interface DemoState {
   intro: boolean; // before play: the finished setup on the board, the coach introduces it
   timer?: number;
 }
-let demo: DemoState | null = null;
-let demoStepping = false; // the demo itself is moving on (not you)
-let canReview = false; // a finished Play game can be reviewed in Practice mode
-let reviewing = false; // reviewing a Play game in Practice mode
-let reviewTitle = ""; // for a game opened from PGN, e.g. "Reviewing: Carlsen - Nakamura (1-0)"
-let reviewSide: Color | null = null; // a PGN game: the side you played (null: just watching)
-let preparing = false; // Stockfish is checking the whole game before the review opens
-let preparingSince = 0;
-let stopLoading: (() => void) | null = null;
-let showReply = false; // in a match, the review shows Stockfish's reply instead of your move
-let plyNotes = new Map<number, string[]>(); // opening notes for a move (1 = the first)
-let gameHeaders: Headers = {}; // the game's PGN headers: who played, when, the result
 
 // Strategy coach
 const insights = new Map<string, Insight>(); // keyed by position
-let quiz: Quiz | null = null;
 const quizScore = [0, 0]; // [right, asked]
 const brilliantShown = new Set<string>(); // positions where you asked to see the brilliant move
-let busy = false;
-let busySince = 0;
-let statusMessage = "";
-let errorText = "";
 
 // Ratings and the eval bar
 const reviewCache = new Map<string, Review>(); // finished ratings never change
 const analyser = new Analyser(() => refresh());
-let lastFraction = 0.5; // eval bar position shown while waiting
 
 // Openings: the database loads in the background
-let book: OpeningBook | null = null;
-let openingCache: { key: string; info: OpeningInfo[] } = { key: "", info: [] };
 const bookReady = OpeningBook.load().then(
   (loaded) => {
-    book = loaded;
+    set.book(loaded);
     refresh();
   },
   (error) => void message("Openings", `The opening database couldn't be loaded: ${error}`),
@@ -308,8 +285,8 @@ const openingEngine: OpeningEngine = {
 // The coach's Stockfish: lines turned into chessops moves
 const coachAnalysis: CoachEngine = {
   async analyse(position, seconds, lines = 1) {
-    coachEngine ??= new Engine();
-    const found = await coachEngine.analyse(fenOf(position), seconds * 1000, lines);
+    const engine = coachEngine ?? set.coachEngine(new Engine())!;
+    const found = await engine.analyse(fenOf(position), seconds * 1000, lines);
     return found.map((line) => {
       let walk = position;
       const pv: NormalMove[] = [];
@@ -325,16 +302,16 @@ const coachAnalysis: CoachEngine = {
     });
   },
   async moveScore(position, move, seconds) {
-    coachEngine ??= new Engine();
-    const [line] = await coachEngine.analyse(fenOf(position), seconds * 1000, 1, [standardUci(position, move)]);
+    const engine = coachEngine ?? set.coachEngine(new Engine())!;
+    const [line] = await engine.analyse(fenOf(position), seconds * 1000, 1, [standardUci(position, move)]);
     return lineScore(position, line);
   },
 };
 
 /** The coach's best line starting with one of these moves (all moves if none given). */
 async function coachLine(position: Chess, seconds: number, first: NormalMove[] = []): Promise<{ score: Score; pv: NormalMove[] } | undefined> {
-  coachEngine ??= new Engine();
-  const [line] = await coachEngine.analyse(fenOf(position), seconds * 1000, 1, first.map((m) => standardUci(position, m)));
+  const engine = coachEngine ?? set.coachEngine(new Engine())!;
+  const [line] = await engine.analyse(fenOf(position), seconds * 1000, 1, first.map((m) => standardUci(position, m)));
   if (!line) return undefined;
   let walk = position;
   const pv: NormalMove[] = [];
@@ -470,10 +447,10 @@ function quizWaiting(): boolean {
 
 /** Keep the preview and quiz only while their position is on screen. */
 function tidyState() {
-  if (viewPly !== null && viewPly >= game.length) viewPly = null;
+  if (viewPly !== null && viewPly >= game.length) set.viewPly(null);
   const fen = fenOf(base());
-  if (preview && preview.baseFen !== fen) preview = null;
-  if (quiz && quiz.fen !== fen) quiz = null;
+  if (preview && preview.baseFen !== fen) set.preview(null);
+  if (quiz && quiz.fen !== fen) set.quiz(null);
 }
 
 // ---------------------------------------------------------------------------
@@ -586,7 +563,7 @@ function buildMenu() {
   if (saved.sfOpening) sfOpeningBox.value = saved.sfOpening;
   if (saved.myOpening) myOpeningBox.value = saved.myOpening;
   for (const box of [colourBox, sfOpeningBox, myOpeningBox]) if (box.selectedIndex < 0) box.selectedIndex = 0;
-  matchColour = REPERTOIRE.find((o) => menuName(o) === myOpeningBox.value)?.colour ?? (saved.colour === "Black" ? "black" : "white");
+  set.matchColour(REPERTOIRE.find((o) => menuName(o) === myOpeningBox.value)?.colour ?? (saved.colour === "Black" ? "black" : "white"));
   if (saved.rateMoves !== undefined) rateMovesBox.checked = saved.rateMoves;
   if (saved.evalBar !== undefined) evalCheck.checked = saved.evalBar;
   if (saved.boardTheme) themeBox.value = saved.boardTheme;
@@ -594,7 +571,7 @@ function buildMenu() {
   reviewDepthBox.value = saved.reviewDepth === "deep" ? "deep" : "quick";
   arrowStyleBox.value = saved.arrowStyle === "colourblind" ? "colourblind" : "standard";
   coachSpeedBox.value = ["50", "33", "16", "0"].includes(saved.coachSpeed ?? "") ? saved.coachSpeed! : "33";
-  if (PUZZLE_LEVELS.some(([v]) => v === saved.puzzleLevel)) puzzleLevel = saved.puzzleLevel as PuzzleLevel;
+  if (PUZZLE_LEVELS.some(([v]) => v === saved.puzzleLevel)) set.puzzleLevel(saved.puzzleLevel as PuzzleLevel);
   applyArrowStyle();
   setTypeSpeed(Number(coachSpeedBox.value));
   if (planModeBox.selectedIndex < 0) planModeBox.selectedIndex = 0;
@@ -670,9 +647,9 @@ function updateMenu() {
 }
 
 function showMenu() {
-  menuOpen = true;
-  homeChoice = null;
-  greeting = pickGreeting();
+  set.menuOpen(true);
+  set.homeChoice(null);
+  set.greeting(pickGreeting());
   showScreen("welcome");
   menu.hidden = false;
 }
@@ -682,15 +659,9 @@ function showMenu() {
 // ---------------------------------------------------------------------------
 
 type HomeScreen = "welcome" | "play" | "practice" | "analysis" | "train" | "progress";
-type HomeChoice = "play" | "practice" | "analysis" | "train";
+export type HomeChoice = "play" | "practice" | "analysis" | "train";
 
-let homeChoice: HomeChoice | null = null;
-let greeting = "";
-let learnColour: Color = "white";
-let matchColour: Color = "white"; // your side in a practice match
-let learnOpening: string | null = null;
 // Where the game on screen came from, so New game goes back to that setup
-let gameOrigin: HomeChoice | "learn" | null = null;
 
 // Openings added lately: marked New until their lesson has been opened
 const NEW_OPENINGS = new Set(["French Defence", "Scandinavian Defence", "Nimzo-Indian Defence",
@@ -824,8 +795,8 @@ function drawHome() {
     }
     tile.addEventListener("click", () => {
       markOpeningSeen(d.opening);
-      learnOpening = d.opening;
-      gameOrigin = "learn";
+      set.learnOpening(d.opening);
+      set.gameOrigin("learn");
       startDemo(d);
     });
     return tile;
@@ -856,7 +827,7 @@ function setupHome() {
   drawIcons();
   for (const button of menu.querySelectorAll<HTMLButtonElement>(".mode-choice")) {
     button.addEventListener("click", () => {
-      homeChoice = button.dataset.choice as HomeChoice;
+      set.homeChoice(button.dataset.choice as HomeChoice);
       drawHome();
     });
   }
@@ -886,15 +857,15 @@ function setupHome() {
   }
   for (const button of menu.querySelectorAll<HTMLButtonElement>("#match-colour button")) {
     button.addEventListener("click", () => {
-      matchColour = button.dataset.colour as Color;
+      set.matchColour(button.dataset.colour as Color);
       drawHome();
       saveSettings();
     });
   }
   for (const button of menu.querySelectorAll<HTMLButtonElement>("#learn-colour button")) {
     button.addEventListener("click", () => {
-      learnColour = button.dataset.colour as Color;
-      learnOpening = null;
+      set.learnColour(button.dataset.colour as Color);
+      set.learnOpening(null);
       drawHome();
     });
   }
@@ -908,12 +879,12 @@ function setupHome() {
   menu.querySelector('[data-start="practice"]')!.addEventListener("click", () => startFromHome("practice"));
   menu.querySelector('[data-start="analysis"]')!.addEventListener("click", (event) => void startAnalysis(event));
   $("empty-board").addEventListener("click", () => {
-    mode = "practice";
+    set.mode("practice");
     resetBoard(new Game());
-    gameOrigin = "analysis";
-    orientation = "white";
-    canReview = false;
-    reviewing = false;
+    set.gameOrigin("analysis");
+    set.orientation("white");
+    set.canReview(false);
+    set.reviewing(false);
     hideMenu();
     refresh();
   });
@@ -925,7 +896,7 @@ function setMode(value: Mode) {
 }
 
 function startFromHome(kind: "play" | "practice") {
-  gameOrigin = kind;
+  set.gameOrigin(kind);
   setMode(kind);
   opponentBox.selectedIndex = 0;
   if (kind === "practice") {
@@ -936,7 +907,7 @@ function startFromHome(kind: "play" | "practice") {
 }
 
 function hideMenu() {
-  menuOpen = false;
+  set.menuOpen(false);
   menu.hidden = true;
   // The board may have changed size while hidden
   requestAnimationFrame(() => {
@@ -946,12 +917,12 @@ function hideMenu() {
 }
 
 function onStartGame() {
-  mode = menuMode();
-  canReview = false;
-  reviewing = false;
+  set.mode(menuMode());
+  set.canReview(false);
+  set.reviewing(false);
   if (mode === "practice" && opponentBox.selectedIndex === 1) {
     resetBoard(new Game()); // a free board: you move both sides
-    orientation = "white";
+    set.orientation("white");
   } else {
     startMatch();
   }
@@ -963,35 +934,35 @@ function onStartGame() {
 
 /** A fresh game from a position, with nothing else going on. */
 function resetBoard(newGame: Game, headers: Headers = { White: "?", Black: "?", Date: today() }) {
-  gameHeaders = { ...headers };
-  currentGameId = null;
-  puzzle = null;
-  drill = null;
-  practice = null;
-  deepening = null;
+  set.gameHeaders({ ...headers });
+  set.currentGameId(null);
+  set.puzzle(null);
+  set.drill(null);
+  set.practice(null);
+  set.deepening(null);
   useDepth("quick");
-  editor = null;
-  lesson = null;
-  explore = null;
-  fromStats = false;
-  stepper = null;
+  set.editor(null);
+  set.lesson(null);
+  set.explore(null);
+  set.fromStats(false);
+  set.stepper(null);
   closeOverlay(false);
-  currentView = "board";
+  set.currentView("board");
   if (demo) clearTimeout(demo.timer);
-  demo = null;
-  clock = null;
-  clockTimes = [];
-  clockHistory = [];
-  match = null;
-  analysis = null;
-  viewPly = null;
-  preview = null;
-  quiz = null;
-  thinking = false;
-  result = "";
-  showReply = false;
-  plyNotes = new Map();
-  game = newGame;
+  set.demo(null);
+  set.clock(null);
+  set.clockTimes([]);
+  set.clockHistory([]);
+  set.match(null);
+  set.analysis(null);
+  set.viewPly(null);
+  set.preview(null);
+  set.quiz(null);
+  set.thinking(false);
+  set.result("");
+  set.showReply(false);
+  set.plyNotes(new Map());
+  set.game(newGame);
 }
 
 // ---------------------------------------------------------------------------
@@ -1007,22 +978,23 @@ function startMatch() {
   const level = levelBox.selectedIndex;
   const sfOpening = pickOpening(sfOpeningBox.value, opposite(user), level);
   const myOpening = pickOpening(myOpeningBox.value, user, level);
-  match = {
-    id: ++matchCounter, user, level,
+  set.match({
+    id: set.matchCounter(matchCounter + 1), user, level,
     sfOpening, sfActive: sfOpening !== null, sfMisses: 0,
     // Opening coaching is a training tool, so Play mode doesn't have it
     myOpening: mode === "practice" ? myOpening : null,
     myActive: mode === "practice" && myOpening !== null,
-  };
+  });
   const stockfish = `Stockfish (${shortName(LEVELS[level])})`;
   const you = playerName();
-  gameHeaders = { White: user === "white" ? you : stockfish, Black: user === "white" ? stockfish : you, Date: today() };
-  orientation = user; // your pieces at the bottom
+  set.gameHeaders({ White: user === "white" ? you : stockfish, Black: user === "white" ? stockfish : you, Date: today() });
+  set.orientation(user); // your pieces at the bottom
   const control = mode === "play" ? menuTimeControl() : undefined;
   if (control) {
-    clock = new Clock(control);
-    clock.start("white");
-    clockHistory = [clock.snapshot()];
+    const started = new Clock(control);
+    set.clock(started);
+    started.start("white");
+    set.clockHistory([started.snapshot()]);
     gameHeaders.TimeControl = timeControlTag(control);
   }
   void engine.newGame();
@@ -1060,7 +1032,7 @@ function coachMyOpening(move: NormalMove) {
 
 /** Called after every move of the game, yours or Stockfish's. */
 function afterMove() {
-  stepper = null;
+  set.stepper(null);
   closeOverlay(false);
   if (match && clock?.running()) {
     clockTimes[game.length - 1] = clock.moved();
@@ -1071,10 +1043,10 @@ function afterMove() {
   if (last) moveSound(last.san, opposite(game.position.turn));
   // (checkmate has its own sound)
   if (!match && game.outcome() && !last?.san.includes("#")) setTimeout(() => void play("gameover"), 350);
-  viewPly = null;
-  preview = null;
-  analysis = null;
-  showReply = false; // the review goes back to your move
+  set.viewPly(null);
+  set.preview(null);
+  set.analysis(null);
+  set.showReply(false); // the review goes back to your move
   refresh();
   if (!match) return;
   if (game.outcome()) {
@@ -1090,7 +1062,7 @@ async function maybeOpponentMove() {
   if (!match || thinking || game.position.turn === match.user || game.outcome()) return;
   const { id, level: levelIndex } = match;
   const level = LEVELS[levelIndex];
-  thinking = true;
+  set.thinking(true);
   refresh();
   const started = performance.now();
   try {
@@ -1150,12 +1122,12 @@ async function maybeOpponentMove() {
     }
     // Ignore a move meant for a match that has since been stopped or changed (Undo)
     if (match?.id !== id || fenOf(game.position) !== fenOf(position)) {
-      thinking = false;
+      set.thinking(false);
       refresh();
       void maybeOpponentMove();
       return;
     }
-    thinking = false;
+    set.thinking(false);
     match.sfMisses = misses;
     if (openingOver) match.sfActive = false;
     if (note) plyNotes.set(game.length + 1, [`Stockfish's opening: ${note}`]);
@@ -1163,9 +1135,9 @@ async function maybeOpponentMove() {
     afterMove();
   } catch (error) {
     if (match?.id !== id) return;
-    thinking = false;
-    match = null;
-    errorText = `Stockfish couldn't make its move: ${error}`;
+    set.thinking(false);
+    set.match(null);
+    set.errorText(`Stockfish couldn't make its move: ${error}`);
     refresh();
   }
 }
@@ -1189,7 +1161,7 @@ function onFlag(colour: Color) {
   const you = colour === match.user;
   gameHeaders.Result = draw ? "1/2-1/2" : other === "white" ? "1-0" : "0-1";
   gameHeaders.Termination = "Time forfeit";
-  result = draw ? "Out of time - a draw" : you ? "You ran out of time - Stockfish wins" : "Stockfish ran out of time - you win";
+  set.result(draw ? "Out of time - a draw" : you ? "You ran out of time - Stockfish wins" : "Stockfish ran out of time - you win");
   const text = draw
     ? `${you ? "You" : "Stockfish"} ran out of time, but ${you ? "Stockfish" : "you"} can't checkmate with the pieces left, so it's a draw.`
     : you ? "You ran out of time - Stockfish wins." : "Stockfish ran out of time - you win!";
@@ -1201,9 +1173,9 @@ function endMatch(text: string) {
   recordGame();
   clock?.stop();
   if (!game.moves[game.length - 1]?.san.includes("#")) void play("gameover"); // (checkmate has its own sound)
-  match = null;
-  thinking = false;
-  canReview = mode === "play" && game.length > 0;
+  set.match(null);
+  set.thinking(false);
+  set.canReview(mode === "play" && game.length > 0);
   refresh();
   const hint =
     mode === "play"
@@ -1214,12 +1186,12 @@ function endMatch(text: string) {
 
 /** After a Play game: switch to Practice to see the ratings and the coach. */
 function onReviewGame() {
-  reviewTitle = "";
-  mode = "practice";
-  canReview = false;
-  reviewing = true;
-  currentView = "stats"; // the statistics first, then the review from move 1
-  viewPly = game.length ? 0 : null;
+  set.reviewTitle("");
+  set.mode("practice");
+  set.canReview(false);
+  set.reviewing(true);
+  set.currentView("stats"); // the statistics first, then the review from move 1
+  set.viewPly(game.length ? 0 : null);
   startPreparing();
   refresh();
 }
@@ -1232,32 +1204,29 @@ const watching = () => reviewing && reviewTitle !== "" && reviewSide === null;
 const PREP_MIN_MS = 2500; // long enough to see the animation once Stockfish has work to do
 const PREP_STALL_MS = 30000; // no progress for this long: show what's ready rather than wait for ever
 const PREP_MAX_MS = 90000; // ...and never longer than this, progress or not
-let prepWorked = false; // Stockfish had something to check (a game seen before opens at once)
-let prepWatch = 0; // a timer that checks on the progress
-let prepProgress = { key: "", since: 0 }; // the last progress seen, and when
 
 function startPreparing() {
   if (!rateMovesBox.checked) return;
-  deepening = null;
+  set.deepening(null);
   useDepth(reviewDepthBox.value === "deep" ? "deep" : "quick");
   restoreAnalysis();
-  prepWorked = false;
-  prepProgress = { key: "", since: performance.now() };
+  set.prepWorked(false);
+  set.prepProgress({ key: "", since: performance.now() });
   $("prep-progress").textContent = "";
   clearInterval(prepWatch);
-  prepWatch = window.setInterval(refresh, 5000);
-  preparing = true;
-  preparingSince = performance.now();
+  set.prepWatch(window.setInterval(refresh, 5000));
+  set.preparing(true);
+  set.preparingSince(performance.now());
   stopLoading?.();
-  stopLoading = startLoadAnimation($("prep-stage"), $("prep-caption"));
+  set.stopLoading(startLoadAnimation($("prep-stage"), $("prep-caption")));
   $("prep-screen").hidden = false;
 }
 
 function stopPreparing() {
-  preparing = false;
+  set.preparing(false);
   clearInterval(prepWatch);
   stopLoading?.();
-  stopLoading = null;
+  set.stopLoading(null);
   $("prep-screen").hidden = true;
 }
 
@@ -1268,14 +1237,14 @@ function drawPrep(list: (Review | undefined)[]) {
   const { done, total } = analyser.progress();
   const finished = done >= total && !deepNeeded.length && !deepMoves.length && list.every(Boolean);
   if (!finished) {
-    prepWorked = true;
+    set.prepWorked(true);
     const closer = deepNeeded.length + deepMoves.length;
     $("prep-progress").textContent = `Checked ${Math.min(done, total)} of ${total} positions` +
       (closer ? ` · a closer look at ${closer} move${closer === 1 ? "" : "s"}` : "") +
       ` · ${list.filter(Boolean).length} of ${list.length} moves rated`;
     // Stuck (no progress for a long time, or far too long): show what's ready rather than wait for ever
     const key = `${done}/${total}/${deepNeeded.length}/${deepMoves.length}/${list.filter(Boolean).length}`;
-    if (key !== prepProgress.key) prepProgress = { key, since: performance.now() };
+    if (key !== prepProgress.key) set.prepProgress({ key, since: performance.now() });
     const slower = analyser.depth === "deep" ? 4 : 1;
     const stalled = performance.now() - prepProgress.since >= PREP_STALL_MS * slower;
     const tooLong = performance.now() - preparingSince >= PREP_MAX_MS * slower;
@@ -1290,7 +1259,7 @@ function drawPrep(list: (Review | undefined)[]) {
   saveGameMistakes(withBook(list));
   saveGameSummary(withBook(list));
   stopPreparing();
-  currentView = "stats";
+  set.currentView("stats");
   applyView();
 }
 
@@ -1363,9 +1332,6 @@ function keepAnalysis() {
   }
 }
 
-let gradeJump = { key: "", next: 0 };
-let silentJump = false; // from the statistics: the top bubble says nothing, the card below does the talking
-let fromStats = false; // jumped to a move from the statistics: a bar leads back
 
 /** The move ratings with the opening's known moves rated Book, as the board's badges show them. */
 function withBook(list: (Review | undefined)[]): (Review | undefined)[] {
@@ -1378,15 +1344,15 @@ function jumpToGrade(colour: Color, grade: string, list: (Review | undefined)[])
   const plies = list.flatMap((review, i) => (review?.rating === grade && game.moverOf(i + 1) === colour ? [i + 1] : []));
   if (!plies.length) return;
   const key = `${colour}:${grade}`;
-  if (gradeJump.key !== key) gradeJump = { key, next: 0 };
+  if (gradeJump.key !== key) set.gradeJump({ key, next: 0 });
   const ply = plies[gradeJump.next % plies.length];
   gradeJump.next++;
-  currentView = "board";
-  stepper = null;
+  set.currentView("board");
+  set.stepper(null);
   // the position before the move first, then the move plays in with its explanation
   goTo(ply - 1);
-  silentJump = true;
-  fromStats = true;
+  set.silentJump(true);
+  set.fromStats(true);
   refresh();
   const review = list[ply - 1]!;
   setTimeout(() => {
@@ -1398,31 +1364,31 @@ const GRADE_JUMP_PAUSE = 1000; // ms on the position before the move
 
 /** The bar back to the statistics, while you're on the board after a jump. */
 function drawStatsBack() {
-  if (!reviewing) fromStats = false;
+  if (!reviewing) set.fromStats(false);
   const show = fromStats && currentView === "board" && !analysis && !demo;
   $("stats-back-bar").hidden = !show;
   document.querySelector(".board-area")!.classList.toggle("statsback", show);
 }
 
 function backToStats() {
-  fromStats = false;
-  silentJump = false;
-  stepper = null;
-  currentView = "stats";
+  set.fromStats(false);
+  set.silentJump(false);
+  set.stepper(null);
+  set.currentView("stats");
   refresh();
 }
 
 /** Start going through the game, from the first move. */
 function startReview() {
-  currentView = "board";
-  stepper = null;
+  set.currentView("board");
+  set.stepper(null);
   goTo(0);
 }
 
 async function onResign() {
   if (!match) return;
   if (!(await message("Resign?", "Are you sure you want to resign this game?", true))) return;
-  result = "You resigned - Stockfish wins";
+  set.result("You resigned - Stockfish wins");
   gameHeaders.Result = match.user === "white" ? "0-1" : "1-0";
   gameHeaders.Termination = `${match.user === "white" ? "White" : "Black"} resigns`;
   endMatch("You resigned.");
@@ -1491,14 +1457,16 @@ function onBoardMove(from: Key, to: Key) {
 // -- Analysis: "what if I'd moved differently?" -----------------------------
 
 function analysisMove(move: NormalMove) {
-  if (!analysis) {
-    analysis = { fromPly: currentPly(), line: new Game(fenOf(base())), ahead: [] };
-    quiz = null;
+  let line = analysis;
+  if (!line) {
+    line = { fromPly: currentPly(), line: new Game(fenOf(base())), ahead: [] };
+    set.analysis(line);
+    set.quiz(null);
   }
-  const played = analysis.line.play(move);
-  analysis.ahead = []; // a new move replaces the ones stepped back over
-  moveSound(played.san, opposite(analysis.line.position.turn));
-  preview = null;
+  const played = line.line.play(move);
+  line.ahead = []; // a new move replaces the ones stepped back over
+  moveSound(played.san, opposite(line.line.position.turn));
+  set.preview(null);
   refresh();
 }
 
@@ -1514,7 +1482,7 @@ function analysisTakeBack() {
   const undone = analysis.line.moves[analysis.line.length - 1].move;
   analysis.line.undo();
   analysis.ahead.unshift(undone);
-  preview = null;
+  set.preview(null);
   refresh();
 }
 
@@ -1522,7 +1490,7 @@ function analysisForward() {
   if (!analysis || !analysis.ahead.length) return;
   const played = analysis.line.play(analysis.ahead.shift()!);
   moveSound(played.san, opposite(analysis.line.position.turn));
-  preview = null;
+  set.preview(null);
   refresh();
 }
 
@@ -1552,16 +1520,16 @@ function drawWhatIf() {
 
 function exitAnalysis() {
   if (!analysis) return;
-  analysis = null;
-  preview = null;
+  set.analysis(null);
+  set.preview(null);
   refresh();
 }
 
 // -- Stepping through the game ------------------------------------------------
 
 function goTo(ply: number) {
-  stepper = null;
-  silentJump = false;
+  set.stepper(null);
+  set.silentJump(false);
   if (demo && !demoStepping) {
     clearTimeout(demo.timer);
     if (demo.playing) demo.interrupted = true;
@@ -1569,15 +1537,15 @@ function goTo(ply: number) {
     if (demo.intro) {
       // out of the introduction's setup and into the line itself
       demo.intro = false;
-      game = new Game();
+      set.game(new Game());
       for (const step of demo.steps) game.play(step.move);
     }
   }
-  if (replaying && !replayStepping) replaying = false;
+  if (replaying && !replayStepping) set.replaying(false);
   ply = Math.max(0, Math.min(ply, game.length));
   if (ply === currentPly() + 1 && !analysis) moveSound(game.moves[ply - 1].san, game.positionAt(ply - 1).turn);
-  analysis = null; // moving through the game leaves any analysis line
-  viewPly = ply === game.length ? null : ply;
+  set.analysis(null); // moving through the game leaves any analysis line
+  set.viewPly(ply === game.length ? null : ply);
   refresh();
   if (explore && viewPly === null) autoReply(); // back at the end: they carry on
 }
@@ -1593,22 +1561,21 @@ function onUndo() {
     clockTimes.length = game.length;
     clock.restore(clockHistory[game.length], game.position.turn);
   }
-  viewPly = null;
+  set.viewPly(null);
   refresh();
   if (match) void maybeOpponentMove();
 }
 
-let fenPosition: Chess | null = null; // the position typed on the analysis screen, if it's valid
 
 /** Check the position box on the analysis screen. */
 function readFen() {
   const text = fenInput.value.trim();
-  fenPosition = null;
+  set.fenPosition(null);
   if (text) {
     try {
-      fenPosition = Chess.fromSetup(parseFen(text).unwrap()).unwrap();
+      set.fenPosition(Chess.fromSetup(parseFen(text).unwrap()).unwrap());
     } catch {
-      fenPosition = null;
+      set.fenPosition(null);
     }
   }
   const status = $("fen-status");
@@ -1619,12 +1586,12 @@ function readFen() {
 /** Explore the position from the analysis screen. */
 function loadFenPosition() {
   if (!fenPosition) return;
-  mode = "practice";
+  set.mode("practice");
   resetBoard(new Game(fenOf(fenPosition)));
-  gameOrigin = "analysis";
-  orientation = fenPosition.turn;
-  canReview = false;
-  reviewing = false;
+  set.gameOrigin("analysis");
+  set.orientation(fenPosition.turn);
+  set.canReview(false);
+  set.reviewing(false);
   if (menuOpen) hideMenu();
   refresh();
 }
@@ -1801,18 +1768,15 @@ function toggleHelp(anchor: HTMLElement) {
 // Train: principles, puzzles and your own positions
 // ---------------------------------------------------------------------------
 
-type PuzzleLevel = "beginner" | "club" | "advanced" | "expert" | "master";
+export type PuzzleLevel = "beginner" | "club" | "advanced" | "expert" | "master";
 const PUZZLE_LEVELS: [PuzzleLevel, string][] = [["beginner", "Beginner"], ["club", "Club"], ["advanced", "Advanced"], ["expert", "Expert"], ["master", "Master"]];
 type PuzzleRow = [id: string, fen: string, moves: string, rating: number, themes: string];
 
-let trainPhase: TrainPhase = "middlegame";
-let trainTab: "openings" | TrainPhase = "openings"; // the tab on screen (openings, or a phase)
-let puzzleLevel: PuzzleLevel = "club";
 // The puzzle sets: opening traps, and the middlegame and endgame
 type PuzzleSet = "openings" | TrainPhase;
 const puzzleFiles = new Map<PuzzleSet, Promise<Record<PuzzleLevel, PuzzleRow[]>>>();
 
-interface PuzzleState {
+export interface PuzzleState {
   phase: PuzzleSet;
   level: PuzzleLevel;
   list: PuzzleRow[];
@@ -1829,10 +1793,9 @@ interface PuzzleState {
   check?: boolean[]; // finding your level: right first time, puzzle by puzzle
 }
 
-let puzzle: PuzzleState | null = null;
 // Your position: the coach helps you analyse it. You play your side, and the
 // other side is played by you or by "an opponent" of the chosen strength.
-interface ExploreState {
+export interface ExploreState {
   user: Color;
   band: Band;
   auto: boolean; // they reply by themselves after your move (pause to move for them)
@@ -1840,8 +1803,6 @@ interface ExploreState {
 }
 
 const AUTO_REPLY_DELAY = 1800; // ms: time to see your move's rating first
-let explore: ExploreState | null = null;
-let exploreBand: Band = "club";
 
 function loadPuzzles(phase: PuzzleSet) {
   if (!puzzleFiles.has(phase)) {
@@ -1877,7 +1838,7 @@ function drawTrainScreen() {
     chip.textContent = label;
     chip.classList.toggle("on", value === puzzleLevel);
     chip.addEventListener("click", () => {
-      puzzleLevel = value;
+      set.puzzleLevel(value);
       saveSettings();
       drawTrainScreen();
     });
@@ -1888,8 +1849,8 @@ function drawTrainScreen() {
 function setupTrain() {
   for (const tab of menu.querySelectorAll<HTMLButtonElement>("[data-train-tab]")) {
     tab.addEventListener("click", () => {
-      trainTab = tab.dataset.trainTab as "openings" | TrainPhase;
-      if (trainTab !== "openings") trainPhase = trainTab;
+      set.trainTab(tab.dataset.trainTab as "openings" | TrainPhase);
+      if (trainTab !== "openings") set.trainPhase(trainTab);
       $("lesson-list").hidden = true;
       $("train-cards").hidden = false;
       drawTrainScreen();
@@ -1955,7 +1916,7 @@ async function startPuzzles(phase: PuzzleSet, level: PuzzleLevel, themes: string
   // a different order each time
   list = [...list].sort(() => Math.random() - 0.5);
   const streak = puzzle?.streak ?? 0;
-  puzzle = { phase, level, list, index: -1, side: "white", solution: [], step: 0, state: "solving", missed: false, hints: 0, themes: [], streak, note: "" };
+  set.puzzle({ phase, level, list, index: -1, side: "white", solution: [], step: 0, state: "solving", missed: false, hints: 0, themes: [], streak, note: "" });
   showPuzzle(0);
 }
 
@@ -1965,18 +1926,18 @@ function showPuzzle(index: number) {
   const row = keep.list[index % keep.list.length];
   const [, fen, moves] = row;
   const all = moves.split(" ").map((uci) => parseUci(uci) as NormalMove);
-  mode = "play"; // no eval bar or ratings to give it away
+  set.mode("play"); // no eval bar or ratings to give it away
   resetBoard(new Game(fen), { White: "?", Black: "?", Event: "Puzzle" });
-  puzzle = keep;
-  gameOrigin = "train";
-  currentView = "board";
+  set.puzzle(keep);
+  set.gameOrigin("train");
+  set.currentView("board");
   const start = game.position.clone();
   start.play(all[0]);
   Object.assign(puzzle, {
     index, side: start.turn, solution: all.slice(1), step: 0, state: "solving", missed: false, hints: 0,
     themes: row[4].split(" "), note: `${colourName(start.turn)} to move. Find the best move.`,
   });
-  orientation = start.turn;
+  set.orientation(start.turn);
   if (menuOpen) hideMenu();
   refresh();
   // Their move first, then it's your turn
@@ -2101,8 +2062,8 @@ async function startLevelCheck() {
   const all = await loadPuzzles("middlegame");
   const list = PUZZLE_LEVELS.map(([level]) => all[level][Math.floor(Math.random() * all[level].length)]);
   resetBoard(new Game());
-  puzzle = { phase: "middlegame", level: "beginner", list, index: -1, side: "white", solution: [], step: 0, state: "solving",
-    missed: false, hints: 0, themes: [], streak: 0, note: "", check: [] };
+  set.puzzle({ phase: "middlegame", level: "beginner", list, index: -1, side: "white", solution: [], step: 0, state: "solving",
+    missed: false, hints: 0, themes: [], streak: 0, note: "", check: [] });
   showPuzzle(0);
 }
 
@@ -2111,7 +2072,7 @@ function finishLevelCheck() {
   const results = puzzle?.check ?? [];
   const right = results.filter(Boolean).length;
   const levels: PuzzleLevel[] = ["beginner", "beginner", "club", "advanced", "expert", "master"];
-  puzzleLevel = levels[right];
+  set.puzzleLevel(levels[right]);
   levelBox.selectedIndex = Math.min(LEVELS.length - 1, right);
   noteLevelCheck("done");
   saveSettings();
@@ -2147,24 +2108,23 @@ function puzzleShapes(): DrawShape[] {
 
 // -- Your position: set it up, then the coach takes a side ---------------------
 
-interface EditorState {
+export interface EditorState {
   board: Board;
   turn: Color;
   pick: Piece | "erase" | null;
 }
 
-let editor: EditorState | null = null;
 
 const PIECE_LETTERS: [PieceRole, string][] = [["king", "K"], ["queen", "Q"], ["rook", "R"], ["bishop", "B"], ["knight", "N"], ["pawn", "P"]];
 
 function startEditor(fen = "4k3/8/8/8/8/8/8/4K3 w - - 0 1") {
-  mode = "practice";
+  set.mode("practice");
   resetBoard(new Game());
-  gameOrigin = "train";
-  currentView = "board";
-  editor = { board: Board.empty(), turn: "white", pick: null };
+  set.gameOrigin("train");
+  set.currentView("board");
+  set.editor({ board: Board.empty(), turn: "white", pick: null });
   editorLoad(fen);
-  orientation = "white";
+  set.orientation("white");
   if (menuOpen) hideMenu();
   drawPalette();
   refresh();
@@ -2306,7 +2266,7 @@ function drawBandChips() {
     chip.classList.toggle("on", band === exploreBand);
     chip.addEventListener("click", (event) => {
       event.preventDefault();
-      exploreBand = band;
+      set.exploreBand(band);
       drawBandChips();
     });
     return chip;
@@ -2349,12 +2309,12 @@ function openPaste() {
 
 /** Analyse your position: the coach shows the best moves and the likely replies. */
 function startExplore(fen: string, user: Color) {
-  mode = "practice";
+  set.mode("practice");
   const opponent = `Opponent · ${BANDS[exploreBand].name}`;
   resetBoard(new Game(fen), { White: user === "white" ? playerName() : opponent, Black: user === "black" ? playerName() : opponent, Date: today() });
-  gameOrigin = "train";
-  explore = { user, band: exploreBand, auto: true, thinking: false };
-  orientation = user;
+  set.gameOrigin("train");
+  set.explore({ user, band: exploreBand, auto: true, thinking: false });
+  set.orientation(user);
   refresh();
   // You go first: the best moves wait until you ask (the bulb). If it's their
   // move, they make it.
@@ -2450,10 +2410,10 @@ async function showIdeas() {
     if (line.length > 1 && score) texts[texts.length - 1] += ` In the end, ${verdictWords(score)}.`;
     setBusy(false);
     if (!frames.length || !explore) return refresh();
-    stepper = { positions: frames.map((f) => f.position), moves: [], texts, step: 1, mood: "talk", extra: SIMULATE, frames };
+    set.stepper({ positions: frames.map((f) => f.position), moves: [], texts, step: 1, mood: "talk", extra: SIMULATE, frames });
     refresh();
   } catch (error) {
-    errorText = `Something went wrong: ${error}`;
+    set.errorText(`Something went wrong: ${error}`);
     setBusy(false);
     refresh();
   }
@@ -2498,7 +2458,7 @@ async function letThemReply() {
     else refresh();
   } catch (error) {
     state.thinking = false;
-    errorText = `Something went wrong: ${error}`;
+    set.errorText(`Something went wrong: ${error}`);
     refresh();
   }
 }
@@ -2555,12 +2515,11 @@ function exploreSays(reviews: (Review | undefined)[]): CoachSay {
 
 // -- Lessons ----------------------------------------------------------------------
 
-interface LessonState {
+export interface LessonState {
   phase: TrainPhase;
   index: number;
 }
 
-let lesson: LessonState | null = null;
 
 function showLessonList() {
   const list = $("lesson-list");
@@ -2598,11 +2557,11 @@ function showLessonList() {
 function startLesson(phase: TrainPhase, index: number) {
   const item: Lesson | undefined = LESSONS[phase][index];
   if (!item) return;
-  mode = "play";
+  set.mode("play");
   resetBoard(new Game(item.steps[0].fen), { White: "?", Black: "?", Event: item.title });
-  gameOrigin = "train";
-  lesson = { phase, index };
-  currentView = "board";
+  set.gameOrigin("train");
+  set.lesson({ phase, index });
+  set.currentView("board");
   if (menuOpen) hideMenu();
   const frames = item.steps.map((step) => {
     const position = Chess.fromSetup(parseFen(step.fen).unwrap()).unwrap();
@@ -2616,13 +2575,13 @@ function startLesson(phase: TrainPhase, index: number) {
   });
   const tryIt: CoachButton = {
     ico: "puzzle", label: "Try it: puzzles on this idea", kind: "accent",
-    run: () => { closeStepper(); lesson = null; void startPuzzles(phase, puzzleLevel, item.themes); },
+    run: () => { closeStepper(); set.lesson(null); void startPuzzles(phase, puzzleLevel, item.themes); },
   };
-  stepper = {
+  set.stepper({
     positions: frames.map((f) => f.position), moves: [], texts: item.steps.map((s) => s.text),
     step: 1, mood: "talk", extra: tryIt, frames,
-  };
-  orientation = frames[0].position.turn;
+  });
+  set.orientation(frames[0].position.turn);
   refresh();
 }
 
@@ -2634,13 +2593,13 @@ const DEMO_MOVE_DELAY = 1100; // ms between moves while it plays on
 
 function startDemo(chosen: Demo, line = 0) {
   resetBoard(new Game(), { White: "White", Black: "Black", Event: `${chosen.opening} demo`, Date: today() });
-  mode = "practice";
-  canReview = false;
-  reviewing = false;
+  set.mode("practice");
+  set.canReview(false);
+  set.reviewing(false);
   // Black openings are shown from Black's side
-  orientation = REPERTOIRE.find((o) => o.name === chosen.opening)?.colour ?? "white";
-  demo = { demo: chosen, line: 0, steps: [], playing: false, interrupted: false, intro: true };
-  gameOrigin = "learn";
+  set.orientation(REPERTOIRE.find((o) => o.name === chosen.opening)?.colour ?? "white");
+  set.demo({ demo: chosen, line: 0, steps: [], playing: false, interrupted: false, intro: true });
+  set.gameOrigin("learn");
   demoPick.replaceChildren(...chosen.lines.map((l, i) => new Option(`${i + 1}. ${l.title}`, String(i))));
   if (menuOpen) hideMenu();
   loadDemoLine(line);
@@ -2652,23 +2611,23 @@ function loadDemoLine(index: number, intro = true) {
   clearTimeout(demo.timer);
   demo.line = index;
   demo.steps = demoSteps(demo.demo, index);
-  game = new Game();
+  set.game(new Game());
   // the introduction shows the opening's basic setup; play brings the whole line
   for (const move of intro ? introMoves(demo.demo, index) : demo.steps.map((step) => step.move)) game.play(move);
-  plyNotes = new Map();
-  analysis = null;
-  preview = null;
-  quiz = null;
+  set.plyNotes(new Map());
+  set.analysis(null);
+  set.preview(null);
+  set.quiz(null);
   demo.interrupted = false;
   demo.intro = intro;
   if (intro) {
     // the basic setup, while the coach introduces it; play starts the line
-    viewPly = null;
+    set.viewPly(null);
     demo.playing = false;
     refresh();
     return;
   }
-  viewPly = 0;
+  set.viewPly(0);
   demo.playing = true;
   refresh(); // the moves follow once the coach has spoken
   scheduleDemo(800);
@@ -2680,11 +2639,11 @@ function startDemoLine() {
   demo.intro = false;
   demo.playing = true; // (before going back to the start, so the coach says "Here we go")
   demo.interrupted = false;
-  game = new Game();
+  set.game(new Game());
   for (const step of demo.steps) game.play(step.move);
-  demoStepping = true;
+  set.demoStepping(true);
   goTo(0);
-  demoStepping = false;
+  set.demoStepping(false);
   refresh();
   scheduleDemo(900);
 }
@@ -2704,9 +2663,9 @@ function demoAdvance() {
     refresh();
     return;
   }
-  demoStepping = true;
+  set.demoStepping(true);
   goTo(ply + 1);
-  demoStepping = false;
+  set.demoStepping(false);
   refresh(); // the next move follows once the coach has said what this one does (onSpoken)
 }
 
@@ -2825,10 +2784,10 @@ async function showWhatYouGet() {
           { ico: "target", label: "Drill it", kind: "accent", labelled: true, run: () => { closeStepper(); startDrill(chosen); } },
           { ico: "knight", label: "Practice match", labelled: true, run: () => { closeStepper(); onDemoTry(); } },
         ];
-    stepper = { positions: frames.map((f) => f.position), moves: [], texts: pages.map((p) => p.text), step: 1, mood: "talk", extra, frames };
+    set.stepper({ positions: frames.map((f) => f.position), moves: [], texts: pages.map((p) => p.text), step: 1, mood: "talk", extra, frames });
     refresh();
   } catch (error) {
-    errorText = `Something went wrong: ${error}`;
+    set.errorText(`Something went wrong: ${error}`);
     setBusy(false);
     refresh();
   }
@@ -2836,8 +2795,6 @@ async function showWhatYouGet() {
 
 // -- Playing a reviewed game through, move by move -------------------------------
 
-let replaying = false;
-let replayStepping = false; // the replay itself is moving (not you)
 const REPLAY_STOPS = new Set(["Brilliant", "Great", "Inaccuracy", "Mistake", "Blunder", "Miss", "Missed Win"]);
 const REPLAY_MOVE_MS = 900; // an ordinary move, then the next
 const REPLAY_WAIT_MS = 6000; // the longest it waits for a move's rating
@@ -2846,15 +2803,15 @@ const canReplay = () => !demo && reviewing && game.length > 0;
 function toggleReplay() {
   if (!canReplay()) return;
   if (replaying) {
-    replaying = false;
+    set.replaying(false);
     refresh();
     return;
   }
-  replaying = true;
+  set.replaying(true);
   if (currentPly() >= game.length) {
-    replayStepping = true;
+    set.replayStepping(true);
     goTo(0);
-    replayStepping = false;
+    set.replayStepping(false);
   }
   refresh();
   setTimeout(replayNext, 400);
@@ -2866,13 +2823,13 @@ function replayNext() {
   if (!replaying) return;
   const ply = currentPly();
   if (ply >= game.length) {
-    replaying = false;
+    set.replaying(false);
     refresh();
     return;
   }
-  replayStepping = true;
+  set.replayStepping(true);
   goTo(ply + 1);
-  replayStepping = false;
+  set.replayStepping(false);
   const shownAt = performance.now();
   const check = () => {
     if (!replaying || currentPly() !== ply + 1) return;
@@ -2884,7 +2841,7 @@ function replayNext() {
       return;
     }
     if (review && REPLAY_STOPS.has(review.rating)) {
-      replaying = false;
+      set.replaying(false);
       refresh();
       return;
     }
@@ -2929,7 +2886,7 @@ interface DrillScore {
   spotted: number; // ...that you punished first time
 }
 
-interface DrillState {
+export interface DrillState {
   demo: Demo;
   opening?: Opening;
   user: Color;
@@ -2949,7 +2906,6 @@ interface DrillState {
   token: number; // a new line cancels the old one's timers
 }
 
-let drill: DrillState | null = null;
 
 const newScore = (): DrillScore => ({ moves: 0, right: 0, slips: 0, spotted: 0 });
 const pickOne = <T,>(list: T[]): T => list[Math.floor(Math.random() * list.length)];
@@ -2960,14 +2916,14 @@ function startDrill(chosen: Demo) {
   const opening = REPERTOIRE.find((o) => o.name === chosen.opening);
   const user = opening?.colour ?? "white";
   resetBoard(new Game(), { White: "White", Black: "Black", Event: `${chosen.opening} drill`, Date: today() });
-  mode = "play"; // no eval bar to give it away
-  gameOrigin = "learn";
-  currentView = "board";
-  orientation = user;
-  drill = {
+  set.mode("play"); // no eval bar to give it away
+  set.gameOrigin("learn");
+  set.currentView("board");
+  set.orientation(user);
+  set.drill({
     demo: chosen, opening, user, round: 1, queue: [], line: 0, script: [], slipped: false, state: "playing",
     waiting: false, tries: 0, note: "", mood: "talk", scores: [newScore(), newScore()], token: 0,
-  };
+  });
   if (menuOpen) hideMenu();
   void play("start");
   startDrillLine(0, false, "Round 1: the main line. You play your moves, I'll play theirs.");
@@ -2994,10 +2950,10 @@ function startDrillLine(line: number, slip: boolean, note: string) {
   d.tries = 0;
   d.note = note;
   d.mood = "talk";
-  game = new Game();
-  viewPly = null;
-  analysis = null;
-  preview = null;
+  set.game(new Game());
+  set.viewPly(null);
+  set.analysis(null);
+  set.preview(null);
   refresh();
   drillContinue(token, 1200);
 }
@@ -3337,12 +3293,12 @@ function practiseOpening(name: string) {
   opponentBox.selectedIndex = 0;
   if (opening) {
     colourBox.value = opening.colour === "white" ? "White" : "Black";
-    matchColour = opening.colour;
+    set.matchColour(opening.colour);
     myOpeningBox.value = menuName(opening);
   }
   refresh();
   showMenu();
-  homeChoice = "practice";
+  set.homeChoice("practice");
   showScreen("practice");
 }
 
@@ -3351,10 +3307,10 @@ function backToTraining(name: string) {
   resetBoard(new Game());
   refresh();
   showMenu();
-  homeChoice = "train";
-  trainTab = "openings";
-  learnOpening = name;
-  learnColour = REPERTOIRE.find((o) => o.name === name)?.colour ?? "white";
+  set.homeChoice("train");
+  set.trainTab("openings");
+  set.learnOpening(name);
+  set.learnColour(REPERTOIRE.find((o) => o.name === name)?.colour ?? "white");
   $("lesson-list").hidden = true;
   showScreen("train");
   drawTrainScreen();
@@ -3362,7 +3318,7 @@ function backToTraining(name: string) {
 
 // -- Your mistakes: positions from your own games and drills, as puzzles ------------
 
-interface Practice {
+export interface Practice {
   list: Mistake[];
   index: number;
   tries: number; // wrong tries at this one
@@ -3374,9 +3330,7 @@ interface Practice {
   right: number; // right first time, this session
 }
 
-let practice: Practice | null = null;
 // The last review's slips, saved as puzzles: for the note under the statistics
-let savedFromReview: { key: string; ids: string[]; added: number } | null = null;
 
 const SAVED_RATINGS = new Set(["Mistake", "Miss", "Missed Win", "Blunder"]);
 
@@ -3403,17 +3357,17 @@ function saveGameMistakes(list: (Review | undefined)[]) {
     }];
   });
   const added = addMistakes(found);
-  savedFromReview = { key: gameKey(), ids: found.map((m) => mistakeId(m.fen, m.best)), added };
+  set.savedFromReview({ key: gameKey(), ids: found.map((m) => mistakeId(m.fen, m.best)), added });
 }
 
 /** Practise these positions, one after another. */
 function startPractice(list: Mistake[]) {
   if (!list.length) return;
   resetBoard(new Game(), { White: "?", Black: "?", Event: "Your mistakes" });
-  mode = "play"; // no eval bar to give it away
-  gameOrigin = "train";
-  currentView = "board";
-  practice = { list, index: -1, tries: 0, hints: 0, state: "solving", waiting: false, note: "", mood: "talk", right: 0 };
+  set.mode("play"); // no eval bar to give it away
+  set.gameOrigin("train");
+  set.currentView("board");
+  set.practice({ list, index: -1, tries: 0, hints: 0, state: "solving", waiting: false, note: "", mood: "talk", right: 0 });
   if (menuOpen) hideMenu();
   showPracticePosition(0);
 }
@@ -3431,11 +3385,11 @@ function showPracticePosition(index: number) {
     refresh();
     return;
   }
-  game = new Game(mistake.fen);
-  viewPly = null;
-  analysis = null;
-  preview = null;
-  orientation = game.position.turn;
+  set.game(new Game(mistake.fen));
+  set.viewPly(null);
+  set.analysis(null);
+  set.preview(null);
+  set.orientation(game.position.turn);
   Object.assign(p, { index, tries: 0, hints: 0, state: "solving", waiting: false, mood: "talk" });
   p.note = mistake.kind === "miss" ? `From ${mistake.source}. Their last move was a slip. Can you punish it this time?`
     : mistake.kind === "drill" ? `From ${mistake.source}. What's the move here?`
@@ -3694,8 +3648,8 @@ function drawProgress() {
   if (seen.weakest) {
     const weakest = seen.weakest;
     suggest(`Lessons: the ${PHASE_WORDS[weakest]}`, weakest === "opening" ? "Your openings" : cap(PHASE_WORDS[weakest]), "Open lessons", () => {
-      trainTab = weakest === "opening" ? "openings" : weakest;
-      if (weakest !== "opening") trainPhase = weakest;
+      set.trainTab(weakest === "opening" ? "openings" : weakest);
+      if (weakest !== "opening") set.trainPhase(weakest);
       showScreen("train");
       $("lesson-list").hidden = true;
       $("train-cards").hidden = false;
@@ -3711,11 +3665,10 @@ function drawProgress() {
 // -- A deeper review: every move checked again, with a longer search ------------------
 
 // Looking deeper at the game on the board: the ratings before, to say what changed
-let deepening: { before: string[]; done: boolean; changes: string[] } | null = null;
 
 /** Look deeper: the game's analysis again at the deep depth (kept, so it's quick next time). */
 function lookDeeper() {
-  deepening = { before: withBook(reviews()).map((r) => r?.rating ?? ""), done: false, changes: [] };
+  set.deepening({ before: withBook(reviews()).map((r) => r?.rating ?? ""), done: false, changes: [] });
   useDepth("deep");
   restoreAnalysis();
   refresh();
@@ -3723,7 +3676,7 @@ function lookDeeper() {
 
 /** Stop: back to the quick review. */
 function stopDeeper() {
-  deepening = null;
+  set.deepening(null);
   useDepth("quick");
   restoreAnalysis();
   refresh();
@@ -3800,7 +3753,7 @@ function leavePractice() {
   resetBoard(new Game());
   refresh();
   showMenu();
-  homeChoice = "train";
+  set.homeChoice("train");
   $("lesson-list").hidden = true;
   showScreen("train");
   drawTrainScreen();
@@ -3852,8 +3805,8 @@ function onDemoExit() {
 type Task = "threat" | "plan" | "quiz" | "ideas" | "brilliant";
 
 async function startTask(kind: Task) {
-  preview = null;
-  errorText = "";
+  set.preview(null);
+  set.errorText("");
   const position = base();
   const fen = fenOf(position);
   const insight = insights.get(fen) ?? {};
@@ -3867,11 +3820,11 @@ async function startTask(kind: Task) {
 
   if (kind === "quiz") {
     if (position.isCheck()) {
-      errorText = "You're in check, so your opponent's idea is obvious: deal with the check first!";
+      set.errorText("You're in check, so your opponent's idea is obvious: deal with the check first!");
       refresh();
       return;
     }
-    quiz = { fen, threat: insight.threat, answered: false };
+    set.quiz({ fen, threat: insight.threat, answered: false });
     checkQuizReady();
   }
 
@@ -3883,12 +3836,12 @@ async function startTask(kind: Task) {
   try {
     const found: Insight = { ...insight };
     if (needBrilliant) {
-      statusMessage = "Stockfish is looking for a sacrifice that works...";
+      set.statusMessage("Stockfish is looking for a sacrifice that works...");
       found.brilliant = await findBrilliant(coachAnalysis, position);
       saveInsight(fen, found);
     }
     if (needThreat) {
-      statusMessage = "Stockfish is looking for threats...";
+      set.statusMessage("Stockfish is looking for threats...");
       found.threat = await threatCheck(coachAnalysis, position);
       saveInsight(fen, found);
       if (quiz && quiz.fen === fen) {
@@ -3899,10 +3852,10 @@ async function startTask(kind: Task) {
     }
     if (needPlan) {
       if (planMode === "best") {
-        statusMessage = "Stockfish is working out the next few moves...";
+        set.statusMessage("Stockfish is working out the next few moves...");
         found.plan = await planAhead(coachAnalysis, position);
       } else {
-        statusMessage = "Stockfish is checking your opening's moves...";
+        set.statusMessage("Stockfish is checking your opening's moves...");
         const first = firstMoveOf(game.positionAt(0), gameMoves());
         found.plan = await openingPlanAhead(coachAnalysis, position, match!.myOpening!, book!, first, planMode);
       }
@@ -3914,9 +3867,9 @@ async function startTask(kind: Task) {
       saveInsight(fen, found);
     }
   } catch (error) {
-    errorText = `Something went wrong: ${error}`;
+    set.errorText(`Something went wrong: ${error}`);
   } finally {
-    if (quiz && !quiz.threat) quiz = null; // the threat search failed
+    if (quiz && !quiz.threat) set.quiz(null); // the threat search failed
     setBusy(false);
     refresh();
   }
@@ -3935,14 +3888,13 @@ function saveInsight(fen: string, found: Insight) {
   insights.set(fen, { ...(insights.get(fen) ?? {}), ...found });
 }
 
-let busyTimer: number | undefined;
 
 function setBusy(on: boolean, text = "") {
-  busy = on;
-  busySince = performance.now();
-  statusMessage = text;
+  set.busy(on);
+  set.busySince(performance.now());
+  set.statusMessage(text);
   clearInterval(busyTimer);
-  if (on) busyTimer = window.setInterval(drawStatus, 250);
+  if (on) set.busyTimer(window.setInterval(drawStatus, 250));
   drawStatus();
 }
 
@@ -3953,7 +3905,7 @@ function drawStatus() {
 
 /** Once the threat is known: if there's nothing to find, there's no question. */
 function checkQuizReady() {
-  if (quiz?.threat && !quiz.threat.threatMove) quiz = null; // the threat text explains
+  if (quiz?.threat && !quiz.threat.threatMove) set.quiz(null); // the threat text explains
 }
 
 function onQuizButton() {
@@ -3990,7 +3942,7 @@ async function explainWrongGuess(guess: NormalMove) {
   try {
     asked.explanation = await explainGuess(coachAnalysis, asked.threat, guess);
   } catch (error) {
-    errorText = `Something went wrong: ${error}`;
+    set.errorText(`Something went wrong: ${error}`);
   } finally {
     asked.explaining = false;
     setBusy(false);
@@ -4008,13 +3960,13 @@ function stepPreview(direction: number) {
   const plan = insights.get(fenOf(base()))?.plan;
   if (!plan || busy) return;
   const step = Math.max(0, Math.min((preview?.step ?? 0) + direction, plan.steps.length));
-  preview = step === 0 ? null : { baseFen: fenOf(base()), step };
+  set.preview(step === 0 ? null : { baseFen: fenOf(base()), step });
   refresh();
 }
 
 function exitPreview() {
   if (quiz) quiz.lineStep = 0;
-  preview = null;
+  set.preview(null);
   refresh();
 }
 
@@ -4030,15 +3982,13 @@ function openingInfo(): OpeningInfo[] {
   // Only worked out again when the moves change
   const key = game.moves.map((m) => makeUci(m.move)).join(" ");
   if (openingCache.key !== key || openingCache.info.length !== game.length) {
-    openingCache = { key, info: book.gameOpenings(Chess.default(), gameMoves()) };
+    set.openingCache({ key, info: book.gameOpenings(Chess.default(), gameMoves()) });
   }
   return openingCache.info;
 }
 
 // Ratings this harsh get a second, longer look by Stockfish before they're final
 const HARSH = new Set(["Inaccuracy", "Mistake", "Blunder", "Miss", "Missed Win"]);
-let deepNeeded: Chess[] = []; // positions waiting for that second look
-let deepMoves: DeepMove[] = []; // moves waiting for it
 
 // A drop in the mover's winning chance this big (lichess's measure) also gets the second look
 const BIG_DROP = 8;
@@ -4079,8 +4029,8 @@ function bigDrop(before: Chess, after: Chess): boolean {
 /** A rating for every move of the game (undefined while Stockfish hasn't
  *  finished, and when ratings are off). */
 function moveReviews(): (Review | undefined)[] {
-  deepNeeded = [];
-  deepMoves = [];
+  set.deepNeeded([]);
+  set.deepMoves([]);
   if (!ratingsOn()) return game.moves.map(() => undefined);
   const rated = game.moves.map((played, i) => rateMove(game.positionAt(i), played.move));
   // A slip gets a deeper look at the move before it too: if that was really a
@@ -4338,21 +4288,21 @@ const FALL_PAUSE_MS = 180; // a short pause before it topples
 const FALL_SPEED_MS = 45; // time between pictures
 const fallStyle = document.createElement("style");
 document.head.append(fallStyle);
-let fall: { fen: string; colour: Color; step: number; timer?: number } | null = null;
 
 function drawFallingKing(position: Chess) {
   if (!position.isCheckmate()) {
     if (fall) clearTimeout(fall.timer);
-    fall = null;
+    set.fall(null);
     fallStyle.textContent = "";
     return;
   }
   const fen = fenOf(position);
   if (fall?.fen === fen) return; // already falling (or fallen)
   if (fall) clearTimeout(fall.timer);
-  fall = { fen, colour: position.turn, step: 0 };
+  const falling: NonNullable<typeof fall> = { fen, colour: position.turn, step: 0 };
+  set.fall(falling);
   showFallFrame();
-  fall.timer = window.setTimeout(advanceFall, FALL_PAUSE_MS);
+  falling.timer = window.setTimeout(advanceFall, FALL_PAUSE_MS);
 }
 
 function advanceFall() {
@@ -4390,7 +4340,7 @@ function drawEvalBar() {
     }
   }
   if (fraction === undefined) [fraction, label] = [lastFraction, "..."];
-  lastFraction = fraction;
+  set.lastFraction(fraction);
   // White's share sits on White's side of the board
   evalBar.classList.toggle("flipped", orientation === "black");
   evalBar.style.setProperty("--white", `${fraction * 100}%`);
@@ -4507,7 +4457,7 @@ function clockTick() {
     const left = clock.timeLeft(match.user);
     const second = Math.ceil(left / 1000);
     if (left < 10_000 && second !== lastTickSecond) {
-      lastTickSecond = second;
+      set.lastTickSecond(second);
       void play("tick");
     }
   }
@@ -4768,7 +4718,7 @@ function drawReview(reviews: (Review | undefined)[], info: OpeningInfo[]) {
 // buttons for more. "Tell me more" opens the overlay; lines of moves are
 // talked through one move at a time by the stepper.
 
-interface CoachButton {
+export interface CoachButton {
   ico: string;
   label: string;
   run: () => void;
@@ -4854,13 +4804,13 @@ function coachSays(reviews: (Review | undefined)[]): CoachSay {
     return { mood: "talk", text: game.length ? "That's the end of the game." : "Press New game to start.", buttons: [] };
   }
   if (quizWaiting()) {
-    return { mood: "think", text: "What are they threatening? Play their move on the board.", buttons: [{ ico: "close", label: "Stop the quiz", run: () => { quiz = null; refresh(); }, kind: "soft" }] };
+    return { mood: "think", text: "What are they threatening? Play their move on the board.", buttons: [{ ico: "close", label: "Stop the quiz", run: () => { set.quiz(null); refresh(); }, kind: "soft" }] };
   }
   if (quiz?.answered && quiz.result) {
     const [correct, text] = quiz.result;
     const short = correct ? "Yes, that's their idea. Well spotted!" : "Not quite. Tap the dots and I'll show you.";
     void text;
-    return { mood: correct ? "happy" : "worried", text: short, buttons: [TELL_MORE, { ico: "close", label: "Done", run: () => { quiz = null; refresh(); }, kind: "soft" }] };
+    return { mood: correct ? "happy" : "worried", text: short, buttons: [TELL_MORE, { ico: "close", label: "Done", run: () => { set.quiz(null); refresh(); }, kind: "soft" }] };
   }
   if (analysis) {
     const review = ratingsOn() ? analysisReview() : undefined;
@@ -4909,10 +4859,10 @@ function iconButton(button: CoachButton, size = 18): HTMLButtonElement {
 }
 
 function drawCoachFace(reviews: (Review | undefined)[]) {
-  lastReviews = reviews;
+  set.lastReviews(reviews);
   const say = coachSays(reviews);
   setFace($("strip-face"), say.mood, 46);
-  stripButtons = say.buttons;
+  set.stripButtons(say.buttons);
   drawStripActions(true); // first, so the words are measured against the room the buttons leave
   speak(say.text, say.key ?? `${currentPly()}:${say.text}`);
   drawStripActions();
@@ -4921,7 +4871,7 @@ function drawCoachFace(reviews: (Review | undefined)[]) {
 
 // -- The coach's bubble: words typed out, a piece at a time ----------------------
 
-interface Speech {
+export interface Speech {
   key: string;
   pieces: string[];
   index: number;
@@ -4929,9 +4879,6 @@ interface Speech {
   done: boolean; // every piece said (and read)
 }
 
-let speech: Speech = { key: "", pieces: [""], index: 0, hold: 0, done: true };
-let stripButtons: CoachButton[] = [];
-let lastReviews: (Review | undefined)[] = [];
 const stripTyper = new Typer($("strip-text"), () => pieceTyped());
 
 /** Say something in the bubble. Long words are cut into pieces that fit; each
@@ -4940,7 +4887,7 @@ function speak(text: string, key: string) {
   if (key === speech.key) return;
   clearTimeout(speech.hold);
   const box = $("strip-text");
-  speech = { key, pieces: splitToFit(text, (piece) => fitsIn(box, piece)), index: 0, hold: 0, done: false };
+  set.speech({ key, pieces: splitToFit(text, (piece) => fitsIn(box, piece)), index: 0, hold: 0, done: false });
   stripTyper.type(speech.pieces[0], true);
 }
 
@@ -5128,9 +5075,10 @@ function extendPages(card: Stepper | null, frames: StepFrame[], texts: string[],
 /** A card of pages in parts ("Why", "What it allows", ...), opening on its first page. */
 function startStory(first: StepFrame, text: string, mood: Mood, chapters: string[]): Stepper {
   closeOverlay(false);
-  stepper = { positions: [], moves: [], texts: [text], step: 1, mood, frames: [first], chapters, chapterOf: [0] };
+  const card: Stepper = { positions: [], moves: [], texts: [text], step: 1, mood, frames: [first], chapters, chapterOf: [0] };
+  set.stepper(card);
   refresh();
-  return stepper;
+  return card;
 }
 
 /** A slip, in three parts: why it isn't the best, what it allows, better was. */
@@ -5179,7 +5127,7 @@ async function explainSlip(ply: number, review: Review) {
     if (better && line.length > 1) pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(before, line, better.score, mover, viewer)}`;
     extendPages(card, pages.frames, pages.texts, 2);
   } catch (error) {
-    errorText = `Something went wrong: ${error}`;
+    set.errorText(`Something went wrong: ${error}`);
     refresh();
   }
 }
@@ -5208,7 +5156,7 @@ async function showBestLine(ply: number) {
     if (line && moves.length > 1) pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(before, moves, line.score, mover, viewer)}`;
     extendPages(card, pages.frames, pages.texts, 1);
   } catch (error) {
-    errorText = `Something went wrong: ${error}`;
+    set.errorText(`Something went wrong: ${error}`);
     refresh();
   }
 }
@@ -5342,7 +5290,7 @@ async function explainBrilliant(ply: number) {
     texts[texts.length - 1] += ` In the end, ${lineOutcome(after, line, best.score, mover, viewer)}`;
     extendStepper(card, story.positions.slice(1), line, texts);
   } catch (error) {
-    errorText = `Something went wrong: ${error}`;
+    set.errorText(`Something went wrong: ${error}`);
     refresh();
   }
 }
@@ -5376,7 +5324,7 @@ async function explainGreat(ply: number) {
       : ` In the end, ${lineOutcome(after, line, best.score, mover, viewer)}`;
     extendStepper(card, story.positions.slice(1), line, texts);
   } catch (error) {
-    errorText = `Something went wrong: ${error}`;
+    set.errorText(`Something went wrong: ${error}`);
     refresh();
   }
 }
@@ -5388,7 +5336,7 @@ function reviews(): (Review | undefined)[] {
 
 // -- The stepper: a line of moves, talked through one move at a time -----------
 
-interface Stepper {
+export interface Stepper {
   positions: Chess[]; // before the first move, then after each
   moves: NormalMove[];
   texts: string[];
@@ -5408,12 +5356,11 @@ interface StepFrame {
   others?: number; // the chance of anything else
 }
 
-let stepper: Stepper | null = null;
 
 function startStepper(positions: Chess[], moves: NormalMove[], texts: string[], mood: Mood, extra?: CoachButton, illustration = false) {
   if (!moves.length) return;
   closeOverlay(false);
-  stepper = { positions, moves, texts, step: 1, mood, extra, illustration };
+  set.stepper({ positions, moves, texts, step: 1, mood, extra, illustration });
   moveSound(makeSan(positions[0], moves[0]), positions[0].turn);
   refresh();
 }
@@ -5429,13 +5376,13 @@ function stepTo(step: number) {
 }
 
 function closeStepper() {
-  stepper = null;
-  silentJump = false;
+  set.stepper(null);
+  set.silentJump(false);
   if (lesson) {
     // leaving a lesson goes back to the list
-    lesson = null;
+    set.lesson(null);
     showMenu();
-    homeChoice = "train";
+    set.homeChoice("train");
     showScreen("train");
     showLessonList();
     return;
@@ -5589,7 +5536,7 @@ async function openStrategy() {
     if (alternative && texts.length) texts[texts.length - 1] += ` There's also a ${style === "attacking" ? "sharper" : "more positional"} way that's nearly as good.`;
     startStepper(positions, moves, texts, "talk", extra);
   } catch (error) {
-    errorText = `Something went wrong: ${error}`;
+    set.errorText(`Something went wrong: ${error}`);
     setBusy(false);
     refresh();
   }
@@ -5611,7 +5558,6 @@ function showStyleAlternative(position: Chess, pv: NormalMove[], style: Style) {
 
 // -- The move strip (phones) and the views (board, statistics, history) --------
 
-let currentView: "board" | "stats" | "history" = "board";
 
 function drawMoveStrip(list: (Review | undefined)[], info: OpeningInfo[]) {
   const strip = $("move-strip");
@@ -5651,7 +5597,6 @@ function applyView() {
 // -- Statistics: accuracy per phase, every grade counted, an estimated rating ---
 
 const GRADES = ["Brilliant", "Great", "Best", "Excellent", "Good", "Book", "Forced", "Inaccuracy", "Mistake", "Miss", "Missed Win", "Blunder"];
-let statsMore = false;
 
 const element = <K extends keyof HTMLElementTagNameMap>(tag: K, className = "", text = "") => {
   const node = document.createElement(tag);
@@ -5747,7 +5692,7 @@ function drawStats() {
   // More: how many moves got each grade
   const toggle = element("button", "stats-more", statsMore ? "More ▴" : "More ▾");
   toggle.addEventListener("click", () => {
-    statsMore = !statsMore;
+    set.statsMore(!statsMore);
     drawStats();
   });
   row(toggle, ["", ""]);
@@ -5849,8 +5794,6 @@ interface SavedGame {
 }
 
 const HISTORY_KEY = "chess-trainer-history";
-let currentGameId: string | null = null;
-let historyColour: Color | "all" = "all";
 const historyResults = new Set<SavedGame["result"]>();
 
 function loadHistory(): SavedGame[] {
@@ -5895,7 +5838,7 @@ function recordGame() {
     result: outcome,
     mode,
   };
-  currentGameId = entry.id;
+  set.currentGameId(entry.id);
   saveHistory([entry, ...loadHistory()]);
 }
 
@@ -5959,7 +5902,7 @@ function drawHistory() {
   for (const [value, label] of [["all", "All"], ["white", "White"], ["black", "Black"]] as const) {
     const button = element("button", value === historyColour ? "on" : "", label);
     button.addEventListener("click", () => {
-      historyColour = value;
+      set.historyColour(value);
       drawHistory();
     });
     colours.append(button);
@@ -6002,17 +5945,17 @@ function openSavedGame(saved: SavedGame) {
   const [parsed] = readPgn(saved.pgn);
   if (!parsed) return;
   const { game: loaded } = parsed.load();
-  mode = "practice";
+  set.mode("practice");
   resetBoard(loaded, parsed.headers);
-  currentGameId = saved.id;
-  canReview = false;
-  reviewing = true;
-  reviewTitle = "";
-  orientation = saved.user;
-  gameOrigin = saved.mode === "play" ? "play" : "practice";
-  viewPly = loaded.length ? 0 : null;
+  set.currentGameId(saved.id);
+  set.canReview(false);
+  set.reviewing(true);
+  set.reviewTitle("");
+  set.orientation(saved.user);
+  set.gameOrigin(saved.mode === "play" ? "play" : "practice");
+  set.viewPly(loaded.length ? 0 : null);
   restoreAnalysis();
-  currentView = "board";
+  set.currentView("board");
   refresh();
 }
 
@@ -6038,12 +5981,12 @@ async function onNewGame() {
   endGame();
   showMenu();
   if (!screen) return;
-  homeChoice = screen;
+  set.homeChoice(screen);
   if (gameOrigin === "learn") {
-    trainTab = "openings";
+    set.trainTab("openings");
     if (learning) {
-      learnOpening = learning;
-      learnColour = REPERTOIRE.find((o) => o.name === learning)?.colour ?? "white";
+      set.learnOpening(learning);
+      set.learnColour(REPERTOIRE.find((o) => o.name === learning)?.colour ?? "white");
     }
   }
   showScreen(screen);
@@ -6052,7 +5995,6 @@ async function onNewGame() {
 
 // -- Updates: check for a new version, and restart into it -------------------------
 
-let checkingUpdates = false;
 
 /** Once a new version has finished downloading: true when it's ready to use. */
 function installed(worker: ServiceWorker): Promise<boolean> {
@@ -6084,7 +6026,7 @@ async function checkForUpdates() {
     void message("Updates", `Updates come by themselves on the website. This is version ${__BUILD__}.`);
     return;
   }
-  checkingUpdates = true;
+  set.checkingUpdates(true);
   button.disabled = true;
   label.textContent = "Checking...";
   try {
@@ -6100,7 +6042,7 @@ async function checkForUpdates() {
   } catch {
     void message("Updates", "Couldn't check for updates. Are you online? The app keeps working as it is.");
   } finally {
-    checkingUpdates = false;
+    set.checkingUpdates(false);
     button.disabled = false;
     label.textContent = "Check for updates";
   }
@@ -6454,12 +6396,11 @@ function textBlock(text: string, className = ""): HTMLElement {
 const pgnText = $<HTMLTextAreaElement>("pgn-text");
 const pgnPick = $<HTMLSelectElement>("pgn-pick");
 const pgnStatus = $("pgn-status");
-let pgnGames: PgnGame[] = [];
 
 /** "Open PGN": the Game review screen. */
 function openPgnDialog() {
   showMenu();
-  homeChoice = "analysis";
+  set.homeChoice("analysis");
   showScreen("analysis");
   readPgnText();
   pgnText.focus();
@@ -6468,7 +6409,7 @@ function openPgnDialog() {
 /** Look for games in the text box (as you type or paste, or after opening a file). */
 function readPgnText() {
   const text = pgnText.value.trim();
-  pgnGames = text ? readPgn(text).filter((g) => g.load().game.length > 0 || g.headers.FEN) : [];
+  set.pgnGames(text ? readPgn(text).filter((g) => g.load().game.length > 0 || g.headers.FEN) : []);
   pgnPick.replaceChildren(...pgnGames.map((g, i) => new Option(`${i + 1}. ${g.title}`, String(i))));
   $("pgn-pick-row").hidden = pgnGames.length < 2;
   drawHome();
@@ -6498,16 +6439,16 @@ async function reviewPgnGame(event: Event) {
   }
   const side = await pickSide(chosen.headers);
   if (side === "cancel") return;
-  mode = "practice";
+  set.mode("practice");
   resetBoard(loaded, chosen.headers);
-  canReview = false;
-  reviewing = true;
-  reviewTitle = `Reviewing: ${chosen.title}`;
-  reviewSide = side;
-  gameOrigin = "analysis";
-  viewPly = loaded.length ? 0 : null; // start from the first position and step through
-  orientation = side ?? "white";
-  currentView = "stats";
+  set.canReview(false);
+  set.reviewing(true);
+  set.reviewTitle(`Reviewing: ${chosen.title}`);
+  set.reviewSide(side);
+  set.gameOrigin("analysis");
+  set.viewPly(loaded.length ? 0 : null); // start from the first position and step through
+  set.orientation(side ?? "white");
+  set.currentView("stats");
   if (menuOpen) hideMenu();
   startPreparing();
   refresh();
@@ -6611,7 +6552,6 @@ function saveDownload() {
 
 const dialog = $<HTMLDialogElement>("dialog");
 
-let answerDialog: ((ok: boolean) => void) | null = null;
 
 /** Shows a message; with `ask`, also a Cancel button. Resolves true for OK.
  *  The answer comes from the button clicks themselves (and Escape), not the
@@ -6623,12 +6563,12 @@ function message(title: string, text: string, ask = false): Promise<boolean> {
   $("dialog-cancel").hidden = !ask;
   if (!dialog.open) dialog.showModal();
   $("dialog-ok").focus();
-  return new Promise((resolve) => (answerDialog = resolve));
+  return new Promise((resolve) => (set.answerDialog(resolve)));
 }
 
 function closeDialog(ok: boolean) {
   const answer = answerDialog;
-  answerDialog = null;
+  set.answerDialog(null);
   dialog.close();
   answer?.(ok);
 }
@@ -6668,7 +6608,7 @@ function wireButtons() {
     refresh();
   });
   $("flip").addEventListener("click", () => {
-    orientation = opposite(orientation);
+    set.orientation(opposite(orientation));
     refresh();
   });
   newButton.addEventListener("click", () => void onNewGame());
@@ -6677,7 +6617,7 @@ function wireButtons() {
   reviewButton.addEventListener("click", onReviewGame);
   exitAnalysisButton.addEventListener("click", exitAnalysis);
   replyButton.addEventListener("click", () => {
-    showReply = !showReply;
+    set.showReply(!showReply);
     refresh();
   });
   rateMovesBox.addEventListener("change", () => {
@@ -6764,7 +6704,7 @@ function wireButtons() {
   $("stats-back").addEventListener("click", backToStats);
   for (const tab of document.querySelectorAll<HTMLButtonElement>(".view-tabs button")) {
     tab.addEventListener("click", () => {
-      currentView = tab.dataset.view as typeof currentView;
+      set.currentView(tab.dataset.view as typeof currentView);
       refresh();
     });
   }
