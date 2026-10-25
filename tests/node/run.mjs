@@ -44,7 +44,7 @@ const server = await createServer({
   server: { middlewareMode: true, hmr: false, ws: false },
 });
 const runner = createServerModuleRunner(server.environments.ssr, { hmr: false });
-const tests = ["review", "desktop", "lessons", "data"];
+const tests = ["review", "desktop", "lessons", "data", "online"];
 let failed = 0;
 for (const name of tests) {
   const { default: run } = await runner.import(`/tests/node/${name}.test.ts`);

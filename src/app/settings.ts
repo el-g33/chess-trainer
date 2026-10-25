@@ -3,7 +3,8 @@
 import type { Mode } from "../main";
 
 import {
-  arrowStyleBox, clockTickBox, coachSpeedBox, colourBox, evalCheck, levelBox, myOpeningBox, opponentBox, piecesBox,
+  arrowStyleBox, chesscomUserBox, clockTickBox, coachSpeedBox, colourBox, evalCheck, levelBox, lichessUserBox, myOpeningBox,
+  opponentBox, piecesBox,
   planModeBox, playerNameBox, rateMovesBox, reviewDepthBox, sfOpeningBox, soundOn, soundStyleBox, soundVolume,
   tcIncrement, tcMinutes, themeBox, timeControlBox, uiThemeBox,
 } from "./dom";
@@ -31,6 +32,8 @@ export interface Settings {
   soundVolume?: number;
   soundStyle?: string;
   playerName?: string;
+  lichessUser?: string;
+  chesscomUser?: string;
   uiTheme?: string;
   pieces?: string;
   timeControl?: string;
@@ -67,6 +70,8 @@ export function saveSettings() {
     soundVolume: Number(soundVolume.value),
     soundStyle: soundStyleBox.value,
     playerName: playerNameBox.value.trim(),
+    lichessUser: lichessUserBox.value.trim(),
+    chesscomUser: chesscomUserBox.value.trim(),
     uiTheme: uiThemeBox.value,
     pieces: piecesBox.value,
     timeControl: timeControlBox.value,

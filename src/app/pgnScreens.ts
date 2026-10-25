@@ -112,7 +112,7 @@ export function saveTarget(): { title: string; note: string; name: string; text:
     if (!games.length) return null;
     return {
       title: "Save all your games",
-      note: `${games.length} game${games.length === 1 ? "" : "s"} against Stockfish, in one PGN.`,
+      note: `${games.length} game${games.length === 1 ? "" : "s"}, in one PGN.`,
       name: `chess-trainer-games-${today().replace(/\./g, "-")}.pgn`,
       text: games.map((g) => g.pgn.trim()).join("\n\n") + "\n",
     };

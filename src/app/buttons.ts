@@ -11,11 +11,13 @@ import { tourOpen } from "../tour";
 
 import {
   backUp, checkForUpdates, closeOverlay, closeStepper, drawDataCounts, onHome, onNewGame, openMore, overlay,
-  overlayOpen, restartIntoUpdate, restoreFromFile, stepTo, stepTyper, stripTyper,
+  overlayOpen, restartIntoUpdate, restoreFromFile, setHistoryFromReview, stepTo, stepTyper, stripTyper,
 } from "./coach";
+import { setupOnlineGames } from "./onlineGames";
 import {
   $, arrowStyleBox, coachSpeedBox, demoPick, demoPlay, evalCheck, exitAnalysisButton, fenInput, lineBack, lineExit,
-  lineForward, navButtons, newButton, piecesBox, planModeBox, playerNameBox, rateMovesBox, replyButton, resignButton,
+  lineForward, navButtons, newButton, piecesBox, planModeBox, playerNameBox, lichessUserBox, chesscomUserBox,
+  rateMovesBox, replyButton, resignButton,
   reviewButton, reviewDepthBox, settingsDialog, showDemoButton, soundOn, soundStyleBox, soundVolume, themeBox,
   toolButtons, uiThemeBox, undoButton,
 } from "./dom";
@@ -35,6 +37,7 @@ import { exitPreview, onQuizButton, startTask, stepPreview } from "./strategyCoa
 import { noteLevelCheck, startLevelCheck } from "./train";
 
 export function wireButtons() {
+  setupOnlineGames();
   $("dialog-ok").addEventListener("click", (event) => {
     event.preventDefault();
     closeDialog(true);
@@ -124,10 +127,12 @@ export function wireButtons() {
     });
   }
   settingsDialog.addEventListener("close", () => refresh());
-  playerNameBox.addEventListener("change", () => {
-    saveSettings();
-    refresh();
-  });
+  for (const box of [playerNameBox, lichessUserBox, chesscomUserBox]) {
+    box.addEventListener("change", () => {
+      saveSettings();
+      refresh();
+    });
+  }
   for (const help of document.querySelectorAll<HTMLElement>(".help-button")) {
     help.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -162,6 +167,7 @@ export function wireButtons() {
   for (const tab of document.querySelectorAll<HTMLButtonElement>(".view-tabs button")) {
     tab.addEventListener("click", () => {
       set.currentView(tab.dataset.view as typeof currentView);
+      setHistoryFromReview(false);
       refresh();
     });
   }

@@ -60,10 +60,11 @@ function ownKeys(): string[] {
   return keys;
 }
 
-/** How much is kept on this device. */
+/** How much is kept on this device (games: your own; ones from Lichess and
+ *  chess.com can be got again, so they don't count towards the reminder). */
 export function dataCounts(): { games: number; reviews: number; mistakes: number } {
   return {
-    games: parsed<unknown[]>(read("chess-trainer-history"), []).length,
+    games: parsed<{ source?: string }[]>(read("chess-trainer-history"), []).filter((g) => !g.source).length,
     reviews: Object.keys(parsed<Record<string, unknown>>(read("chess-trainer-analysis"), {})).length,
     mistakes: parsed<unknown[]>(read("chess-trainer-mistakes"), []).length,
   };

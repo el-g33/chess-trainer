@@ -30,6 +30,7 @@ import { controlledSquares, dangerAfter, moveInWords, narrateMove, targetsOf, ve
 import {
   type OpeningInfo, REPERTOIRE, firstMoveOf, goalWords, isStartPosition, mainFamily, systemFor,
 } from "../openings";
+import { SOURCE_NAMES, type Source } from "../online";
 import { readPgn, writePgn } from "../pgn";
 import { type Review, fenOf, isDrawnPosition, isSacrifice, verdictWords, winningChance } from "../review";
 import { planAhead } from "../strategy";
@@ -49,6 +50,8 @@ import {
   cap, depthCard, drillSays, lowerFirst, openingShortName, practiceSays, scheduleDemo, showWhatYouGet, startDemoLine,
   startPractice,
 } from "./openingDemos";
+import { importGames, importing, importNote, reviewImported } from "./onlineGames";
+import { openPgnDialog } from "./pgnScreens";
 import { MOVE_MARKS, barName, gameScores, ratingClass } from "./playerBars";
 import { message } from "./popups";
 import { analysisReview, moveReviews, openingInfo, reviewPly } from "./ratings";
@@ -1129,7 +1132,7 @@ export function drawStats() {
   updateHistoryAccuracy(overall);
 }
 
-// -- Game history: your games against Stockfish, saved on this device -----------
+// -- Game history: your games against Stockfish (and from Lichess and chess.com), on this device
 
 export interface SavedGame {
   id: string;
@@ -1142,7 +1145,15 @@ export interface SavedGame {
   result: "win" | "draw" | "loss";
   accuracy?: number;
   mode: Mode;
+  // Games brought in from Lichess or chess.com
+  source?: Source;
+  opponent?: string;
+  opponentRating?: number;
+  speed?: string; // "Blitz", "Rapid"...
 }
+
+const KEEP_OWN = 500; // your games here
+const KEEP_IMPORTED = 300; // games from Lichess and chess.com (they can be got again)
 
 export const HISTORY_KEY = "chess-trainer-history";
 export const historyResults = new Set<SavedGame["result"]>();
@@ -1156,8 +1167,13 @@ export function loadHistory(): SavedGame[] {
 }
 
 export function saveHistory(games: SavedGame[]) {
+  // newest first; games brought in never push out your own
+  const sorted = [...games].sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+  const own = sorted.filter((g) => !g.source).slice(0, KEEP_OWN);
+  const imported = sorted.filter((g) => g.source).slice(0, KEEP_IMPORTED);
+  const kept = new Set([...own, ...imported]);
   try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(games.slice(0, 500)));
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(sorted.filter((g) => kept.has(g))));
   } catch {
     // storage full or blocked: the record just isn't kept
   }
@@ -1244,10 +1260,47 @@ export function drawHistory() {
     box.append(note);
   }
   const games = loadHistory();
+  // Back to Game review (when you came from there), and the import button
+  const top = element("div", "history-top");
+  if (historyFromReview) {
+    const back = element("button", "soft history-back", "");
+    back.type = "button";
+    back.innerHTML = `${icon("back", 16)} Game review`;
+    back.addEventListener("click", () => {
+      setHistoryFromReview(false);
+      openPgnDialog();
+    });
+    top.append(back);
+  }
+  top.append(element("span", "history-gap"));
+  const get = element("button", "history-get", "");
+  get.type = "button";
+  get.innerHTML = `${icon("download", 16)} ${importing ? "Getting..." : "Get my games"}`;
+  get.disabled = importing;
+  get.addEventListener("click", () => void importGames());
+  top.append(get);
+  box.append(top);
+  if (importNote) box.append(element("p", "stats-note history-import-note", importNote));
   if (!games.length) {
-    tabMessage(box, "No games yet. Play against Stockfish and your record builds up here.");
+    tabMessage(box, "No games yet. Play against Stockfish, or get your games from Lichess or chess.com, and your record builds up here.");
     return;
   }
+  // Where from: all, this app, Lichess, chess.com (when there are games from more than one place)
+  const sources = new Set(games.map((g) => g.source ?? "app"));
+  if (historySource !== "all" && !sources.has(historySource)) historySource = "all";
+  const where = element("div", "seg history-sources");
+  if (sources.size > 1) {
+    for (const [value, label] of [["all", "All"], ["app", "This app"], ["lichess", "Lichess"], ["chesscom", "chess.com"]] as const) {
+      if (value !== "all" && !sources.has(value)) continue;
+      const button = element("button", value === historySource ? "on" : "", label);
+      button.addEventListener("click", () => {
+        historySource = value;
+        drawHistory();
+      });
+      where.append(button);
+    }
+  }
+  const fromHere = games.filter((g) => historySource === "all" || (g.source ?? "app") === historySource);
   // Colour: all, White or Black
   const colours = element("div", "seg history-colours");
   for (const [value, label] of [["all", "All"], ["white", "White"], ["black", "Black"]] as const) {
@@ -1259,7 +1312,7 @@ export function drawHistory() {
     colours.append(button);
   }
   // Results: wins, draws and losses, as filters that combine with the colour
-  const ofColour = games.filter((g) => historyColour === "all" || g.user === historyColour);
+  const ofColour = fromHere.filter((g) => historyColour === "all" || g.user === historyColour);
   const record = element("div", "history-record");
   for (const [value, label] of [["win", "Wins"], ["draw", "Draws"], ["loss", "Losses"]] as const) {
     const button = element("button", `history-result ${value} ${historyResults.has(value) ? "on" : ""}`);
@@ -1274,21 +1327,37 @@ export function drawHistory() {
   }
   const shown = ofColour.filter((g) => !historyResults.size || historyResults.has(g.result));
   const list = element("div", "history-list");
-  for (const saved of shown) {
-    const item = element("button", "history-game");
-    const mark = element("span", `history-mark ${saved.result}`, saved.result === "win" ? "W" : saved.result === "loss" ? "L" : "D");
-    const text = element("span", "history-text");
-    text.append(
-      element("span", "history-title", `vs Stockfish · ${shortName(LEVELS[saved.level] ?? LEVELS[0])}`),
-      element("span", "history-meta", [saved.opening || "Game", saved.user === "white" ? "White" : "Black",
-        timeControlLabel(saved.timeControl), saved.accuracy !== undefined ? `${saved.accuracy}%` : ""].filter(Boolean).join(" · ")),
-    );
-    item.append(mark, text, element("span", "history-date", shortDate(saved.date)));
-    item.addEventListener("click", () => openSavedGame(saved));
-    list.append(item);
-  }
+  for (const saved of shown) list.append(historyRow(saved));
   if (!shown.length) list.append(element("p", "stats-note", "No games match these filters."));
-  box.append(colours, record, list);
+  box.append(...(where.childElementCount ? [where] : []), colours, record, list);
+  if (games.some((g) => g.source)) {
+    const older = element("button", "link-button history-older", "Get older games");
+    older.type = "button";
+    older.disabled = importing;
+    older.addEventListener("click", () => void importGames(true));
+    box.append(older);
+  }
+}
+
+let historySource: "all" | "app" | Source = "all";
+export let historyFromReview = false; // opened with See all games: the way back is to Game review
+export const setHistoryFromReview = (on: boolean) => (historyFromReview = on);
+
+/** One game in the history (and on the Game review screen): tap to replay or review it. */
+export function historyRow(saved: SavedGame): HTMLButtonElement {
+  const item = element("button", "history-game");
+  item.type = "button";
+  const mark = element("span", `history-mark ${saved.result}`, saved.result === "win" ? "W" : saved.result === "loss" ? "L" : "D");
+  const text = element("span", "history-text");
+  const title = element("span", "history-title", saved.source
+    ? `${saved.opponent ?? "?"}${saved.opponentRating ? ` (${saved.opponentRating})` : ""}`
+    : `vs Stockfish · ${shortName(LEVELS[saved.level] ?? LEVELS[0])}`);
+  if (saved.source) title.append(element("span", `history-tag ${saved.source}`, SOURCE_NAMES[saved.source]));
+  text.append(title, element("span", "history-meta", [saved.speed ?? "", saved.opening || "Game", saved.user === "white" ? "White" : "Black",
+    saved.source ? "" : timeControlLabel(saved.timeControl), saved.accuracy !== undefined ? `${saved.accuracy}%` : ""].filter(Boolean).join(" · ")));
+  item.append(mark, text, element("span", "history-date", shortDate(saved.date)));
+  item.addEventListener("click", () => (saved.source ? reviewImported(saved) : openSavedGame(saved)));
+  return item;
 }
 
 /** Replay a saved game with the coach. */

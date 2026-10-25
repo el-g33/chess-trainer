@@ -1010,6 +1010,82 @@ html body .board-area .board-controls {
   font-size: 0.85rem;
 }
 
+/* Games from Lichess and chess.com: the import button, the source filter and tag */
+.history-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.history-gap {
+  flex: 1;
+}
+.history-back,
+.history-get {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 5px 12px;
+  min-height: 0;
+  font-size: 0.88rem;
+}
+.history-sources {
+  margin-bottom: 8px;
+}
+.history-import-note {
+  margin: -4px 0 10px;
+}
+.history-tag {
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--line);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  vertical-align: 1px;
+}
+.history-older {
+  display: block;
+  margin: 12px auto 0;
+}
+.history-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Game review: your latest games, above the paste box */
+.your-games {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.your-games-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.your-games .stats-note:empty,
+.your-games p[hidden],
+.your-games button[hidden] {
+  display: none;
+}
+.your-games-all {
+  align-self: flex-end;
+}
+
+/* Settings: your usernames */
+.online-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 10px;
+  align-items: center;
+  margin-top: 6px;
+}
+
 /* In a demo the coach speaks the notes, so the panel keeps just the controls */
 #demo-note,
 #demo-line {

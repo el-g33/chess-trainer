@@ -13,6 +13,7 @@ import { REPERTOIRE, menuName } from "../openings";
 import { type Headers, today } from "../pgn";
 
 import { closeOverlay, setFace } from "./coach";
+import { drawYourGames } from "./onlineGames";
 import {
   $, colourBox, levelBox, menu, menuCard, myOpeningBox, opponentBox, playerNameBox, sfOpeningBox, tcIncrement,
   tcMinutes, timeControlBox,
@@ -90,6 +91,7 @@ export const tcKindOf = (value: string) =>
 
 export function showScreen(screen: HomeScreen) {
   for (const section of menu.querySelectorAll<HTMLElement>(".screen")) section.hidden = section.dataset.screen !== screen;
+  if (screen === "analysis") drawYourGames();
   // The level box is shared by the Play and Practice screens
   const slot = menu.querySelector<HTMLElement>(`.screen[data-screen="${screen}"] .slot-level`);
   if (slot && levelBox.parentElement !== slot) {

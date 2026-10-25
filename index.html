@@ -143,7 +143,18 @@
             <h2>Game review</h2>
             <button type="button" class="setup-start accent" data-start="analysis" disabled>Start</button>
           </div>
-          <p class="setup-note">Paste a game in PGN format (from lichess, chess.com or anywhere), or open a .pgn file.</p>
+          <!-- Your latest games (from here, Lichess and chess.com): tap one to review it -->
+          <div id="your-games" class="your-games">
+            <div class="your-games-head">
+              <b>Your games</b>
+              <button type="button" id="your-games-get" class="history-get"><span data-ico="download" data-ico-size="16"></span> Get my games</button>
+            </div>
+            <p id="your-games-note" class="stats-note"></p>
+            <p id="your-games-empty" class="setup-note">Play a game here, or get yours from Lichess or chess.com.</p>
+            <div class="your-games-list history-list"></div>
+            <button type="button" class="link-button your-games-all" id="your-games-all">See all games ›</button>
+          </div>
+          <p class="setup-label">Or paste a game (PGN), or open a .pgn file</p>
           <textarea id="pgn-text" rows="8" spellcheck="false" placeholder='[White "..."]&#10;[Black "..."]&#10;&#10;1. e4 e5 2. Nf3 Nc6 ...'></textarea>
           <div class="pgn-file-row">
             <label class="file-button">Open a .pgn file&hellip;<input type="file" id="pgn-file" accept=".pgn,.txt,application/x-chess-pgn,text/plain" hidden /></label>
@@ -468,6 +479,16 @@
             <option value="positional">Positional</option>
             <option value="attacking">Attacking</option>
           </select>
+          <div class="your-data wide" id="online-accounts">
+            <h4>Your online games</h4>
+            <p class="setup-note">Your usernames, to bring your games into Game history. Only your public games are read; nothing is posted.</p>
+            <div class="online-grid">
+              <label for="lichess-user">Lichess username</label>
+              <input type="text" id="lichess-user" maxlength="30" autocomplete="off" autocapitalize="off" spellcheck="false" />
+              <label for="chesscom-user">chess.com username</label>
+              <input type="text" id="chesscom-user" maxlength="30" autocomplete="off" autocapitalize="off" spellcheck="false" />
+            </div>
+          </div>
           <div class="your-data wide">
             <h4>Your data</h4>
             <div id="data-counts" class="data-counts"></div>

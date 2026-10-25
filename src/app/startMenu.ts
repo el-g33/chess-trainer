@@ -13,7 +13,8 @@ import { setTypeSpeed } from "../talk";
 
 import {
   $, arrowStyleBox, clockTickBox, coachSpeedBox, colourBox, evalCheck, levelBox, menu, menuCard, myOpeningBox,
-  opponentBox, piecesBox, planModeBox, playerNameBox, rateMovesBox, reviewDepthBox, sfOpeningBox, soundOn,
+  opponentBox, piecesBox, planModeBox, playerNameBox, lichessUserBox, chesscomUserBox, rateMovesBox, reviewDepthBox,
+  sfOpeningBox, soundOn,
   soundStyleBox, soundVolume, tcIncrement, tcMinutes, themeBox, timeControlBox, uiThemeBox,
 } from "./dom";
 import { loadSettings } from "./settings";
@@ -70,6 +71,8 @@ export function buildMenu() {
   for (const [value, label] of Object.entries(SOUND_STYLES)) soundStyleBox.add(new Option(label, value));
   soundStyleBox.value = saved.soundStyle && saved.soundStyle in SOUND_STYLES ? saved.soundStyle : "original";
   if (saved.playerName) playerNameBox.value = saved.playerName;
+  if (saved.lichessUser) lichessUserBox.value = saved.lichessUser;
+  if (saved.chesscomUser) chesscomUserBox.value = saved.chesscomUser;
   if (saved.timeControl) timeControlBox.value = saved.timeControl;
   if (timeControlBox.selectedIndex < 0) timeControlBox.selectedIndex = 0;
   if (saved.tcMinutes) tcMinutes.value = String(saved.tcMinutes);
