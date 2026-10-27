@@ -9,6 +9,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.3",
+    items: [
+      { icon: "chart", title: "A calmer game review", text: "One score card, a slim line to look deeper, and the details only when you ask." },
+      { icon: "puzzle", title: "Your slips, as you go", text: "I tell you once when slips are saved, point each one out in the review, and offer them as puzzles at the end." },
+      { icon: "gear", title: "Settings in three tabs", text: "Appearance, Gameplay and Profile." },
+      { icon: "knight", title: "Knight arrows, tidied", text: "The L now runs through the middle of the squares." },
+    ],
+  },
+  {
     version: "3.2",
     items: [
       { icon: "download", title: "Your Lichess and chess.com games", text: "Add your usernames in Settings, then Get my games. Tap any game to review it." },
