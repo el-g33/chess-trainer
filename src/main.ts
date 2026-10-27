@@ -278,16 +278,19 @@ export function bendKnightArrows(shapes: DrawShape[]): DrawShape[] {
     const side: [number, number] = [-uy * 2 * width, ux * 2 * width];
     const dashed = brush.color === THREAT_ARROW || brush.color === CB_THEIRS ? ' stroke-dasharray="18 11"'
       : brush.color === BEST_ARROW ? ' stroke-dasharray="14 10"' : "";
-    // (0, 0) is the middle of the knight's square
+    // The shape's (0, 0) is the knight's square's top-left corner: move to its middle
     const html =
-      `<g opacity="${brush.opacity}"><path d="M0 0 L${corner[0]} ${corner[1]} L${base[0] + ux} ${base[1] + uy}" ` +
+      // as see-through as the board's own arrows (their layer is drawn at 60%)
+      `<g transform="translate(50 50)" opacity="${(brush.opacity * 0.6).toFixed(2)}"><path d="M0 0 L${corner[0]} ${corner[1]} L${base[0] + ux} ${base[1] + uy}" ` +
       `fill="none" stroke="${brush.color}" stroke-width="${width}" stroke-linejoin="round" stroke-linecap="round"${dashed}/>` +
       `<path d="M${tip[0]} ${tip[1]} L${base[0] + side[0]} ${base[1] + side[1]} L${base[0] - side[0]} ${base[1] - side[1]} Z" fill="${brush.color}"/></g>` +
+      `<g transform="translate(50 50)">` +
       // a numbered arrow (a line of moves): its number on the bend, as the board draws them
       (shape.label
         ? `<circle cx="${corner[0]}" cy="${corner[1]}" r="20" fill="${shape.label.fill ?? brush.color}" fill-opacity="0.9" stroke="#fff" stroke-width="3"/>` +
           `<text x="${corner[0]}" y="${corner[1] + 10}" font-size="${30 * 0.75 ** shape.label.text.length + 6}" font-family="Noto Sans, sans-serif" text-anchor="middle" fill="#fff">${shape.label.text}</text>`
-        : "");
+        : "") +
+      "</g>";
     return { orig: shape.orig, customSvg: { html } };
   });
 }
