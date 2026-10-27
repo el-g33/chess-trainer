@@ -1,6 +1,8 @@
 // What's new: shown once after the app updates (the versions since the one
 // you last saw, newest first), and from Settings any time. Add an entry here
 // with each version you publish (package.json's version, without the .0).
+// Gameplay changes are spelled out, one each; changes to how things look go
+// together in one short line.
 
 export interface Release {
   version: string; // "3.2"
@@ -11,26 +13,23 @@ export const RELEASES: Release[] = [
   {
     version: "3.3",
     items: [
-      { icon: "chart", title: "A calmer game review", text: "One score card, a slim line to look deeper, and the details only when you ask." },
       { icon: "puzzle", title: "Your slips, as you go", text: "I tell you once when slips are saved, point each one out in the review, and offer them as puzzles at the end." },
-      { icon: "gear", title: "Settings in three tabs", text: "Appearance, Gameplay and Profile." },
-      { icon: "knight", title: "Knight arrows, tidied", text: "The L now runs through the middle of the squares." },
+      { icon: "eye", title: "A streamlined look", text: "A cleaner review and settings, for a better experience." },
     ],
   },
   {
     version: "3.2",
     items: [
       { icon: "download", title: "Your Lichess and chess.com games", text: "Add your usernames in Settings, then Get my games. Tap any game to review it." },
-      { icon: "knight", title: "Choose your promotion, and knight arrows that bend", text: "A pawn on the last rank can become a queen, knight, rook or bishop. Knight moves are drawn as an L, the way the knight goes." },
-      { icon: "history", title: "Your games on Game review", text: "Your latest games are right there, with See all games." },
-      { icon: "eye", title: "Two new themes, picked by sight", text: "Forest club and Rose quartz. Settings now shows every theme, board and piece set as a picture." },
+      { icon: "knight", title: "Choose your promotion", text: "A pawn on the last rank can become a queen, knight, rook or bishop." },
+      { icon: "eye", title: "New themes and a streamlined look", text: "Two new themes, and a fresher look for a better experience." },
     ],
   },
   {
     version: "3.1",
     items: [
-      { icon: "school", title: "A tidier Training screen", text: "The openings fit on one screen; tap Opening traps to choose a level." },
       { icon: "target", title: "How the game got there", text: "Your mistakes now show the moves before the puzzle, and play their last move for you." },
+      { icon: "eye", title: "A streamlined look", text: "A tidier Training screen, for a better experience." },
     ],
   },
   {
