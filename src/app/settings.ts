@@ -86,9 +86,11 @@ export function saveSettings() {
   }
 }
 
-// -- The Settings tabs: Appearance, Gameplay, Profile (it opens on the last one used)
+// -- The Settings tabs: Appearance and Gameplay (it opens on the last one used).
+// Both panels share one space (the other is only made invisible), so Settings
+// keeps one size whichever tab is showing.
 
-export type SettingsTab = "appearance" | "gameplay" | "profile";
+export type SettingsTab = "appearance" | "gameplay";
 const TAB_KEY = "chess-trainer-settings-tab";
 
 export function showSettingsTab(tab: SettingsTab) {
@@ -97,8 +99,12 @@ export function showSettingsTab(tab: SettingsTab) {
     button.classList.toggle("on", on);
     button.setAttribute("aria-selected", String(on));
   }
-  for (const panel of document.querySelectorAll<HTMLElement>("[data-settings-panel]")) panel.hidden = panel.dataset.settingsPanel !== tab;
-  document.getElementById("settings-dialog")?.scrollTo({ top: 0 }); // each tab from its top
+  for (const panel of document.querySelectorAll<HTMLElement>("[data-settings-panel]")) {
+    const off = panel.dataset.settingsPanel !== tab;
+    panel.classList.toggle("inactive", off);
+    panel.setAttribute("aria-hidden", String(off));
+  }
+  document.querySelector("#settings-dialog .settings-panels")?.scrollTo({ top: 0 }); // each tab from its top
   try {
     localStorage.setItem(TAB_KEY, tab);
   } catch {
@@ -116,5 +122,5 @@ export function setupSettingsTabs() {
   } catch {
     // storage blocked
   }
-  showSettingsTab(last === "gameplay" || last === "profile" ? last : "appearance");
+  showSettingsTab(last === "gameplay" ? last : "appearance");
 }

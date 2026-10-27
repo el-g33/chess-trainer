@@ -5,6 +5,7 @@ const PATHS: Record<string, string> = {
   gear:
     '<circle cx="12" cy="12" r="8.2" stroke-width="3.4" stroke-dasharray="3.2 3.24" stroke-linecap="butt"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2.4"/>',
   back: '<path d="M15 5l-7 7 7 7"/>',
+  user: '<circle cx="12" cy="8.5" r="3.6"/><path d="M5 20c.8-3.8 3.6-6 7-6s6.2 2.2 7 6"/>',
   home: '<path d="M4 11l8-7 8 7"/><path d="M6.5 9.5V20h11V9.5M10 20v-5.5h4V20"/>',
   play: '<path d="M8 5.5v13l11-6.5z" fill="currentColor" fill-opacity=".9"/>',
   pause: '<path d="M8.5 5.5v13M15.5 5.5v13" stroke-width="3"/>',

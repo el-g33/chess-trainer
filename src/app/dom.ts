@@ -5,6 +5,7 @@ export const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.g
 export const menu = $("menu");
 export const menuCard = $<HTMLFormElement>("menu-card");
 export const settingsDialog = $<HTMLDialogElement>("settings-dialog");
+export const profileDialog = $<HTMLDialogElement>("profile-dialog");
 export const opponentBox = $<HTMLSelectElement>("opponent");
 export const levelBox = $<HTMLSelectElement>("level");
 export const colourBox = $<HTMLSelectElement>("colour");

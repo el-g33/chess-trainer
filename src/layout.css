@@ -2343,6 +2343,69 @@ button.stats-info {
 .settings-grid[hidden] {
   display: none;
 }
+/* The tabs' panels share one space (the other is just invisible), so the
+   window keeps one size; a phone too short for it scrolls the panels only */
+.settings-dialog > form {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 48px);
+}
+.settings-panels {
+  display: grid;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* Settings and Your profile: one size for both (the room Gameplay needs) */
+.settings-dialog.same-size {
+  height: min(610px, calc(100dvh - 48px));
+}
+.settings-dialog.same-size > form {
+  height: 100%;
+}
+.settings-dialog.same-size .settings-panels {
+  flex: 1;
+}
+.settings-panels > * {
+  grid-area: 1 / 1;
+  align-content: start;
+}
+.settings-panels > .inactive {
+  visibility: hidden;
+}
+/* The app: its version, What's new and Check for updates */
+.settings-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.settings-foot > * {
+  white-space: nowrap;
+}
+.settings-foot .link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+}
+/* Save this game, under the review summary; Save all, in the history's header */
+.stats-save {
+  display: block;
+  margin: 12px auto 0;
+  font-size: 0.85rem;
+}
+.history-save {
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  padding: 0;
+}
 .settings-group {
   margin: 10px 0 0;
   padding-top: 10px;

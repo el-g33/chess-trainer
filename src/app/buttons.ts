@@ -10,16 +10,16 @@ import { setTypeSpeed } from "../talk";
 import { tourOpen } from "../tour";
 
 import {
-  backUp, checkForUpdates, closeOverlay, closeStepper, drawDataCounts, onHome, onNewGame, openMore, overlay,
+  backUp, checkForUpdates, closeOverlay, closeStepper, onHome, onNewGame, openMore, overlay,
   overlayOpen, restartIntoUpdate, restoreFromFile, setHistoryFromReview, stepTo, stepTyper, stripTyper,
 } from "./coach";
 import { drawLookRows } from "./lookPickers";
-import { setupOnlineGames } from "./onlineGames";
+import { openProfile, setupOnlineGames } from "./onlineGames";
 import {
   $, arrowStyleBox, coachSpeedBox, demoPick, demoPlay, evalCheck, exitAnalysisButton, fenInput, lineBack, lineExit,
   lineForward, navButtons, newButton, piecesBox, planModeBox, playerNameBox, lichessUserBox, chesscomUserBox,
   rateMovesBox, replyButton, resignButton,
-  reviewButton, reviewDepthBox, settingsDialog, showDemoButton, soundOn, soundStyleBox, soundVolume, themeBox,
+  profileDialog, reviewButton, reviewDepthBox, settingsDialog, showDemoButton, soundOn, soundStyleBox, soundVolume, themeBox,
   toolButtons, uiThemeBox, undoButton,
 } from "./dom";
 import { refresh } from "./draw";
@@ -27,7 +27,7 @@ import { toggleHelp } from "./featureTour";
 import { backToStats, onResign, onReviewGame, stopPreparing } from "./matches";
 import { exitAnalysis, goTo, navigate, onUndo, readFen } from "./moves";
 import { loadDemoLine, onDemoExit, onDemoPlay, onDemoTry, onNavPlay, onShowDemo } from "./openingDemos";
-import { openPgnDialog, openSave, pgnText, readPgnText, saveCopy, saveDownload, saveTarget } from "./pgnScreens";
+import { openPgnDialog, pgnText, readPgnText, saveCopy, saveDownload } from "./pgnScreens";
 import { clockTick } from "./playerBars";
 import { closeDialog, dialog } from "./popups";
 import { saveSettings, setupSettingsTabs } from "./settings";
@@ -94,10 +94,6 @@ export function wireButtons() {
     readFen();
     drawHome();
   });
-  $("settings-save").addEventListener("click", () => {
-    settingsDialog.close();
-    openSave();
-  });
   $("save-copy").addEventListener("click", () => void saveCopy());
   $("save-file").addEventListener("click", saveDownload);
   window.setInterval(clockTick, 100);
@@ -119,17 +115,13 @@ export function wireButtons() {
   $("open-pgn").addEventListener("click", openPgnDialog);
   for (const gear of document.querySelectorAll(".gear-button")) {
     gear.addEventListener("click", () => {
-      // Saving the game is only offered in a game with something to save
-      const target = menuOpen ? null : saveTarget();
-      const save = $("settings-save");
-      save.hidden = !target;
-      save.lastChild!.textContent = currentView === "history" ? " Save all your games (PGN)" : " Save this game (PGN)";
-      drawDataCounts();
       drawLookRows(); // the pieces' pictures may have loaded since
       settingsDialog.showModal();
     });
   }
+  for (const button of document.querySelectorAll(".profile-button")) button.addEventListener("click", () => openProfile());
   settingsDialog.addEventListener("close", () => refresh());
+  profileDialog.addEventListener("close", () => refresh());
   for (const box of [playerNameBox, lichessUserBox, chesscomUserBox]) {
     box.addEventListener("change", () => {
       saveSettings();

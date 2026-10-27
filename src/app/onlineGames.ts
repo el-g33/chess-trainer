@@ -5,10 +5,9 @@ import { OnlineError, SOURCE_NAMES, type OnlineGame, type Source, type Wanted, f
 import { readPgn } from "../pgn";
 
 import { type SavedGame, drawDataCounts, historyRow, loadHistory, saveHistory, setHistoryFromReview } from "./coach";
-import { $, chesscomUserBox, lichessUserBox, settingsDialog } from "./dom";
+import { $, chesscomUserBox, lichessUserBox, profileDialog } from "./dom";
 import { refresh } from "./draw";
 import { startPreparing } from "./matches";
-import { showSettingsTab } from "./settings";
 import { hideMenu, resetBoard } from "./startScreens";
 import { menuOpen, set } from "./state";
 
@@ -74,11 +73,15 @@ function addToHistory(games: OnlineGame[]): number {
   return fresh.length;
 }
 
-/** Settings, scrolled to the username boxes. */
-export function openAccounts() {
+/** Your profile: your name, your online usernames and your data. */
+export function openProfile() {
   drawDataCounts();
-  showSettingsTab("profile");
-  settingsDialog.showModal();
+  profileDialog.showModal();
+}
+
+/** Your profile, at the username boxes. */
+export function openAccounts() {
+  openProfile();
   $("online-accounts").scrollIntoView({ block: "center" });
   (lichessUserBox.value ? chesscomUserBox : lichessUserBox).focus();
 }

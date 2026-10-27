@@ -50,7 +50,7 @@ import {
   practiseGameSlips,
 } from "./openingDemos";
 import { importGames, importing, importNote, reviewImported } from "./onlineGames";
-import { openPgnDialog } from "./pgnScreens";
+import { openPgnDialog, openSave } from "./pgnScreens";
 import { MOVE_MARKS, barName, gameScores, ratingClass } from "./playerBars";
 import { message } from "./popups";
 import { analysisReview, moveReviews, openingInfo, reviewPly } from "./ratings";
@@ -1130,6 +1130,11 @@ export function drawStats() {
 
   box.append(card);
   if (reviewing) box.append(depthCard(pending));
+  // Save this game: as a PGN, for elsewhere (Lichess, chess.com, a friend)
+  const save = element("button", "link-button stats-save", "Save this game (PGN)");
+  save.type = "button";
+  save.addEventListener("click", openSave);
+  box.append(save);
   updateHistoryAccuracy(overall);
 }
 
@@ -1274,6 +1279,16 @@ export function drawHistory() {
     top.append(back);
   }
   top.append(element("span", "history-gap"));
+  // Save all your games, in one PGN
+  if (games.length) {
+    const save = element("button", "round soft history-save", "");
+    save.type = "button";
+    save.innerHTML = icon("download", 16);
+    save.title = "Save all your games (PGN)";
+    save.setAttribute("aria-label", "Save all your games (PGN)");
+    save.addEventListener("click", openSave);
+    top.append(save);
+  }
   const get = element("button", "history-get", "");
   get.type = "button";
   get.innerHTML = `${icon("download", 16)} ${importing ? "Getting..." : "Get my games"}`;

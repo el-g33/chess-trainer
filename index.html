@@ -62,6 +62,7 @@
         <section class="screen" data-screen="welcome">
           <div class="home-top">
             <span class="home-gap"></span>
+            <button type="button" class="icon-button profile-button" aria-label="Your profile" title="Your profile"><span data-ico="user"></span></button>
             <button type="button" class="icon-button help-button" aria-label="Help" title="Help"><span data-ico="quiz"></span></button>
             <button type="button" class="icon-button gear-button" aria-label="Settings" title="Settings"><span data-ico="gear"></span></button>
           </div>
@@ -239,6 +240,7 @@
           <button type="button" data-view="stats" aria-label="Statistics" title="Statistics"><span data-ico="chart"></span></button>
           <button type="button" data-view="history" aria-label="Game history" title="Game history"><span data-ico="history"></span></button>
         </nav>
+        <button type="button" class="icon-button profile-button" aria-label="Your profile" title="Your profile"><span data-ico="user"></span></button>
         <button type="button" class="icon-button help-button" aria-label="Help" title="Help"><span data-ico="quiz"></span></button>
         <button type="button" class="icon-button gear-button" aria-label="Settings" title="Settings"><span data-ico="gear"></span></button>
       </header>
@@ -423,18 +425,18 @@
     </div>
 
     <!-- Settings (the gear) -->
-    <dialog id="settings-dialog" class="settings-dialog">
+    <dialog id="settings-dialog" class="settings-dialog same-size">
       <form method="dialog">
         <div class="settings-head">
           <h3>Settings</h3>
           <button value="close" class="round soft" aria-label="Close"><span data-ico="close"></span></button>
         </div>
-        <!-- Three tabs (like Training's): Appearance, Gameplay, Profile -->
+        <!-- Two tabs (like Training's); the panels share one space, so it keeps one size -->
         <div class="tabs settings-tabs" role="tablist">
           <button type="button" role="tab" data-settings-tab="appearance">Appearance</button>
           <button type="button" role="tab" data-settings-tab="gameplay">Gameplay</button>
-          <button type="button" role="tab" data-settings-tab="profile">Profile</button>
         </div>
+        <div class="settings-panels">
         <div class="settings-grid" data-settings-panel="appearance">
           <label for="ui-theme">Theme</label>
           <select id="ui-theme" class="dd-native" data-themed="picture" tabindex="-1" aria-hidden="true">
@@ -463,7 +465,7 @@
             <option value="colourblind">Colour-blind friendly</option>
           </select>
         </div>
-        <div class="settings-grid" data-settings-panel="gameplay" hidden>
+        <div class="settings-grid inactive" data-settings-panel="gameplay" aria-hidden="true">
           <h4 class="settings-group wide">While you play</h4>
           <label class="check wide"><input type="checkbox" id="eval-check" checked /> Eval bar (practice)</label>
           <label class="check wide"><input type="checkbox" id="rate-moves" checked /> Rate moves (practice)</label>
@@ -492,8 +494,23 @@
             <option value="deep">Deep (slower)</option>
           </select>
         </div>
-        <div class="settings-grid" data-settings-panel="profile" hidden>
-          <h4 class="settings-group wide">You</h4>
+        </div>
+        <div class="settings-foot">
+          <span><span id="app-version"></span> · <button type="button" class="link-button" id="whats-new-open">What's new</button></span>
+          <button type="button" id="check-updates" class="link-button"><span data-ico="replay" data-ico-size="16"></span> <span class="cu-label">Check for updates</span></button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Your profile: your name, your online usernames and your data -->
+    <dialog id="profile-dialog" class="settings-dialog profile-dialog same-size">
+      <form method="dialog">
+        <div class="settings-head">
+          <h3>Your profile</h3>
+          <button value="close" class="round soft" aria-label="Close"><span data-ico="close"></span></button>
+        </div>
+        <div class="settings-panels">
+        <div class="settings-grid">
           <label for="player-name">Your name</label>
           <input type="text" id="player-name" maxlength="30" placeholder="You" autocomplete="nickname" />
           <div class="settings-section wide" id="online-accounts">
@@ -513,15 +530,10 @@
               <button type="button" id="data-backup" class="accent"><span data-ico="download" data-ico-size="18"></span> Back up</button>
               <button type="button" id="data-restore"><span data-ico="upload" data-ico-size="18"></span> Restore</button>
             </div>
-            <button type="button" id="settings-save" class="settings-save data-save"><span data-ico="download" data-ico-size="18"></span> Save this game (PGN)</button>
             <p class="setup-note">Everything stays on this device. A backup is one small file you can keep in Drive, email to yourself, or move to another device.</p>
             <input type="file" id="data-file" accept=".json,application/json" hidden />
           </div>
-          <div class="settings-section wide">
-            <h4>The app</h4>
-            <button type="button" id="check-updates" class="settings-save"><span data-ico="replay" data-ico-size="18"></span> <span class="cu-label">Check for updates</span></button>
-            <p class="app-version"><span id="app-version"></span> <button type="button" class="link-button" id="whats-new-open">What's new</button></p>
-          </div>
+        </div>
         </div>
       </form>
     </dialog>
