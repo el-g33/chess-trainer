@@ -2428,3 +2428,62 @@ body.cb-arrows cg-container svg.cg-shapes line[stroke="#B26B00" i] {
   height: 82%;
   margin: 0;
 }
+
+/* What's new: after an update, and from Settings */
+.whats-new {
+  padding: 18px 18px 16px;
+}
+.wn-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.wn-face {
+  flex: none;
+  width: 48px;
+  height: 48px;
+}
+.wn-head b {
+  display: block;
+  font-size: 1.1rem;
+}
+.wn-head small {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.wn-items {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.wn-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.wn-item svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent);
+}
+.wn-item b {
+  display: block;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+.wn-also {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.wn-ok {
+  width: 100%;
+  margin-top: 12px;
+  border-radius: 999px;
+}

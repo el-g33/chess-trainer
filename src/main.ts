@@ -46,6 +46,7 @@ import { installed } from "./app/coach";
 import { buildMenu, showMenu } from "./app/startMenu";
 import { onBoardMove, onUndo } from "./app/moves";
 import { wireButtons } from "./app/buttons";
+import { setupWhatsNew } from "./app/whatsNewCard";
 
 // The styles are in (imports run first), so the page can show; the theme's
 // stand-in background (see index.html) gives way to the real one
@@ -355,6 +356,7 @@ buildMenu();
 wireButtons();
 refresh();
 showMenu();
+setupWhatsNew(); // after an update: what's new
 void loadPieces().then(refresh);
 // The built site keeps a copy of itself, so it works offline (see vite.config.ts).
 // A new version downloads in the background; when it's in, a notice offers to restart into it.

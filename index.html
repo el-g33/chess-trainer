@@ -500,7 +500,7 @@
             <input type="file" id="data-file" accept=".json,application/json" hidden />
           </div>
           <button type="button" id="check-updates" class="wide settings-save"><span data-ico="replay" data-ico-size="18"></span> <span class="cu-label">Check for updates</span></button>
-          <p id="app-version" class="app-version wide"></p>
+          <p class="app-version wide"><span id="app-version"></span> <button type="button" class="link-button" id="whats-new-open">What's new</button></p>
         </div>
       </form>
     </dialog>
@@ -616,6 +616,16 @@
     </dialog>
 
     <!-- Pop-up messages -->
+    <!-- What's new: once after an update, and from Settings -->
+    <dialog id="whats-new" class="whats-new" aria-labelledby="wn-title">
+      <div class="wn-head">
+        <span id="wn-face" class="wn-face"></span>
+        <span><b id="wn-title">What's new</b><small id="wn-version"></small></span>
+      </div>
+      <div id="wn-items" class="wn-items"></div>
+      <button type="button" id="wn-ok" class="accent wn-ok">Got it</button>
+    </dialog>
+
     <dialog id="dialog">
       <form method="dialog">
         <h3 id="dialog-title"></h3>

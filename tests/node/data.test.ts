@@ -3,6 +3,8 @@
 import { addMistakes, dueMistakes, loadMistakes, MASTERED, recordAttempt, saveLines, today } from "../../src/mistakes";
 import { picture, saveSummary } from "../../src/progress";
 import { makeBackup, readBackup, restoreBackup } from "../../src/backup";
+import { RELEASES, newSinceLastVisit } from "../../src/whatsNew";
+import pkg from "../../package.json";
 
 export default async function run() {
   const failures: string[] = [];
@@ -67,6 +69,18 @@ export default async function run() {
     const after = JSON.parse(localStorage.getItem("chess-trainer-history")!).map((g: { id: string }) => g.id);
     expect("replacing makes it match the backup", JSON.stringify(after) === '["a"]', JSON.stringify(after));
   }
+  // -- What's new: once after an update, never on a first visit, and written for each version
+  localStorage.clear();
+  expect("what's new: nothing on a first visit", newSinceLastVisit("3.2").length === 0);
+  expect("what's new: nothing again on the same version", newSinceLastVisit("3.2").length === 0);
+  localStorage.setItem("chess-trainer-seen-version", "3.0");
+  expect("what's new: every version you skipped, newest first", newSinceLastVisit("3.2").map((r) => r.version).join() === "3.2,3.1");
+  localStorage.clear();
+  localStorage.setItem("chess-trainer-settings", "{}");
+  expect("what's new: someone from before it was added sees 3.2", newSinceLastVisit("3.2").map((r) => r.version).join() === "3.2");
+  const version = pkg.version.split(".").slice(0, 2).join(".");
+  expect("what's new: the version being published has its notes", RELEASES[0].version === version,
+    `package.json is ${version}; add a "${version}" entry at the top of RELEASES in src/whatsNew.ts`);
   localStorage.clear();
   return { name: "Your mistakes, progress and backups", checks, failures };
 }
