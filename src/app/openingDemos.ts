@@ -44,7 +44,7 @@ import { moveSound, showMenu } from "./startMenu";
 import { hideMenu, resetBoard, showScreen } from "./startScreens";
 import {
   orientation, busy, deepMoves, deepNeeded, deepening, demo, drill, game, gameHeaders, lastReviews, match, menuOpen,
-  practice, puzzleLevel, replaying, reviewing, set, trainTab, viewPly,
+  practice, puzzleLevel, replaying, reviewing, savedFromReview, set, trainTab, viewPly,
 } from "./state";
 import { setBusy } from "./strategyCoach";
 import { PUZZLE_LEVELS, drawTrainScreen, showLessonList, startPuzzles } from "./train";
@@ -805,11 +805,13 @@ export function saveGameMistakes(list: (Review | undefined)[]) {
       : division.end !== undefined && division.end <= ply ? "endgame" : "middlegame";
   const opponent = gameHeaders[you === "white" ? "Black" : "White"];
   const source = opponent && opponent !== "?" && opponent !== "Stockfish" ? `your game against ${opponent}` : "one of your games";
+  const plies: number[] = [];
   const found = list.flatMap((review, i) => {
     if (!review || !SAVED_RATINGS.has(review.rating) || !review.bestSan || game.moverOf(i + 1) !== you) return [];
     const before = positions[i];
     const best = parseSan(before, review.bestSan) as NormalMove | undefined;
     if (!best) return [];
+    plies.push(i + 1);
     return [{
       fen: fenOf(before), best: makeUci(best), played: makeUci(game.moves[i].move),
       line: { start: game.fenAt(0), moves: game.moves.slice(0, i).map((m) => makeUci(m.move)) },
@@ -817,8 +819,24 @@ export function saveGameMistakes(list: (Review | undefined)[]) {
       phase: phaseOf(i), source,
     }];
   });
+  const earlier = savedFromReview?.key === gameKey() ? savedFromReview.ids.length : 0; // before a deeper look
   const added = addMistakes(found);
-  set.savedFromReview({ key: gameKey(), ids: found.map((m) => mistakeId(m.fen, m.best)), added });
+  set.savedFromReview({ key: gameKey(), ids: found.map((m) => mistakeId(m.fen, m.best)), added, plies });
+  // New ones: say so once, to be acknowledged (the review marks each as you reach it)
+  if (added) {
+    const one = added === 1;
+    void message(`${earlier ? `${added} more` : one ? "A" : added} slip${one ? "" : "s"} saved to Your mistakes`,
+      (earlier ? `The deeper look found ${one ? "it" : "them"}. ` : "") +
+      `I'll point ${one ? "it" : "them"} out as we go through the game, and you can try ${one ? "it as a puzzle" : "them as puzzles"} at the end.`);
+  }
+}
+
+/** Try the slips saved from the game on the board, as puzzles. */
+export function practiseGameSlips() {
+  const saved = savedFromReview;
+  if (!saved) return;
+  const ids = new Set(saved.ids);
+  startPractice(loadMistakes().filter((m) => ids.has(m.id)));
 }
 
 /** Practise these positions, one after another. */
@@ -1278,52 +1296,70 @@ export function checkDeeper(list: (Review | undefined)[]) {
   saveGameSummary(graded);
 }
 
-/** The statistics: which review this is, and the way to look deeper. */
-export function depthCard(list: (Review | undefined)[], pending: boolean): HTMLElement {
-  const card = element("div", "stats-card depth-card");
-  const row = element("div", "stats-row");
-  row.append(element("span", "stats-label", "Checked with"));
+let depthOpen = false; // the deep review's changes (or the quick review's note), shown under the line
+
+/** The statistics: which review this is, as one slim line - Look deeper, its
+ *  progress while it runs, then what changed. */
+export function depthCard(pending: boolean): HTMLElement {
+  const box = element("div", "depth-box");
+  const line = element("div", "depth-line");
   const deep = analyser.depth === "deep";
-  const which = element("span", "depth-which", deep ? "Deep review" : "Quick review");
-  if (deep && !pending) which.append(element("span", "stats-tag done", "done"));
-  row.append(which);
-  card.append(row);
+  const toggle = (label: string) => {
+    const button = element("button", "depth-go", label);
+    button.type = "button";
+    button.setAttribute("aria-expanded", String(depthOpen));
+    button.addEventListener("click", () => {
+      depthOpen = !depthOpen;
+      refresh();
+    });
+    return button;
+  };
+  let note = "";
   if (deepening && !deepening.done) {
     const { done, total } = analyser.progress();
-    const rated = list.filter(Boolean).length;
-    card.append(element("p", "", "Looking deeper at every move..."));
+    line.append(element("span", "depth-which", "Looking deeper"));
     const track = element("div", "depth-track");
     const fill = element("div", "depth-fill");
     fill.style.width = `${Math.round(100 * Math.min(1, total ? done / total : 0))}%`;
     track.append(fill);
-    card.append(track, element("p", "stats-note", `${Math.min(done, total)} of ${total} positions · ${rated} of ${list.length} moves rated`));
-    const stop = element("button", "soft depth-button", "Stop and keep the quick review");
+    const stop = element("button", "round soft depth-stop", "");
     stop.type = "button";
+    stop.innerHTML = icon("close", 14);
+    stop.title = "Stop and keep the quick review";
+    stop.setAttribute("aria-label", "Stop and keep the quick review");
     stop.addEventListener("click", stopDeeper);
-    card.append(stop);
+    line.append(track, element("span", "depth-count", `${Math.min(done, total)} / ${total}`), stop);
   } else if (deep) {
+    const which = element("span", "depth-which", "Deep review ");
+    if (!pending) which.append(element("span", "depth-done", "✓"));
+    line.append(which);
     const changes = deepening?.done ? deepening.changes : null;
     // the changes that matter in full; Good / Excellent / Best swapping places just counted
     const SMALL = /^\S+ (Best|Excellent|Good|Book|Forced) → (Best|Excellent|Good|Book|Forced)$/;
     const big = (changes ?? []).filter((c) => !SMALL.test(c));
     const small = (changes ?? []).length - big.length;
     const smallWords = small ? `${small} small one${small === 1 ? "" : "s"} (Good, Excellent and Best swapping places)` : "";
-    card.append(element("p", "stats-note", changes === null
-      ? "Every move was checked with a longer search."
-      : !changes.length
-        ? "No ratings changed: the quick review had them right."
-        : big.length
-          ? `What changed: ${big.join(", ")}.${small ? ` Also ${smallWords}.` : ""}`
-          : `${cap(smallWords)}. None of the slips changed.`));
+    if (changes?.length) {
+      line.append(toggle(`${changes.length} rating${changes.length === 1 ? "" : "s"} changed ${depthOpen ? "▴" : "›"}`));
+      note = big.length ? `What changed: ${big.join(", ")}.${small ? ` Also ${smallWords}.` : ""}` : `${cap(smallWords)}. None of the slips changed.`;
+    } else {
+      line.append(element("span", "depth-count", changes ? "no ratings changed" : "every move checked longer"));
+    }
   } else {
-    card.append(element("p", "stats-note",
-      "Your phone's Stockfish, at a quick depth. A longer look may rate a few moves a step differently."));
-    const button = element("button", "accent depth-button", "Look deeper (1-3 min)");
+    const info = toggle("ⓘ");
+    info.classList.add("depth-info");
+    info.setAttribute("aria-label", "About the quick review");
+    line.append(element("span", "depth-which", "Quick review"), info);
+    const button = element("button", "depth-go", "Look deeper ›");
     button.type = "button";
+    button.title = "1-3 minutes";
     button.addEventListener("click", lookDeeper);
-    card.append(button);
+    line.append(button);
+    note = "Your phone's Stockfish, at a quick depth. A longer look (1-3 minutes) may rate a few moves a step differently.";
   }
-  return card;
+  box.append(line);
+  if (depthOpen && note) box.append(element("p", "stats-note depth-note", note));
+  return box;
 }
 
 /** Back to Training, on the tab you came from. */

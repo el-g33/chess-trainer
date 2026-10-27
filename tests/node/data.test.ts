@@ -20,6 +20,9 @@ export default async function run() {
   const base = { fen, best: "g8f6", kind: "mistake" as const, phase: "opening" as const, source: "a test" };
   expect("a mistake is added", addMistakes([base]) === 1);
   expect("the same mistake isn't added twice", addMistakes([base]) === 0);
+  expect("a deeper look's better move updates it, not adds it", addMistakes([{ ...base, best: "f8c5" }]) === 0 &&
+    loadMistakes().length === 1 && loadMistakes()[0].best === "f8c5");
+  addMistakes([base]); // and back, for the checks below
   expect("a new mistake is due today", dueMistakes().length === 1);
   const id = loadMistakes()[0].id;
   const gaps: number[] = [];
@@ -31,8 +34,8 @@ export default async function run() {
   expect("a wrong answer starts it again tomorrow", wrong.stage === 0 && wrong.due - today() === 1);
   // How the game got there: kept with a new one, and found later for an older one
   const line = { start: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", moves: ["e2e4", "e7e5"] };
-  addMistakes([{ ...base, best: "b1c3", line }]);
-  expect("the moves before a mistake are kept", loadMistakes().find((m) => m.best === "b1c3")?.line?.moves.length === 2);
+  addMistakes([{ ...base, fen: "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", best: "g1f3", line }]);
+  expect("the moves before a mistake are kept", loadMistakes().find((m) => m.best === "g1f3")?.line?.moves.length === 2);
   saveLines(new Map([[id, line]]));
   expect("moves found for an older one are kept", loadMistakes().find((m) => m.id === id)?.line?.moves.join() === "e2e4,e7e5");
 

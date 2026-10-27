@@ -2121,18 +2121,6 @@ body.demo-intro .move-strip {
   padding: 6px 14px;
 }
 
-/* The statistics: the slips saved as puzzles */
-.stats-saved {
-  margin-top: 10px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--button);
-  border: 1px solid var(--line);
-}
-.stats-saved p {
-  margin: 0 0 8px;
-}
-
 /* Home: the way into Your progress */
 .home-progress {
   display: inline-flex;
@@ -2263,30 +2251,85 @@ body.demo-intro .move-strip {
   font-weight: 600;
   vertical-align: 1px;
 }
-.stats-tag.done {
-  background: #e1f5ee;
-  color: #085041;
+button.stats-info {
+  min-height: 0;
+  border: 0;
+  cursor: pointer;
 }
-.depth-card p {
-  margin: 6px 0 0;
+.stats-info-note {
+  margin: 2px 0 6px;
+}
+
+/* Which review it was, as one slim line: Look deeper, its progress, what changed */
+.depth-box {
+  margin-top: 8px;
+}
+.depth-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 4px 6px 4px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  font-size: 0.9rem;
+}
+.depth-which {
+  white-space: nowrap;
+}
+.depth-done {
+  color: var(--good, #2e7d32);
+  font-weight: 700;
+}
+.depth-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.depth-track + .depth-count {
+  margin-left: 0;
+}
+.depth-go {
+  margin-left: auto;
+  min-height: 0;
+  padding: 5px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 600;
+}
+.depth-go.depth-info {
+  margin-left: -6px;
+  padding: 5px 6px;
+  color: var(--muted);
+}
+.depth-info + .depth-go {
+  margin-left: auto;
 }
 .depth-track {
-  height: 8px;
-  margin: 8px 0 0;
-  border-radius: 4px;
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
   background: var(--line);
   overflow: hidden;
 }
 .depth-fill {
   height: 100%;
-  border-radius: 4px;
+  border-radius: 3px;
   background: var(--accent);
   transition: width 0.4s;
 }
-.depth-button {
-  margin-top: 8px;
-  padding: 6px 14px;
+.depth-stop {
+  flex: none;
+  width: 30px;
+  height: 30px;
   min-height: 0;
+  padding: 0;
+}
+.depth-note {
+  margin: 6px 12px 0;
 }
 
 /* Settings: three tabs (Appearance, Gameplay, Profile), each a grid of rows

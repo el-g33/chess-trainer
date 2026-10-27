@@ -80,7 +80,7 @@ export let replaying = false;
 export let replayStepping = false; // the replay itself is moving (not you)
 export let drill: DrillState | null = null;
 export let practice: Practice | null = null;
-export let savedFromReview: { key: string; ids: string[]; added: number } | null = null;
+export let savedFromReview: { key: string; ids: string[]; added: number; plies: number[] } | null = null;
 export let deepening: { before: string[]; done: boolean; changes: string[] } | null = null;
 export let busyTimer: number | undefined;
 export let deepNeeded: Chess[] = []; // positions waiting for that second look

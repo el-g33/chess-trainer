@@ -25,7 +25,6 @@ import {
   HINT_TEXT, type Mode, analyser, base, brilliantShown, coachAnalysis, coachLine, currentPly, gameMoves, insights,
   previewPlan, quizLinePositions, quizScore, quizWaiting, ratingsOn,
 } from "../main";
-import { loadMistakes } from "../mistakes";
 import { controlledSquares, dangerAfter, moveInWords, narrateMove, targetsOf, verdict, whyMove } from "../narrate";
 import {
   type OpeningInfo, REPERTOIRE, firstMoveOf, goalWords, isStartPosition, mainFamily, systemFor,
@@ -48,7 +47,7 @@ import {
 import { analysisLineText, goTo } from "./moves";
 import {
   cap, depthCard, drillSays, lowerFirst, openingShortName, practiceSays, scheduleDemo, showWhatYouGet, startDemoLine,
-  startPractice,
+  practiseGameSlips,
 } from "./openingDemos";
 import { importGames, importing, importNote, reviewImported } from "./onlineGames";
 import { openPgnDialog } from "./pgnScreens";
@@ -58,7 +57,7 @@ import { analysisReview, moveReviews, openingInfo, reviewPly } from "./ratings";
 import { moveSound, showMenu } from "./startMenu";
 import { type HomeChoice, resetBoard, showScreen } from "./startScreens";
 import {
-  orientation, analysis, book, busy, canReview, clock, clockTimes, currentGameId, currentView, demo, drill, editor,
+  orientation, analysis, book, busy, canReview, clock, clockTimes, currentGameId, currentView, deepening, demo, drill, editor,
   errorText, explore, game, gameHeaders, gameOrigin, historyColour, lesson, match, mode, practice, preparing,
   preview, puzzle, quiz, result, reviewSide, reviewTitle, reviewing, savedFromReview, set, silentJump, speech,
   statsMore, statusMessage, stepper, stripButtons, thinking, viewPly,
@@ -183,10 +182,20 @@ export function coachSays(reviews: (Review | undefined)[]): CoachSay {
   if (!review) return { mood: "think", text: "Hmm, let me check that move...", buttons: [STRATEGY] };
   const before = game.positionAt(ply - 1);
   const after = game.positionAt(ply);
-  const text = verdict(review, before, after, analyser.evals.get(fenOf(after)), listener(), ply, watching());
+  let text = verdict(review, before, after, analyser.evals.get(fenOf(after)), listener(), ply, watching());
   // a good move that wasn't the best: the bulb (why it's good, then the best move) instead of Tell me more
   const more: CoachButton = notTheBest(ply, review) ? { ico: "bulb", label: "See the best move", run: () => void showBestLine(ply) } : TELL_MORE;
-  return { mood: moodForRating(review.rating), text, buttons: [more, STRATEGY] };
+  const buttons = [more, STRATEGY];
+  // Your slips saved as puzzles: said at each one, and offered at the end of the game
+  const saved = reviewing && savedFromReview?.key === gameKey() ? savedFromReview : null;
+  if (saved?.plies.includes(ply)) text += " I've saved this one to Your mistakes.";
+  if (saved?.plies.length && ply === game.length) {
+    const count = saved.plies.length;
+    text += ` That's the game. Want to try ${count === 1 ? "your slip" : `your ${count} slips`} now, while ${count === 1 ? "it's" : "they're"} fresh?`;
+    // (the puzzle button in place of Strategy: the strip keeps its size, so the words keep their room)
+    buttons.splice(0, buttons.length, { ico: "puzzle", label: "Try them now", run: practiseGameSlips, kind: "accent" }, more);
+  }
+  return { mood: moodForRating(review.rating), text, buttons };
 }
 
 /** An icon button that also shows its words, when the button asks for it. */
@@ -276,7 +285,7 @@ export function drawStripActions(roomForNav = false) {
     next.classList.add("piece-nav");
     nav.push(back, next);
   }
-  $("strip-actions").replaceChildren(...nav, ...stripButtons.map((b) => iconButton(b)));
+  $("strip-actions").replaceChildren(...nav, ...stripButtons.map((b) => labelledButton(b)));
 }
 
 /** Everything in the bubble has been said: a demo or a replay moves on. */
@@ -974,6 +983,8 @@ export function tabMessage(box: HTMLElement, text: string, button?: CoachButton)
   box.append(say);
 }
 
+let ratingInfo = false; // the rating's explanation, shown with its i
+
 export function drawStats() {
   const box = $("stats");
   box.replaceChildren();
@@ -1003,7 +1014,7 @@ export function drawStats() {
   const { done, total } = analyser.progress();
   // Until Stockfish has checked every move, show ?? rather than numbers that keep changing
   const pending = done < total || scores.some((score) => !score) || list.some((review) => !review);
-  if (pending) {
+  if (pending && !(deepening && !deepening.done)) {
     const bar = element("div", "stats-progress");
     const fill = element("div", "stats-progress-fill");
     const fraction = total ? done / total : 0;
@@ -1042,6 +1053,27 @@ export function drawStats() {
   row("Opening", sides.map((c) => percent(phases.opening[c])));
   row("Middlegame", sides.map((c) => percent(phases.middlegame[c])));
   row("Endgame", sides.map((c) => percent(phases.endgame[c])));
+  const fromRatings = ["WhiteElo", "BlackElo"].some((tag) => Number(gameHeaders[tag]) > 0);
+  const ratingLabel = element("span", "stats-label", "Rating");
+  const info = element("button", "stats-tag stats-info", "estimate ⓘ");
+  info.type = "button";
+  info.setAttribute("aria-expanded", String(ratingInfo));
+  info.addEventListener("click", () => {
+    ratingInfo = !ratingInfo;
+    drawStats();
+  });
+  ratingLabel.append(info);
+  row(ratingLabel, sides.map((c) => {
+    const cell = element("span", "stats-cell");
+    cell.append(element("span", "rating-block", pending ? "??" : ratings[c] ? String(ratings[c]) : "-"));
+    return cell;
+  }), "rating-row");
+  if (ratingInfo) {
+    const note = element("p", "stats-note stats-info-note",
+      `An estimate from how accurately each side played${fromRatings ? ", starting from their ratings" : ""}. ` +
+      "One game is a small sample: expect it to vary a few hundred points.");
+    table.append(note);
+  }
 
   // More: how many moves got each grade
   const toggle = element("button", "stats-more", statsMore ? "More ▴" : "More ▾");
@@ -1077,30 +1109,15 @@ export function drawStats() {
     }
   }
   card.append(table);
-  // Where each phase began, so the scores make sense
-  const division = divide(positions);
-  const moveNumber = (ply: number) => positions[ply].fullmoves;
-  const phasesNote = division.middle === undefined
-    ? "The game stayed in the opening phase."
-    : [`Middlegame from move ${moveNumber(division.middle)}`,
-       division.end !== undefined ? `endgame from move ${moveNumber(division.end)}` : "no endgame"].join(" · ") +
-      ". A phase needs 3 moves from a player to be scored.";
-  card.append(element("p", "stats-note", phasesNote));
-  if (savedFromReview?.key === gameKey() && savedFromReview.ids.length) {
-    const saved = savedFromReview;
-    const count = saved.ids.length;
-    const note = element("div", "stats-saved");
-    note.append(element("p", "", saved.added
-      ? `I saved ${saved.added === 1 ? "one of your slips" : `${saved.added} of your slips`} as puzzles. They'll come back over the next few weeks until you've got them.`
-      : `Your ${count === 1 ? "slip" : `${count} slips`} from this game ${count === 1 ? "is" : "are"} already in your puzzles.`));
-    const button = iconButton({ ico: "target", label: "Try them now", run: () => {
-      const ids = new Set(saved.ids);
-      startPractice(loadMistakes().filter((m) => ids.has(m.id)));
-    } }, 16);
-    button.classList.add("labelled");
-    button.append(element("span", "", "Try them now"));
-    note.append(button);
-    card.append(note);
+  if (statsMore) {
+    // Where each phase began, so the scores make sense
+    const division = divide(positions);
+    const moveNumber = (ply: number) => positions[ply].fullmoves;
+    card.append(element("p", "stats-note", division.middle === undefined
+      ? "The game stayed in the opening phase."
+      : [`Middlegame from move ${moveNumber(division.middle)}`,
+         division.end !== undefined ? `endgame from move ${moveNumber(division.end)}` : "no endgame"].join(" · ") +
+        ". A phase needs 3 moves from a player to be scored."));
   }
   if (reviewing) {
     const start = element("div", "stats-start");
@@ -1111,24 +1128,8 @@ export function drawStats() {
     box.append(start);
   }
 
-  // The rating, in its own table
-  const rating = element("div", "stats-card rating-card");
-  const line = element("div", "stats-row");
-  const ratingLabel = element("span", "stats-label", "Rating");
-  ratingLabel.append(element("span", "stats-tag", "estimate"));
-  line.append(ratingLabel);
-  for (const colour of sides) {
-    const cell = element("span", "stats-cell");
-    cell.append(element("span", "rating-block", pending ? "??" : ratings[colour] ? String(ratings[colour]) : "-"));
-    line.append(cell);
-  }
-  rating.append(line);
-  const fromRatings = ["WhiteElo", "BlackElo"].some((tag) => Number(gameHeaders[tag]) > 0);
-  rating.append(element("p", "stats-note",
-    `An estimate from how accurately each side played${fromRatings ? ", starting from their ratings" : ""}. ` +
-    "One game is a small sample: expect it to vary a few hundred points."));
-  box.append(card, rating);
-  if (reviewing) box.append(depthCard(list, pending));
+  box.append(card);
+  if (reviewing) box.append(depthCard(pending));
   updateHistoryAccuracy(overall);
 }
 

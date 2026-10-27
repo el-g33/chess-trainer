@@ -43,6 +43,7 @@ export function refresh() {
   tidyState();
   const reviews = moveReviews();
   requestEval(); // (before drawing, so the review's progress line is current)
+  checkDeeper(reviews); // (and so a finished deeper look shows as finished)
   const info = openingInfo();
   applyMode();
   drawBoard(reviews, info);
@@ -64,7 +65,6 @@ export function refresh() {
   drawCoach();
   drawDemo();
   drawPrep(reviews);
-  checkDeeper(reviews);
   drawStatsBack();
 }
 

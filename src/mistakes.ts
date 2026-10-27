@@ -59,20 +59,29 @@ function saveAll(list: Mistake[]) {
 /** A saved position's id: the position (without the move counters) and the better move. */
 export const mistakeId = (fen: string, best: string) => `${fen.split(" ").slice(0, 4).join(" ")} ${best}`;
 
-/** Add positions (one already there is left as it is). Returns how many are new. */
+/** Add positions. One already there stays as it is - or, when a deeper look
+ *  found a different best move for it, takes the new move and keeps its
+ *  progress (never the same position twice). Returns how many are new. */
 export function addMistakes(found: Omit<Mistake, "id" | "added" | "due" | "stage">[]): number {
   const list = loadMistakes();
-  const have = new Set(list.map((m) => m.id));
+  const position = (fen: string) => fen.split(" ").slice(0, 4).join(" ");
   let added = 0;
+  let changed = false;
   for (const mistake of found) {
     const id = mistakeId(mistake.fen, mistake.best);
-    if (have.has(id)) continue;
-    have.add(id);
+    const same = list.find((m) => position(m.fen) === position(mistake.fen));
+    if (same) {
+      if (same.id !== id) {
+        Object.assign(same, { id, best: mistake.best, kind: mistake.kind, line: mistake.line ?? same.line });
+        changed = true;
+      }
+      continue;
+    }
     // a new one is ready to practise straight away
     list.push({ ...mistake, id, added: today(), due: today(), stage: 0 });
     added++;
   }
-  if (added) saveAll(list);
+  if (added || changed) saveAll(list);
   return added;
 }
 

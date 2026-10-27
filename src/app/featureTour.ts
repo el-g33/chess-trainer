@@ -54,7 +54,7 @@ export const DEMO_TOUR: TourStep[] = [
 export const STATS_TOUR: TourStep[] = [
   { target: ".stats-card", title: "Accuracy",
     text: "How accurately each player played: over the whole game, then the opening, middlegame and endgame. Tap More for a count of every grade." },
-  { target: ".rating-card", title: "Rating",
+  { target: ".rating-row", title: "Rating",
     text: "Roughly how strongly each side played in this game, judged by how much they gave away move by move." },
   { target: ".stats-start", title: "The review", text: "Go through the game move by move, from the start." },
   { target: ".view-tabs", title: "Tabs", text: "Back to the board, or on to your game history." },
