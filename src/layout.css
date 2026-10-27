@@ -2398,3 +2398,33 @@ body.cb-arrows cg-container svg.cg-shapes line[stroke="#B26B00" i] {
     grid-column: 2;
   }
 }
+
+/* Promotion: the four pieces in a column on the pawn's square */
+.promotion-pick {
+  position: fixed;
+  z-index: 950;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 4px;
+}
+.promotion-choice {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #f4f1ea;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+.promotion-choice:hover:not(:disabled),
+.promotion-choice:focus-visible {
+  background: #fff;
+  border-radius: 12%;
+}
+.promotion-choice .mini-piece {
+  width: 82%;
+  height: 82%;
+  margin: 0;
+}

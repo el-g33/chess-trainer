@@ -3,7 +3,7 @@
 import type { Key } from "@lichess-org/chessground/types";
 import { Chess, normalizeMove } from "chessops/chess";
 import { parseFen } from "chessops/fen";
-import type { Color, NormalMove } from "chessops/types";
+import type { Color, NormalMove, Role } from "chessops/types";
 import { opposite, parseSquare } from "chessops/util";
 
 import { colourName, variationSan } from "../coach";
@@ -21,8 +21,8 @@ import { moveSound } from "./startMenu";
 import { hideMenu, resetBoard } from "./startScreens";
 import {
   analysis, busy, clock, clockHistory, clockTimes, demo, demoStepping, drill, editor, explore, fenPosition, game,
-  match, menuOpen, pgnGames, plyNotes, practice, preview, puzzle, quiz, replayStepping, replaying, set, stepper,
-  thinking, viewPly,
+  match, menuOpen, orientation, pgnGames, plyNotes, practice, preview, puzzle, quiz, replayStepping, replaying, set,
+  stepper, thinking, viewPly,
 } from "./state";
 import { answerQuiz } from "./strategyCoach";
 import { autoReply, exploreMove, puzzleMove } from "./train";
@@ -55,8 +55,18 @@ export function onBoardMove(from: Key, to: Key) {
   if (editor) return; // setting up a position: editorSync keeps track
   const position = clickPosition();
   const given: NormalMove = { from: parseSquare(from)!, to: parseSquare(to)! };
-  // Pawns reaching the last rank always become queens (as in the desktop app)
-  if (position.board.get(given.from)?.role === "pawn" && (to[1] === "8" || to[1] === "1")) given.promotion = "queen";
+  // A pawn reaching the last rank: you choose what it becomes (nothing chosen: the move is taken back)
+  if (position.board.get(given.from)?.role === "pawn" && (to[1] === "8" || to[1] === "1")) {
+    void choosePromotion(to, position.turn).then((role) => {
+      if (!role) return refresh();
+      playBoardMove(position, { ...given, promotion: role });
+    });
+    return;
+  }
+  playBoardMove(position, given);
+}
+
+function playBoardMove(position: Chess, given: NormalMove) {
   const move = normalizeMove(position, given) as NormalMove;
   if (drill) {
     drillMove(move);
@@ -82,6 +92,51 @@ export function onBoardMove(from: Key, to: Key) {
     afterMove();
   }
 }
+
+const PROMOTIONS: Role[] = ["queen", "knight", "rook", "bishop"];
+
+/** What the pawn becomes: the four pieces in a column on its square (as on
+ *  Lichess). Tapping anywhere else cancels. */
+function choosePromotion(to: Key, colour: Color): Promise<Role | null> {
+  const board = document.querySelector<HTMLElement>("#board cg-board");
+  if (!board) return Promise.resolve("queen");
+  const rect = board.getBoundingClientRect();
+  const size = rect.width / 8;
+  const file = to.charCodeAt(0) - 97;
+  const rank = Number(to[1]);
+  const column = orientation === "white" ? file : 7 - file;
+  const row = orientation === "white" ? 8 - rank : rank - 1;
+  const down = row === 0; // from the top edge the pieces go down, from the bottom edge up
+  const cover = document.createElement("div");
+  cover.className = "promotion-pick";
+  Object.assign(cover.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` });
+  return new Promise((resolve) => {
+    const done = (role: Role | null) => {
+      cover.remove();
+      resolve(role);
+    };
+    PROMOTIONS.forEach((role, i) => {
+      const choice = document.createElement("button");
+      choice.type = "button";
+      choice.className = "promotion-choice";
+      choice.setAttribute("aria-label", cap(role));
+      Object.assign(choice.style, {
+        left: `${column * size}px`, top: `${(down ? row + i : row - i) * size}px`, width: `${size}px`, height: `${size}px`,
+      });
+      choice.append(Object.assign(document.createElement("span"), { className: `mini-piece ${role} ${colour}` }));
+      choice.addEventListener("click", (event) => {
+        event.stopPropagation();
+        done(role);
+      });
+      cover.append(choice);
+    });
+    cover.addEventListener("click", () => done(null));
+    document.body.append(cover);
+    cover.querySelector<HTMLButtonElement>("button")?.focus();
+  });
+}
+
+const cap = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 // -- Analysis: "what if I'd moved differently?" -----------------------------
 
