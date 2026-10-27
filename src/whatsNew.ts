@@ -12,7 +12,7 @@ export const RELEASES: Release[] = [
     version: "3.2",
     items: [
       { icon: "download", title: "Your Lichess and chess.com games", text: "Add your usernames in Settings, then Get my games. Tap any game to review it." },
-      { icon: "knight", title: "Choose your promotion", text: "A pawn on the last rank can become a queen, knight, rook or bishop." },
+      { icon: "knight", title: "Choose your promotion, and knight arrows that bend", text: "A pawn on the last rank can become a queen, knight, rook or bishop. Knight moves are drawn as an L, the way the knight goes." },
       { icon: "history", title: "Your games on Game review", text: "Your latest games are right there, with See all games." },
       { icon: "eye", title: "Two new themes, picked by sight", text: "Forest club and Rose quartz. Settings now shows every theme, board and piece set as a picture." },
     ],

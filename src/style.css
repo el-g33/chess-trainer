@@ -1585,3 +1585,9 @@ button.coach-face:hover:not(:disabled) {
     display: none !important;
   }
 }
+
+/* Knight arrows (an L, drawn as a shape of their own - see bendKnightArrows):
+   let them reach past their first square */
+cg-container svg.cg-custom-svgs svg {
+  overflow: visible;
+}

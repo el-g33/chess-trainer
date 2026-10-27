@@ -256,6 +256,42 @@ export function markThreats(shapes: DrawShape[]): DrawShape[] {
   return [...shapes, ...marks];
 }
 
+/** Knight moves drawn as an L - two squares, then one, the way the knight goes -
+ *  instead of a straight line (the board draws only straight arrows, so these
+ *  are drawn as a shape of their own, in the arrow's colour). */
+export function bendKnightArrows(shapes: DrawShape[]): DrawShape[] {
+  return shapes.map((shape) => {
+    const brush = shape.brush ? ground.state.drawable.brushes[shape.brush] : undefined;
+    if (!shape.dest || !brush || shape.customSvg) return shape;
+    const dx = shape.dest.charCodeAt(0) - shape.orig.charCodeAt(0);
+    const dy = Number(shape.dest[1]) - Number(shape.orig[1]);
+    if (!((Math.abs(dx) === 1 && Math.abs(dy) === 2) || (Math.abs(dx) === 2 && Math.abs(dy) === 1))) return shape;
+    // In the shape's own units: a square is 100, x to the right and y down as seen
+    const flip = ground.state.orientation === "white" ? 1 : -1;
+    const [ex, ey] = [dx * 100 * flip, -dy * 100 * flip];
+    const corner: [number, number] = Math.abs(dx) === 2 ? [ex, 0] : [0, ey];
+    const width = ((brush.lineWidth || 10) / 64) * 100;
+    // As the board's own arrows: the tip stops short of the square's middle, and the head is 3 widths long
+    const [ux, uy] = [Math.sign(ex - corner[0]), Math.sign(ey - corner[1])];
+    const tip: [number, number] = [ex - ux * (15.6 - 0.95 * width), ey - uy * (15.6 - 0.95 * width)];
+    const base: [number, number] = [tip[0] - ux * 3 * width, tip[1] - uy * 3 * width];
+    const side: [number, number] = [-uy * 2 * width, ux * 2 * width];
+    const dashed = brush.color === THREAT_ARROW || brush.color === CB_THEIRS ? ' stroke-dasharray="18 11"'
+      : brush.color === BEST_ARROW ? ' stroke-dasharray="14 10"' : "";
+    // (0, 0) is the middle of the knight's square
+    const html =
+      `<g opacity="${brush.opacity}"><path d="M0 0 L${corner[0]} ${corner[1]} L${base[0] + ux} ${base[1] + uy}" ` +
+      `fill="none" stroke="${brush.color}" stroke-width="${width}" stroke-linejoin="round" stroke-linecap="round"${dashed}/>` +
+      `<path d="M${tip[0]} ${tip[1]} L${base[0] + side[0]} ${base[1] + side[1]} L${base[0] - side[0]} ${base[1] - side[1]} Z" fill="${brush.color}"/></g>` +
+      // a numbered arrow (a line of moves): its number on the bend, as the board draws them
+      (shape.label
+        ? `<circle cx="${corner[0]}" cy="${corner[1]}" r="20" fill="${shape.label.fill ?? brush.color}" fill-opacity="0.9" stroke="#fff" stroke-width="3"/>` +
+          `<text x="${corner[0]}" y="${corner[1] + 10}" font-size="${30 * 0.75 ** shape.label.text.length + 6}" font-family="Noto Sans, sans-serif" text-anchor="middle" fill="#fff">${shape.label.text}</text>`
+        : "");
+    return { orig: shape.orig, customSvg: { html } };
+  });
+}
+
 Object.assign(ground.state.drawable.brushes, {
   you: { key: "you", color: YOUR_ARROW, opacity: 0.85, lineWidth: 10 },
   them: { key: "them", color: OPPONENT_ARROW, opacity: 0.85, lineWidth: 10 },
@@ -344,7 +380,7 @@ export function tidyState() {
 // For testing in development only (not in the published site)
 if (import.meta.env.DEV) {
   (window as unknown as { trainer: unknown }).trainer = {
-    analyser, game: () => game, gameScores, answerQuiz, startTask, quiz: () => quiz, parseUci, normalizeMove, base,
+    analyser, ground, bendKnightArrows, game: () => game, gameScores, answerQuiz, startTask, quiz: () => quiz, parseUci, normalizeMove, base,
     boardMove: onBoardMove, clock: () => clock, clockTimes: () => clockTimes, onUndo,
     demo: () => demo, startDemo, DEMOS, demoSteps, showTour, drill: () => drill, startDrill,
     puzzle: () => puzzle, editor: () => editor, startPuzzles, startEditor, startLesson, editorTap,

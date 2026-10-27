@@ -13,7 +13,7 @@ import { demoFor } from "../demos";
 import { syncDropdowns } from "../dropdown";
 import {
   ARROWS_AT_ONCE, BRILLIANT_ARROW, DEVIATE_ARROW, GUESS_ARROW, OPPONENT_ARROW, THREAT_ARROW, YOUR_ARROW, analyser,
-  base, brilliantShown, currentPly, evalOn, ground, insights, markThreats, previewPlan, quizLinePositions,
+  base, bendKnightArrows, brilliantShown, currentPly, evalOn, ground, insights, markThreats, previewPlan, quizLinePositions,
   quizWaiting, ratingsOn, shown, tidyState,
 } from "../main";
 import type { OpeningPlan } from "../openingPlan";
@@ -209,7 +209,7 @@ export function drawBoard(reviews: (Review | undefined)[], info: OpeningInfo[]) 
   }
   const colour = movableColour();
   const movesFrom = quizWaiting() ? quiz!.threat!.passed! : position;
-  ground.setAutoShapes(markThreats(stepper ? stepperShapes() : drill ? drillShapes() : practice ? practiceShapes() : puzzle ? puzzleShapes() : editor ? [] : demo ? demoShapes() : [...badgeShapes(reviews, info), ...arrowShapes(), ...replayShapes()]));
+  ground.setAutoShapes(bendKnightArrows(markThreats(stepper ? stepperShapes() : drill ? drillShapes() : practice ? practiceShapes() : puzzle ? puzzleShapes() : editor ? [] : demo ? demoShapes() : [...badgeShapes(reviews, info), ...arrowShapes(), ...replayShapes()])));
   if (editor || demo?.intro) last = undefined;
   ground.set({
     fen: fenOf(position),
