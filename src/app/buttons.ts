@@ -30,7 +30,7 @@ import { loadDemoLine, onDemoExit, onDemoPlay, onDemoTry, onNavPlay, onShowDemo 
 import { openPgnDialog, openSave, pgnText, readPgnText, saveCopy, saveDownload, saveTarget } from "./pgnScreens";
 import { clockTick } from "./playerBars";
 import { closeDialog, dialog } from "./popups";
-import { saveSettings } from "./settings";
+import { saveSettings, setupSettingsTabs } from "./settings";
 import { THEME_BOARDS, applySound, applyTheme, applyUiTheme, showMenu } from "./startMenu";
 import { drawHome } from "./startScreens";
 import { orientation, currentView, demo, menuOpen, preview, set, showReply, stepper } from "./state";
@@ -39,6 +39,7 @@ import { noteLevelCheck, startLevelCheck } from "./train";
 
 export function wireButtons() {
   setupOnlineGames();
+  setupSettingsTabs();
   $("dialog-ok").addEventListener("click", (event) => {
     event.preventDefault();
     closeDialog(true);

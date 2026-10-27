@@ -8,6 +8,7 @@ import { type SavedGame, drawDataCounts, historyRow, loadHistory, saveHistory, s
 import { $, chesscomUserBox, lichessUserBox, settingsDialog } from "./dom";
 import { refresh } from "./draw";
 import { startPreparing } from "./matches";
+import { showSettingsTab } from "./settings";
 import { hideMenu, resetBoard } from "./startScreens";
 import { menuOpen, set } from "./state";
 
@@ -76,6 +77,7 @@ function addToHistory(games: OnlineGame[]): number {
 /** Settings, scrolled to the username boxes. */
 export function openAccounts() {
   drawDataCounts();
+  showSettingsTab("profile");
   settingsDialog.showModal();
   $("online-accounts").scrollIntoView({ block: "center" });
   (lichessUserBox.value ? chesscomUserBox : lichessUserBox).focus();

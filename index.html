@@ -429,9 +429,13 @@
           <h3>Settings</h3>
           <button value="close" class="round soft" aria-label="Close"><span data-ico="close"></span></button>
         </div>
-        <div class="settings-grid">
-          <label for="player-name">Your name</label>
-          <input type="text" id="player-name" maxlength="30" placeholder="You" autocomplete="nickname" />
+        <!-- Three tabs (like Training's): Appearance, Gameplay, Profile -->
+        <div class="tabs settings-tabs" role="tablist">
+          <button type="button" role="tab" data-settings-tab="appearance">Appearance</button>
+          <button type="button" role="tab" data-settings-tab="gameplay">Gameplay</button>
+          <button type="button" role="tab" data-settings-tab="profile">Profile</button>
+        </div>
+        <div class="settings-grid" data-settings-panel="appearance">
           <label for="ui-theme">Theme</label>
           <select id="ui-theme" class="dd-native" data-themed="picture" tabindex="-1" aria-hidden="true">
             <option value="stone">Warm stone</option>
@@ -453,19 +457,28 @@
           </select>
           <label for="pieces">Pieces</label>
           <select id="pieces" class="dd-native" data-themed="picture" tabindex="-1" aria-hidden="true"></select>
-          <label class="check"><input type="checkbox" id="sound-on" checked /> Sounds</label>
-          <input type="range" id="sound-volume" min="0" max="100" value="70" aria-label="Sound volume" />
-          <label for="sound-style">Sound style</label>
-          <select id="sound-style"></select>
-          <label class="check wide"><input type="checkbox" id="clock-tick" checked /> Tick in your last 10 seconds</label>
-          <label class="check wide"><input type="checkbox" id="eval-check" checked /> Eval bar (practice)</label>
-          <label class="check wide"><input type="checkbox" id="rate-moves" checked /> Rate moves (practice)</label>
-          <button type="button" id="settings-save" class="wide settings-save"><span data-ico="download" data-ico-size="18"></span> Save this game (PGN)</button>
           <label for="arrow-style">Arrow style</label>
           <select id="arrow-style">
             <option value="standard">Standard</option>
             <option value="colourblind">Colour-blind friendly</option>
           </select>
+        </div>
+        <div class="settings-grid" data-settings-panel="gameplay" hidden>
+          <h4 class="settings-group wide">While you play</h4>
+          <label class="check wide"><input type="checkbox" id="eval-check" checked /> Eval bar (practice)</label>
+          <label class="check wide"><input type="checkbox" id="rate-moves" checked /> Rate moves (practice)</label>
+          <label for="plan-mode">Playing style (for Strategy)</label>
+          <select id="plan-mode">
+            <option value="positional">Positional</option>
+            <option value="attacking">Attacking</option>
+          </select>
+          <h4 class="settings-group wide">Sound</h4>
+          <label class="check"><input type="checkbox" id="sound-on" checked /> Sounds</label>
+          <input type="range" id="sound-volume" min="0" max="100" value="70" aria-label="Sound volume" />
+          <label for="sound-style">Sound style</label>
+          <select id="sound-style"></select>
+          <label class="check wide"><input type="checkbox" id="clock-tick" checked /> Tick in your last 10 seconds</label>
+          <h4 class="settings-group wide">The coach</h4>
           <label for="coach-speed">Coach speed</label>
           <select id="coach-speed">
             <option value="50">Relaxed</option>
@@ -478,12 +491,12 @@
             <option value="quick">Quick</option>
             <option value="deep">Deep (slower)</option>
           </select>
-          <label for="plan-mode">Playing style (for Strategy)</label>
-          <select id="plan-mode">
-            <option value="positional">Positional</option>
-            <option value="attacking">Attacking</option>
-          </select>
-          <div class="your-data wide" id="online-accounts">
+        </div>
+        <div class="settings-grid" data-settings-panel="profile" hidden>
+          <h4 class="settings-group wide">You</h4>
+          <label for="player-name">Your name</label>
+          <input type="text" id="player-name" maxlength="30" placeholder="You" autocomplete="nickname" />
+          <div class="settings-section wide" id="online-accounts">
             <h4>Your online games</h4>
             <p class="setup-note">Your usernames, to bring your games into Game history. Only your public games are read; nothing is posted.</p>
             <div class="online-grid">
@@ -493,18 +506,22 @@
               <input type="text" id="chesscom-user" maxlength="30" autocomplete="off" autocapitalize="off" spellcheck="false" />
             </div>
           </div>
-          <div class="your-data wide">
+          <div class="settings-section wide">
             <h4>Your data</h4>
             <div id="data-counts" class="data-counts"></div>
             <div class="data-buttons">
               <button type="button" id="data-backup" class="accent"><span data-ico="download" data-ico-size="18"></span> Back up</button>
               <button type="button" id="data-restore"><span data-ico="upload" data-ico-size="18"></span> Restore</button>
             </div>
+            <button type="button" id="settings-save" class="settings-save data-save"><span data-ico="download" data-ico-size="18"></span> Save this game (PGN)</button>
             <p class="setup-note">Everything stays on this device. A backup is one small file you can keep in Drive, email to yourself, or move to another device.</p>
             <input type="file" id="data-file" accept=".json,application/json" hidden />
           </div>
-          <button type="button" id="check-updates" class="wide settings-save"><span data-ico="replay" data-ico-size="18"></span> <span class="cu-label">Check for updates</span></button>
-          <p class="app-version wide"><span id="app-version"></span> <button type="button" class="link-button" id="whats-new-open">What's new</button></p>
+          <div class="settings-section wide">
+            <h4>The app</h4>
+            <button type="button" id="check-updates" class="settings-save"><span data-ico="replay" data-ico-size="18"></span> <span class="cu-label">Check for updates</span></button>
+            <p class="app-version"><span id="app-version"></span> <button type="button" class="link-button" id="whats-new-open">What's new</button></p>
+          </div>
         </div>
       </form>
     </dialog>

@@ -2289,14 +2289,43 @@ body.demo-intro .move-strip {
   min-height: 0;
 }
 
-/* Settings: your data */
-.your-data {
+/* Settings: three tabs (Appearance, Gameplay, Profile), each a grid of rows
+   in groups; the controls get a fair share of the width so names aren't cut */
+.settings-tabs {
+  margin-bottom: 12px;
+}
+.settings-dialog .settings-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(7.5rem, 10.5rem);
+}
+.settings-grid[hidden] {
+  display: none;
+}
+.settings-group {
+  margin: 10px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.settings-group:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.settings-section {
   margin-top: 6px;
   padding-top: 10px;
   border-top: 1px solid var(--line);
 }
-.your-data h4 {
+.settings-section h4 {
   margin: 0 0 6px;
+}
+.settings-section .settings-save {
+  width: 100%;
+  margin-top: 8px;
 }
 .data-counts {
   font-size: 0.88rem;

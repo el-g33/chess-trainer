@@ -85,3 +85,36 @@ export function saveSettings() {
     // private browsing or storage blocked: the choices just aren't remembered
   }
 }
+
+// -- The Settings tabs: Appearance, Gameplay, Profile (it opens on the last one used)
+
+export type SettingsTab = "appearance" | "gameplay" | "profile";
+const TAB_KEY = "chess-trainer-settings-tab";
+
+export function showSettingsTab(tab: SettingsTab) {
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-settings-tab]")) {
+    const on = button.dataset.settingsTab === tab;
+    button.classList.toggle("on", on);
+    button.setAttribute("aria-selected", String(on));
+  }
+  for (const panel of document.querySelectorAll<HTMLElement>("[data-settings-panel]")) panel.hidden = panel.dataset.settingsPanel !== tab;
+  document.getElementById("settings-dialog")?.scrollTo({ top: 0 }); // each tab from its top
+  try {
+    localStorage.setItem(TAB_KEY, tab);
+  } catch {
+    // storage blocked: it just opens on Appearance next time
+  }
+}
+
+export function setupSettingsTabs() {
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-settings-tab]")) {
+    button.addEventListener("click", () => showSettingsTab(button.dataset.settingsTab as SettingsTab));
+  }
+  let last: string | null = null;
+  try {
+    last = localStorage.getItem(TAB_KEY);
+  } catch {
+    // storage blocked
+  }
+  showSettingsTab(last === "gameplay" || last === "profile" ? last : "appearance");
+}
