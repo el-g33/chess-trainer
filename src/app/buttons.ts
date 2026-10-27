@@ -13,6 +13,7 @@ import {
   backUp, checkForUpdates, closeOverlay, closeStepper, drawDataCounts, onHome, onNewGame, openMore, overlay,
   overlayOpen, restartIntoUpdate, restoreFromFile, setHistoryFromReview, stepTo, stepTyper, stripTyper,
 } from "./coach";
+import { drawLookRows } from "./lookPickers";
 import { setupOnlineGames } from "./onlineGames";
 import {
   $, arrowStyleBox, coachSpeedBox, demoPick, demoPlay, evalCheck, exitAnalysisButton, fenInput, lineBack, lineExit,
@@ -123,6 +124,7 @@ export function wireButtons() {
       save.hidden = !target;
       save.lastChild!.textContent = currentView === "history" ? " Save all your games (PGN)" : " Save this game (PGN)";
       drawDataCounts();
+      drawLookRows(); // the pieces' pictures may have loaded since
       settingsDialog.showModal();
     });
   }

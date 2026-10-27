@@ -21,7 +21,7 @@
         } catch (e) {}
         document.documentElement.dataset.ui = theme;
         document.documentElement.dataset.pieces = pieces || theme;
-        var bars = { classic: "#fafafa", ember: "#16181e", stone: "#9a908a", violet: "#33365e" };
+        var bars = { classic: "#fafafa", ember: "#16181e", stone: "#9a908a", violet: "#33365e", forest: "#1d2b24", rose: "#e8d5d2" };
         document.querySelector('meta[name="theme-color"]').setAttribute("content", bars[theme] || "#9a908a");
         // the theme's background straight away, while the page waits for its styles
         document.documentElement.style.background = bars[theme] || "#9a908a";
@@ -433,22 +433,26 @@
           <label for="player-name">Your name</label>
           <input type="text" id="player-name" maxlength="30" placeholder="You" autocomplete="nickname" />
           <label for="ui-theme">Theme</label>
-          <select id="ui-theme">
+          <select id="ui-theme" class="dd-native" data-themed="picture" tabindex="-1" aria-hidden="true">
             <option value="stone">Warm stone</option>
             <option value="classic">Classic</option>
             <option value="ember">Midnight ember</option>
             <option value="violet">Violet glass</option>
+            <option value="forest">Forest club</option>
+            <option value="rose">Rose quartz</option>
           </select>
           <label for="board-theme">Board</label>
-          <select id="board-theme">
+          <select id="board-theme" class="dd-native" data-themed="picture" tabindex="-1" aria-hidden="true">
             <option value="wood">Wood</option>
             <option value="grey">Grey &amp; white</option>
             <option value="slate">Slate</option>
             <option value="walnut">Cream &amp; walnut</option>
             <option value="lavender">Lavender</option>
+            <option value="green">Club green</option>
+            <option value="rose">Rose</option>
           </select>
           <label for="pieces">Pieces</label>
-          <select id="pieces"></select>
+          <select id="pieces" class="dd-native" data-themed="picture" tabindex="-1" aria-hidden="true"></select>
           <label class="check"><input type="checkbox" id="sound-on" checked /> Sounds</label>
           <input type="range" id="sound-volume" min="0" max="100" value="70" aria-label="Sound volume" />
           <label for="sound-style">Sound style</label>
@@ -616,6 +620,15 @@
     </dialog>
 
     <!-- Pop-up messages -->
+    <!-- Settings: Theme, Board or Pieces, chosen from pictures (lookPickers.ts) -->
+    <dialog id="look-picker" class="look-picker" aria-labelledby="lp-title">
+      <div class="lp-head">
+        <h3 id="lp-title"></h3>
+        <button type="button" id="lp-done" class="link-button">Done</button>
+      </div>
+      <div id="lp-tiles" class="lp-tiles"></div>
+    </dialog>
+
     <!-- What's new: once after an update, and from Settings -->
     <dialog id="whats-new" class="whats-new" aria-labelledby="wn-title">
       <div class="wn-head">

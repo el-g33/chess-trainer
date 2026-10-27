@@ -18,6 +18,8 @@ export const PALETTES: Record<string, Palette> = {
   ember: { label: "Steel and ember", white: ["#E6E9F0", "#AEB4C2", "#15171C"], black: ["#1A1C22", "#8C93A6", 0.5], rim: "#FF5A36" },
   stone: { label: "Ivory and espresso", white: ["#FFF8EE", "#E3D2BA", "#3A2A20"], black: ["#3A2A20", "#B08968", 0.6] },
   violet: { label: "Pearl and indigo", white: ["#FFFFFF", "#D9D6F5", "#26215C"], black: ["#26215C", "#9D97E8", 0.6], rim: "#5DE0E6" },
+  forest: { label: "Ivory and pine", white: ["#F6F1DF", "#D9CFAE", "#1D2B24"], black: ["#232A24", "#7E8F7C", 0.5] },
+  rose: { label: "Blush and plum", white: ["#FFFAF8", "#EBD3D1", "#4A2533"], black: ["#4A2533", "#C98F93", 0.6] },
 };
 
 /** Other piece sets, drawn by their authors (folder in public/pieces). */
@@ -118,6 +120,12 @@ export async function loadPieces(): Promise<void> {
   style.textContent = rules.join("\n");
   document.head.append(style);
   document.documentElement.dataset.pieces ??= current;
+}
+
+/** A set's king, as a picture (for the Pieces picker); undefined until loaded. */
+export function pieceSample(choice: string, colour: Color): string | undefined {
+  const svg = kings[choice]?.[colour];
+  return svg ? dataUrl(svg) : undefined;
 }
 
 /** The king of `colour` tipped over by `angle` degrees: it turns round its

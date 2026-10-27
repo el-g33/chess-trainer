@@ -17,6 +17,7 @@ import {
   sfOpeningBox, soundOn,
   soundStyleBox, soundVolume, tcIncrement, tcMinutes, themeBox, timeControlBox, uiThemeBox,
 } from "./dom";
+import { setupLookPickers } from "./lookPickers";
 import { loadSettings } from "./settings";
 import { drawHome, pickGreeting, setupHome, showScreen } from "./startScreens";
 import { orientation, set } from "./state";
@@ -102,6 +103,7 @@ export function buildMenu() {
   setupHome();
   updateMenu();
   enhanceSelects();
+  setupLookPickers();
 }
 
 /** Sound effects on or off, how loud, and in which style. */
@@ -119,8 +121,12 @@ export function moveSound(san: string, mover: Color) {
 /** The board theme: "wood" or "grey" (a class on the board). */
 // Each look comes with a board that suits it (the Board box can still change it)
 export const DEFAULT_THEME = "stone";
-export const THEME_BOARDS: Record<string, string> = { classic: "wood", ember: "slate", stone: "walnut", violet: "lavender" };
-export const THEME_BARS: Record<string, string> = { classic: "#fafafa", ember: "#16181e", stone: "#9a908a", violet: "#33365e" };
+export const THEME_BOARDS: Record<string, string> = {
+  classic: "wood", ember: "slate", stone: "walnut", violet: "lavender", forest: "green", rose: "rose",
+};
+export const THEME_BARS: Record<string, string> = {
+  classic: "#fafafa", ember: "#16181e", stone: "#9a908a", violet: "#33365e", forest: "#1d2b24", rose: "#e8d5d2",
+};
 
 /** The colours of the whole page: Classic, Midnight ember, Warm stone or Violet glass. */
 export function applyUiTheme() {

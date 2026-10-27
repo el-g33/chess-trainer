@@ -72,6 +72,76 @@
   --card-radius: 24px;
 }
 
+/* -- Forest club: deep club-room green, brass accents --------------------- */
+
+:root[data-ui="forest"] {
+  --r-brilliant: #3fe0c5;
+  --r-great: #8dbcf0;
+  --r-best: #7fd6a0;
+  --r-inaccuracy: #f2cf4a;
+  --r-mistake: #ffa04d;
+  --r-miss: #ff86cf;
+  --r-blunder: #ff6b5e;
+  color-scheme: dark;
+  --bg: #1d2b24;
+  --card: #26372e;
+  --text: #eef0e6;
+  --muted: #a9b8a8;
+  --line: #36493e;
+  --line-strong: #415649;
+  --button: #2d4036;
+  --button-hover: #36493e;
+  --accent: #d4a83a;
+  --accent-hover: #e0b852;
+  --on-accent: #1d2b24;
+  --current-move: rgba(212, 168, 58, 0.26);
+  --disabled: #6b7d70;
+  --input: #2d4036;
+  --soft: #2a3b31;
+  --danger: #ff7b6b;
+  --danger-soft: #3d2420;
+  --good: #7fd69a;
+  --note: #b9c6b6;
+  --book: #e0b46a;
+  --special: #c9a2ff;
+  --clock: #2d4036;
+  --clock-text: #a9b8a8;
+  --clock-run: #d4a83a;
+  --card-radius: 14px;
+}
+
+/* -- Rose quartz: soft blush, berry accent --------------------------------- */
+
+:root[data-ui="rose"] {
+  --r-brilliant: #096d60;
+  --r-great: #2559a8;
+  --r-best: #276b2b;
+  --r-inaccuracy: #806000;
+  --r-mistake: #a54b08;
+  --r-miss: #8a2c7e;
+  --r-blunder: #c0231b;
+  --bg: #e8d5d2;
+  --card: #fff8f6;
+  --text: #3a2a2e;
+  --muted: #8a6f74;
+  --line: #efdcd8;
+  --line-strong: #e3cbc6;
+  --button: #fffaf9;
+  --button-hover: #f6e7e4;
+  --accent: #b0285f;
+  --accent-hover: #c23a70;
+  --on-accent: #ffffff;
+  --current-move: #f7d6e1;
+  --input: #ffffff;
+  --soft: #f6e7e4;
+  --book: #9a5b2c;
+  --clock: #f3e3e0;
+  --clock-text: #8a6f74;
+  --clock-run: #3a2a2e;
+  --radius: 14px;
+  --card-radius: 22px;
+}
+
 /* -- Violet glass: dusky indigo, translucent cards, cyan highlights --------- */
 
 :root[data-ui="violet"] {
@@ -119,6 +189,8 @@
 /* Cards: in Warm stone and Violet glass the page sits on cards */
 :root[data-ui="stone"] .moves-area,
 :root[data-ui="stone"] .panel,
+:root[data-ui="rose"] .moves-area,
+:root[data-ui="rose"] .panel,
 :root[data-ui="violet"] .moves-area,
 :root[data-ui="violet"] .panel {
   background: var(--card);
@@ -140,17 +212,20 @@
 
 /* The running clock in a solid accent colour */
 :root[data-ui="ember"] .pb-clock.running,
+:root[data-ui="forest"] .pb-clock.running,
 :root[data-ui="violet"] .pb-clock.running {
   color: var(--on-accent);
   box-shadow: none;
 }
 
-:root[data-ui="stone"] .pb-clock.running {
+:root[data-ui="stone"] .pb-clock.running,
+:root[data-ui="rose"] .pb-clock.running {
   color: var(--card);
   box-shadow: none;
 }
 
 :root[data-ui="stone"] .pb-clock,
+:root[data-ui="rose"] .pb-clock,
 :root[data-ui="violet"] .pb-clock {
   border-radius: 999px;
 }
@@ -177,10 +252,10 @@
 }
 
 /* Move ratings, brighter so they read on the dark themes */
-:root[data-ui="ember"] .r-excellent, :root[data-ui="violet"] .r-excellent { color: #8fd05a; }
-:root[data-ui="ember"] .r-good, :root[data-ui="violet"] .r-good { color: #a8c48c; }
-:root[data-ui="ember"] .r-book, :root[data-ui="violet"] .r-book { color: #e0a46a; }
-:root[data-ui="ember"] .r-forced, :root[data-ui="violet"] .r-forced { color: #a5c79a; }
+:root[data-ui="ember"] .r-excellent, :root[data-ui="violet"] .r-excellent, :root[data-ui="forest"] .r-excellent { color: #8fd05a; }
+:root[data-ui="ember"] .r-good, :root[data-ui="violet"] .r-good, :root[data-ui="forest"] .r-good { color: #a8c48c; }
+:root[data-ui="ember"] .r-book, :root[data-ui="violet"] .r-book, :root[data-ui="forest"] .r-book { color: #e0a46a; }
+:root[data-ui="ember"] .r-forced, :root[data-ui="violet"] .r-forced, :root[data-ui="forest"] .r-forced { color: #a5c79a; }
 
 /* -- The matching boards (flat squares, light a8 at the top-left) ----------- */
 
@@ -217,7 +292,30 @@
   background: repeating-conic-gradient(#8f89cf 0 25%, #cfcbf0 0 50%) 0 0 / 25% 25%;
 }
 
+#board.green {
+  --last-move: rgba(212, 168, 58, 0.5);
+  --selected: rgba(212, 168, 58, 0.65);
+  --coord-on-light: #6f8f55;
+  --coord-on-dark: #e9e4c8;
+}
+
+.green cg-board {
+  background: repeating-conic-gradient(#6f8f55 0 25%, #e9e4c8 0 50%) 0 0 / 25% 25%;
+}
+
+#board.rose {
+  --last-move: rgba(176, 40, 95, 0.3);
+  --selected: rgba(176, 40, 95, 0.45);
+  --coord-on-light: #b07a7e;
+  --coord-on-dark: #fbefec;
+}
+
+.rose cg-board {
+  background: repeating-conic-gradient(#c98f93 0 25%, #f7e6e2 0 50%) 0 0 / 25% 25%;
+}
+
 /* Rounder boards for the softer themes */
+:root[data-ui="rose"] cg-board,
 :root[data-ui="stone"] cg-board,
 :root[data-ui="violet"] cg-board {
   border-radius: 10px;
