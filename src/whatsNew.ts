@@ -11,6 +11,12 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.4",
+    items: [
+      { icon: "user", title: "A streamlined look", text: "Your profile has its own button, and Settings keeps one size, for a better experience." },
+    ],
+  },
+  {
     version: "3.3",
     items: [
       { icon: "puzzle", title: "Your slips, as you go", text: "I tell you once when slips are saved, point each one out in the review, and offer them as puzzles at the end." },
