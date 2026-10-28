@@ -11,6 +11,13 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.5",
+    items: [
+      { icon: "chart", title: "Move ratings, renamed", text: "Masterstroke, Key move, Top move, Strong, Solid, Theory, Imprecise and Missed chance, with new badges. The ratings themselves are the same." },
+      { icon: "download", title: "Games from chess.com", text: "Copy or download a game's PGN on chess.com and paste it into Game review. Lichess games still come in with Get my games." },
+    ],
+  },
+  {
     version: "3.4",
     items: [
       { icon: "user", title: "A streamlined look", text: "Your profile has its own button, and Settings keeps one size, for a better experience." },
