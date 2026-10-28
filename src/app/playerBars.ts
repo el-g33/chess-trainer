@@ -194,7 +194,7 @@ export function drawMoveList(reviews: (Review | undefined)[], info: OpeningInfo[
   const lines: string[] = [];
   if (match && mode === "practice") {
     if (match.sfOpening) {
-      lines.push(`Stockfish is playing: ${match.sfOpening.name}${match.sfActive ? "" : " (opening phase over)"}`);
+      lines.push(`The coach is playing: ${match.sfOpening.name}${match.sfActive ? "" : " (opening phase over)"}`);
     }
     if (match.myOpening) {
       const first = firstMoveOf(game.positionAt(0), gameMoves());

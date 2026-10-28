@@ -151,7 +151,7 @@ export function coachSays(reviews: (Review | undefined)[]): CoachSay {
     if (match) {
       const yours = game.position.turn === match.user;
       return thinking || !yours
-        ? { mood: "think", text: "Stockfish is thinking...", buttons: [] }
+        ? { mood: "think", text: "Let me think...", buttons: [] }
         : { mood: "talk", text: game.length ? "Your move." : "Your move. Good luck!", buttons: [] };
     }
     if (canReview) return { mood: "happy", text: "Good game! Shall we go through it together?", buttons: [{ ico: "search", label: "Review the game", run: onReviewGame, kind: "accent" }] };
@@ -1299,7 +1299,7 @@ export function drawHistory() {
   box.append(top);
   if (importNote) box.append(element("p", "stats-note history-import-note", importNote));
   if (!games.length) {
-    tabMessage(box, "No games yet. Play against Stockfish, or get your games from Lichess, and your record builds up here.");
+    tabMessage(box, "No games yet. Play against me, or get your games from Lichess, and your record builds up here.");
     return;
   }
   // Where from: all, this app, Lichess, chess.com (when there are games from more than one place)
@@ -1368,7 +1368,7 @@ export function historyRow(saved: SavedGame): HTMLButtonElement {
   const text = element("span", "history-text");
   const title = element("span", "history-title", saved.source
     ? `${saved.opponent ?? "?"}${saved.opponentRating ? ` (${saved.opponentRating})` : ""}`
-    : `vs Stockfish · ${shortName(LEVELS[saved.level] ?? LEVELS[0])}`);
+    : `vs the coach · ${shortName(LEVELS[saved.level] ?? LEVELS[0])}`);
   if (saved.source) title.append(element("span", `history-tag ${saved.source}`, SOURCE_NAMES[saved.source]));
   text.append(title, element("span", "history-meta", [saved.speed ?? "", saved.opening || "Game", saved.user === "white" ? "White" : "Black",
     saved.source ? "" : timeControlLabel(saved.timeControl), saved.accuracy !== undefined ? `${saved.accuracy}%` : ""].filter(Boolean).join(" · ")));
@@ -1616,9 +1616,9 @@ export function drawTurn() {
   if (analysis) gameInfo.textContent = "Exploring a different move";
   else if (match) {
     const colour = match.user === "white" ? "White" : "Black";
-    gameInfo.textContent = `vs Stockfish (${shortName(LEVELS[match.level])}), you play ${colour}`;
+    gameInfo.textContent = `vs the coach (${shortName(LEVELS[match.level])}), you play ${colour}`;
   } else if (canReview && mode === "play") gameInfo.textContent = "Game over. See how every move rated:";
-  else if (mode === "practice" && reviewing) gameInfo.textContent = reviewTitle || "Reviewing your game against Stockfish";
+  else if (mode === "practice" && reviewing) gameInfo.textContent = reviewTitle || "Reviewing your game against the coach";
   else if (mode === "practice") gameInfo.textContent = "Free board: you move both sides";
   else gameInfo.textContent = game.length ? "Match over" : "";
 }
@@ -1653,7 +1653,7 @@ export function turnText(): string {
   if (outcome) return "Game over - draw";
   if (match) {
     if (position.turn === match.user) return `Your move (${side})${position.isCheck() ? " - you're in check!" : ""}`;
-    return "Stockfish is thinking...";
+    return "The coach is thinking...";
   }
   return position.isCheck() ? `${side} to move - in check!` : `${side} to move`;
 }
@@ -1806,7 +1806,7 @@ export function drawCoach() {
   if (!coachText.childElementCount && match && (match.sfOpening || match.myOpening)) {
     // Start of a match: the plans of the openings being played
     const first = firstMoveOf(game.positionAt(0), gameMoves());
-    for (const [who, opening] of [["Your opening", match.myOpening], ["Stockfish's opening", match.sfOpening]] as const) {
+    for (const [who, opening] of [["Your opening", match.myOpening], ["The coach's opening", match.sfOpening]] as const) {
       if (!opening) continue;
       const system = systemFor(opening, first);
       section(`${who}: ${opening.name}`, `${opening.plan}\nSetup: ${system.setup.map(goalWords).join(", ")}.`);

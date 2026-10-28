@@ -8,7 +8,7 @@ import { opposite, parseSquare } from "chessops/util";
 
 import { colourName, variationSan } from "../coach";
 import { Game } from "../game";
-import { analysing, base, currentPly, freeBoard, quizWaiting } from "../main";
+import { analysing, base, currentPly, freeBoard, ground, quizWaiting } from "../main";
 import { fenOf } from "../review";
 
 import { overlayOpen } from "./coach";
@@ -21,7 +21,7 @@ import { moveSound } from "./startMenu";
 import { hideMenu, resetBoard } from "./startScreens";
 import {
   analysis, busy, clock, clockHistory, clockTimes, demo, demoStepping, drill, editor, explore, fenPosition, game,
-  match, menuOpen, orientation, pgnGames, plyNotes, practice, preview, puzzle, quiz, replayStepping, replaying, set,
+  match, menuOpen, mode, orientation, pgnGames, plyNotes, practice, preview, puzzle, quiz, replayStepping, replaying, set,
   stepper, thinking, viewPly,
 } from "./state";
 import { answerQuiz } from "./strategyCoach";
@@ -51,12 +51,33 @@ export function movableColour(): Color | undefined {
   return game.outcome() ? undefined : game.position.turn; // a free board
 }
 
+/** In a timed game against the coach: while it thinks, you can set up your
+ *  next move (a premove), played the moment it has moved. */
+export function premoveColour(): Color | undefined {
+  if (!match || !clock || mode !== "play" || viewPly !== null || menuOpen || overlayOpen() || game.outcome()) return undefined;
+  return game.position.turn !== match.user ? match.user : undefined;
+}
+
+let playingPremove = false;
+
+/** Play the move set up while the coach was thinking, if it's still legal. */
+export function playPremove() {
+  playingPremove = true;
+  try {
+    ground.playPremove();
+  } finally {
+    playingPremove = false;
+  }
+}
+
 export function onBoardMove(from: Key, to: Key) {
   if (editor) return; // setting up a position: editorSync keeps track
   const position = clickPosition();
   const given: NormalMove = { from: parseSquare(from)!, to: parseSquare(to)! };
   // A pawn reaching the last rank: you choose what it becomes (nothing chosen: the move is taken back)
   if (position.board.get(given.from)?.role === "pawn" && (to[1] === "8" || to[1] === "1")) {
+    // a premove becomes a queen (no time to ask while the clock runs)
+    if (playingPremove) return playBoardMove(position, { ...given, promotion: "queen" });
     void choosePromotion(to, position.turn).then((role) => {
       if (!role) return refresh();
       playBoardMove(position, { ...given, promotion: role });

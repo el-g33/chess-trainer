@@ -72,8 +72,8 @@ export function pickGreeting(): string {
 }
 
 export const MODE_LINES: Record<HomeChoice, string> = {
-  play: "A real game against Stockfish. No hints until it's over, then I'll go through it with you.",
-  practice: "A game against Stockfish with me helping along the way: ratings, hints and plans.",
+  play: "A real game against me. No hints until it's over, then we'll go through it together.",
+  practice: "A game against me, with help along the way: ratings, hints and plans.",
   analysis: "Got a game from lichess or chess.com? Let's look at it together.",
   train: "Openings, middlegame and endgame: short lessons, puzzles for every level, and your own positions to play out with me.",
 };
@@ -307,6 +307,7 @@ export function onStartGame() {
 
 /** A fresh game from a position, with nothing else going on. */
 export function resetBoard(newGame: Game, headers: Headers = { White: "?", Black: "?", Date: today() }) {
+  ground.cancelPremove();
   set.gameHeaders({ ...headers });
   set.currentGameId(null);
   set.puzzle(null);

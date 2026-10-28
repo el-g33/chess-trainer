@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#9a908a" />
-    <meta name="description" content="Play and practise chess against Stockfish." />
+    <meta name="description" content="Play and practise chess against the coach." />
     <!-- Unlisted: search engines are asked not to list the site. Remove this
          line (and register the site with Google Search Console) to make it findable. -->
     <meta name="robots" content="noindex, nofollow" />
@@ -53,7 +53,7 @@
         <div hidden>
           <input type="radio" name="mode" value="play" checked />
           <input type="radio" name="mode" value="practice" />
-          <select id="opponent"><option>Stockfish</option><option>Nobody - I move both sides</option></select>
+          <select id="opponent"><option>The coach</option><option>Nobody - I move both sides</option></select>
           <select id="colour"><option>White</option><option>Black</option><option>Random</option></select>
           <select id="time-control"></select>
         </div>
@@ -69,14 +69,14 @@
           <div id="home-face" class="home-face" aria-hidden="true"></div>
           <p id="home-bubble" class="home-bubble" aria-live="polite"></p>
           <div class="mode-choices" role="radiogroup" aria-label="What would you like to do?">
-            <button type="button" class="mode-choice" data-choice="play" role="radio" aria-checked="false"><span class="mc-icon" data-ico="knight" data-ico-size="22"></span>Play against the computer</button>
+            <button type="button" class="mode-choice" data-choice="play" role="radio" aria-checked="false"><span class="mc-icon" data-ico="knight" data-ico-size="22"></span>Play against the coach</button>
             <button type="button" class="mode-choice" data-choice="practice" role="radio" aria-checked="false"><span class="mc-icon" data-ico="school" data-ico-size="22"></span>Practice match</button>
             <button type="button" class="mode-choice" data-choice="analysis" role="radio" aria-checked="false"><span class="mc-icon" data-ico="search" data-ico-size="22"></span>Game review</button>
             <button type="button" class="mode-choice" data-choice="train" role="radio" aria-checked="false"><span class="mc-icon" data-ico="puzzle" data-ico-size="22"></span>Training</button>
           </div>
           <button type="button" id="home-next" class="home-next accent" disabled>Next</button>
           <div id="level-check" class="level-check" hidden>
-            <b>First time here?</b> Find your level: five quick positions, from easy to hard. I'll set your puzzle level and Stockfish's strength to match.
+            <b>First time here?</b> Find your level: five quick positions, from easy to hard. I'll set your puzzle level and my playing strength to match.
             <div class="level-check-buttons">
               <button type="button" id="level-check-start" class="accent">Find my level</button>
               <button type="button" id="level-check-skip">Skip</button>
@@ -86,15 +86,15 @@
           <p id="engine-status" class="engine-status">Loading Stockfish...</p>
         </section>
 
-        <!-- 2a. Play against the computer -->
+        <!-- 2a. Play against the coach -->
         <section class="screen" data-screen="play" hidden>
           <div class="setup-head">
             <button type="button" class="home-link setup-back"><span data-ico="home" data-ico-size="18"></span> Home</button>
             <h2>Play</h2>
             <button type="button" class="setup-start accent" data-start="play">Start</button>
           </div>
-          <label class="setup-label">Stockfish's level</label>
-          <div class="slot-level"><select id="level" aria-label="Stockfish's level"></select></div>
+          <label class="setup-label">The coach's level</label>
+          <div class="slot-level"><select id="level" aria-label="The coach's level"></select></div>
           <label class="setup-label">Your colour</label>
           <div class="seg" id="colour-seg">
             <button type="button" data-colour="White"><span class="seg-icon">♔</span>White</button>
@@ -127,11 +127,11 @@
               <button type="button" data-colour="white"><span class="seg-icon">♔</span>White</button>
               <button type="button" data-colour="black"><span class="seg-icon">♚</span>Black</button>
             </div>
-            <label class="setup-label">Stockfish's level</label>
+            <label class="setup-label">The coach's level</label>
             <div class="slot-level"></div>
             <label class="setup-label" for="my-opening">Your opening</label>
             <select id="my-opening"></select>
-            <label class="setup-label" for="sf-opening">Stockfish's opening</label>
+            <label class="setup-label" for="sf-opening">The coach's opening</label>
             <select id="sf-opening"></select>
             <p id="practice-note" class="setup-note"></p>
           </div>

@@ -10,7 +10,7 @@ import { Game, type Outcome } from "../game";
 import { LEVELS, OPPONENT_MIN_DELAY, shortName } from "../levels";
 import { startLoadAnimation } from "../loading";
 import {
-  NO_OPENING, STOCKFISH_DECIDES, analyser, bookReady, currentPly, engine, gameMoves, openingEngine, reviewCache,
+  NO_OPENING, STOCKFISH_DECIDES, analyser, bookReady, currentPly, engine, gameMoves, ground, openingEngine, reviewCache,
 } from "../main";
 import {
   type Opening, REPERTOIRE, chooseOpeningMove, coachOpeningMove, firstMoveOf, menuName, suggestedFor,
@@ -25,7 +25,7 @@ import {
   timeControlBox,
 } from "./dom";
 import { refresh } from "./draw";
-import { goTo } from "./moves";
+import { goTo, playPremove } from "./moves";
 import { saveGameMistakes, saveGameSummary } from "./openingDemos";
 import { legalMoveCount, playerName } from "./playerBars";
 import { message } from "./popups";
@@ -54,7 +54,7 @@ export function startMatch() {
     myOpening: mode === "practice" ? myOpening : null,
     myActive: mode === "practice" && myOpening !== null,
   });
-  const stockfish = `Stockfish (${shortName(LEVELS[level])})`;
+  const stockfish = `Coach (${shortName(LEVELS[level])})`; // its name in the game's details
   const you = playerName();
   set.gameHeaders({ White: user === "white" ? you : stockfish, Black: user === "white" ? stockfish : you, Date: today() });
   set.orientation(user); // your pieces at the bottom
@@ -199,25 +199,28 @@ export async function maybeOpponentMove() {
     set.thinking(false);
     match.sfMisses = misses;
     if (openingOver) match.sfActive = false;
-    if (note) plyNotes.set(game.length + 1, [`Stockfish's opening: ${note}`]);
+    if (note) plyNotes.set(game.length + 1, [`The coach's opening: ${note}`]);
     game.play(move);
     afterMove();
+    // A move you set up while it was thinking: played at once (if still legal)
+    if (gameClock && match?.id === id && !game.outcome()) playPremove();
   } catch (error) {
     if (match?.id !== id) return;
     set.thinking(false);
     set.match(null);
-    set.errorText(`Stockfish couldn't make its move: ${error}`);
+    set.errorText(`I couldn't make my move: ${error}`);
     refresh();
   }
 }
 
 export function finishMatch() {
+  ground.cancelPremove(); // a move set up for a game that has ended
   const outcome = game.outcome() as Outcome;
   let text: string;
   gameHeaders.Result = !outcome.winner ? "1/2-1/2" : outcome.winner === "white" ? "1-0" : "0-1";
   if (!outcome.winner) text = `It's a draw (${outcome.reason}).`;
   else if (outcome.winner === match!.user) text = "You won! Well played.";
-  else text = "Stockfish won this time.";
+  else text = "I won this time.";
   endMatch(text);
 }
 
@@ -225,15 +228,16 @@ export function finishMatch() {
 export function onFlag(colour: Color) {
   if (!match || !clock) return;
   clock.stop();
+  ground.cancelPremove();
   const other = opposite(colour);
   const draw = game.position.hasInsufficientMaterial(other);
   const you = colour === match.user;
   gameHeaders.Result = draw ? "1/2-1/2" : other === "white" ? "1-0" : "0-1";
   gameHeaders.Termination = "Time forfeit";
-  set.result(draw ? "Out of time - a draw" : you ? "You ran out of time - Stockfish wins" : "Stockfish ran out of time - you win");
+  set.result(draw ? "Out of time - a draw" : you ? "You ran out of time - the coach wins" : "The coach ran out of time - you win");
   const text = draw
-    ? `${you ? "You" : "Stockfish"} ran out of time, but ${you ? "Stockfish" : "you"} can't checkmate with the pieces left, so it's a draw.`
-    : you ? "You ran out of time - Stockfish wins." : "Stockfish ran out of time - you win!";
+    ? `${you ? "You" : "I"} ran out of time, but ${you ? "I" : "you"} can't checkmate with the pieces left, so it's a draw.`
+    : you ? "You ran out of time, so I win this one." : "I ran out of time - you win!";
   endMatch(text);
 }
 
@@ -457,7 +461,7 @@ export function startReview() {
 export async function onResign() {
   if (!match) return;
   if (!(await message("Resign?", "Are you sure you want to resign this game?", true))) return;
-  set.result("You resigned - Stockfish wins");
+  set.result("You resigned - the coach wins");
   gameHeaders.Result = match.user === "white" ? "0-1" : "1-0";
   gameHeaders.Termination = `${match.user === "white" ? "White" : "Black"} resigns`;
   endMatch("You resigned.");

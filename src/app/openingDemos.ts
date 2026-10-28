@@ -805,7 +805,8 @@ export function saveGameMistakes(list: (Review | undefined)[]) {
     division.middle === undefined || ply < division.middle ? "opening"
       : division.end !== undefined && division.end <= ply ? "endgame" : "middlegame";
   const opponent = gameHeaders[you === "white" ? "Black" : "White"];
-  const source = opponent && opponent !== "?" && opponent !== "Stockfish" ? `your game against ${opponent}` : "one of your games";
+  const source = /^(Stockfish|Coach)\b/.test(opponent ?? "") ? "your game against the coach"
+    : opponent && opponent !== "?" ? `your game against ${opponent}` : "one of your games";
   const plies: number[] = [];
   const found = list.flatMap((review, i) => {
     if (!review || !SAVED_RATINGS.has(review.rating) || !review.bestSan || game.moverOf(i + 1) !== you) return [];

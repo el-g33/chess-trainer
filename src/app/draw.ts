@@ -28,7 +28,7 @@ import {
   $, coachPanel, demoPanel, evalBar, modeTitle, planModeRow, reviewArea, showDemoButton, undoButton,
 } from "./dom";
 import { drawPrep, drawStatsBack } from "./matches";
-import { drawWhatIf, movableColour } from "./moves";
+import { drawWhatIf, movableColour, premoveColour } from "./moves";
 import { checkDeeper, demoShapes, drawDemo, drawDrillSetup, drillShapes, practiceShapes } from "./openingDemos";
 import { clockShouldPause, drawClocks, drawMoveList, drawPlayerBars, drawReview } from "./playerBars";
 import { analysisReview, moveReviews, openingInfo, requestEval, reviewPly } from "./ratings";
@@ -208,6 +208,7 @@ export function drawBoard(reviews: (Review | undefined)[], info: OpeningInfo[]) 
     last = [played.from as Key, played.to as Key];
   }
   const colour = movableColour();
+  const premoving = colour ? undefined : premoveColour(); // your move set up while the coach thinks
   const movesFrom = quizWaiting() ? quiz!.threat!.passed! : position;
   ground.setAutoShapes(bendKnightArrows(markThreats(stepper ? stepperShapes() : drill ? drillShapes() : practice ? practiceShapes() : puzzle ? puzzleShapes() : editor ? [] : demo ? demoShapes() : [...badgeShapes(reviews, info), ...arrowShapes(), ...replayShapes()])));
   if (editor || demo?.intro) last = undefined;
@@ -219,7 +220,8 @@ export function drawBoard(reviews: (Review | undefined)[], info: OpeningInfo[]) 
     check: quizWaiting() ? false : position.isCheck(),
     movable: editor && !editor.pick
       ? { color: "both", free: true, showDests: false }
-      : { color: colour, free: false, showDests: true, dests: colour ? chessgroundDests(movesFrom) : new Map() },
+      : { color: colour ?? premoving, free: false, showDests: true, dests: colour ? chessgroundDests(movesFrom) : new Map() },
+    premovable: { enabled: !!premoving || (!!colour && !!clock && mode === "play" && !!match) },
     draggable: { deleteOnDropOff: !!editor && !editor.pick },
   });
   // In analysis the board gets a blue frame, so it's clear the moves aren't the game
