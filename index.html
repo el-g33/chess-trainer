@@ -151,7 +151,7 @@
               <button type="button" id="your-games-get" class="history-get"><span data-ico="download" data-ico-size="16"></span> Get my games</button>
             </div>
             <p id="your-games-note" class="stats-note"></p>
-            <p id="your-games-empty" class="setup-note">Play a game here, or get yours from Lichess or chess.com.</p>
+            <p id="your-games-empty" class="setup-note">Play a game here, or get yours from Lichess.</p>
             <div class="your-games-list history-list"></div>
             <button type="button" class="link-button your-games-all" id="your-games-all">See all games ›</button>
           </div>
@@ -515,7 +515,7 @@
           <input type="text" id="player-name" maxlength="30" placeholder="You" autocomplete="nickname" />
           <div class="settings-section wide" id="online-accounts">
             <h4>Your online games</h4>
-            <p class="setup-note">Your usernames, to bring your games into Game history. Only your public games are read; nothing is posted.</p>
+            <p class="setup-note" id="online-note"></p>
             <div class="online-grid">
               <label for="lichess-user">Lichess username</label>
               <input type="text" id="lichess-user" maxlength="30" autocomplete="off" autocapitalize="off" spellcheck="false" />

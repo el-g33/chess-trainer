@@ -26,7 +26,7 @@ export const RELEASES: Release[] = [
   {
     version: "3.2",
     items: [
-      { icon: "download", title: "Your Lichess and chess.com games", text: "Add your usernames in Settings, then Get my games. Tap any game to review it." },
+      { icon: "download", title: "Your Lichess games", text: "Add your Lichess username in Your profile, then Get my games. Tap any game to review it." },
       { icon: "knight", title: "Choose your promotion", text: "A pawn on the last rank can become a queen, knight, rook or bishop." },
       { icon: "eye", title: "New themes and a streamlined look", text: "Two new themes, and a fresher look for a better experience." },
     ],

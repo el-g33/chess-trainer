@@ -11,6 +11,12 @@ import { startPreparing } from "./matches";
 import { hideMenu, resetBoard } from "./startScreens";
 import { menuOpen, set } from "./state";
 
+// chess.com's import is switched off until chess.com gives its written OK: its
+// data API invites it, but its User Agreement (section 4D) asks for written
+// permission for tools built on its content. Games from chess.com can still be
+// pasted in (a PGN copied or downloaded there). Lichess's terms allow it.
+export const CHESSCOM_IMPORT = false;
+
 const FIRST_IMPORT = 50; // games per site the first time (and per "Get older games")
 const NEWER_MAX = 200; // the most new games per site in one go
 
@@ -19,7 +25,7 @@ export let importNote = ""; // what the last import found (or what went wrong)
 
 const usernames = (): Partial<Record<Source, string>> => ({
   ...(lichessUserBox.value.trim() ? { lichess: lichessUserBox.value.trim() } : {}),
-  ...(chesscomUserBox.value.trim() ? { chesscom: chesscomUserBox.value.trim() } : {}),
+  ...(CHESSCOM_IMPORT && chesscomUserBox.value.trim() ? { chesscom: chesscomUserBox.value.trim() } : {}),
 });
 
 /** Get my games: what's new since the last import (or, with `older`, the 50
@@ -83,7 +89,7 @@ export function openProfile() {
 export function openAccounts() {
   openProfile();
   $("online-accounts").scrollIntoView({ block: "center" });
-  (lichessUserBox.value ? chesscomUserBox : lichessUserBox).focus();
+  (CHESSCOM_IMPORT && lichessUserBox.value ? chesscomUserBox : lichessUserBox).focus();
 }
 
 /** Review a game from Lichess or chess.com: your side is known, so straight in. */
@@ -118,6 +124,14 @@ export function showAllGames() {
 export function setupOnlineGames() {
   $("your-games-get").addEventListener("click", () => void importGames());
   $("your-games-all").addEventListener("click", showAllGames);
+  // Your profile: the chess.com box only while its import is on
+  for (const element of [chesscomUserBox, document.querySelector<HTMLElement>('label[for="chesscom-user"]')]) {
+    if (element) element.hidden = !CHESSCOM_IMPORT;
+  }
+  $("online-note").textContent = CHESSCOM_IMPORT
+    ? "Your usernames, to bring your games into Game history. Only your public games are read; nothing is posted."
+    : "Your Lichess username, to bring your games into Game history. Only your public games are read; nothing is posted. " +
+      "Games from chess.com: copy or download the PGN there, and paste it into Game review.";
 }
 
 /** The Game review screen: your three latest games, to review with a tap. */

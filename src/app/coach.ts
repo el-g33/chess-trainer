@@ -1299,7 +1299,7 @@ export function drawHistory() {
   box.append(top);
   if (importNote) box.append(element("p", "stats-note history-import-note", importNote));
   if (!games.length) {
-    tabMessage(box, "No games yet. Play against Stockfish, or get your games from Lichess or chess.com, and your record builds up here.");
+    tabMessage(box, "No games yet. Play against Stockfish, or get your games from Lichess, and your record builds up here.");
     return;
   }
   // Where from: all, this app, Lichess, chess.com (when there are games from more than one place)
