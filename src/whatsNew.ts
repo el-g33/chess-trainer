@@ -11,6 +11,13 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.6",
+    items: [
+      { icon: "rapid", title: "Pre-moves", text: "In a timed game, set up your next move while the coach is thinking: it plays the moment the coach has moved." },
+      { icon: "user", title: "Play against the coach", text: "Your opponent is now the coach, at the level you choose." },
+    ],
+  },
+  {
     version: "3.5",
     items: [
       { icon: "chart", title: "Move ratings, renamed", text: "Masterstroke, Key move, Top move, Strong, Solid, Theory, Imprecise and Missed chance, with new badges. The ratings themselves are the same." },
