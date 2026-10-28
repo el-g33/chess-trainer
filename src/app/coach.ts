@@ -31,6 +31,7 @@ import {
 } from "../openings";
 import { SOURCE_NAMES, type Source } from "../online";
 import { readPgn, writePgn } from "../pgn";
+import { ratingName } from "../ratingNames";
 import { type Review, fenOf, isDrawnPosition, isSacrifice, verdictWords, winningChance } from "../review";
 import { planAhead } from "../strategy";
 import { type Style, styleAlternative } from "../style";
@@ -618,7 +619,7 @@ export async function explainBrilliant(ply: number) {
     for (const [from, dests] of after.allDests()) if (dests.has(offered)) takes.push({ from, to: offered });
   }
   const whose = whoseOf(mover, viewer);
-  const intro = `Brilliant! ${narrateMove(before, played, viewer)}`;
+  const intro = `A masterstroke! ${narrateMove(before, played, viewer)}`;
   const trapped = piece !== undefined && takes.length > 0;
   let first = `${intro} A bold move that Stockfish confirms.`;
   if (trapped) {
@@ -626,7 +627,7 @@ export async function explainBrilliant(ply: number) {
     const taker = takes.map((m) => after.board.get(m.from)!.role).sort((a, b) => MATERIAL[a] - MATERIAL[b])[0];
     const theirs = whoseOf(opposite(mover), viewer);
     first = offered === played.to
-      ? `Brilliant! ${cap(whose)} ${NAME[piece!.role]} goes where ${theirs} ${NAME[taker]} can take it, but taking it is a trap.`
+      ? `A masterstroke! ${cap(whose)} ${NAME[piece!.role]} goes where ${theirs} ${NAME[taker]} can take it, but taking it is a trap.`
       : `${intro} It leaves ${whose} ${NAME[piece!.role]} to be taken, but taking it is a trap.`;
   }
   startStepper([before, after], [played], [first], "happy");
@@ -671,7 +672,7 @@ export async function explainGreat(ply: number) {
   const piece = before.board.get(played.from)!;
   const attacked = before.kingAttackers(played.from, opposite(mover), before.board.occupied).nonEmpty();
   const reason = attacked && piece.role !== "king" ? `It gets ${whoseOf(mover, viewer)} ${NAME[piece.role]} out of danger.` : why && why !== "it's a useful waiting move" ? `${cap(why)}.` : "";
-  const intro = `Great move! ${narrateMove(before, played, viewer)} ${reason} It was the only good move here: everything else was clearly worse.`.replace(/  +/g, " ");
+  const intro = `The key move! ${narrateMove(before, played, viewer)} ${reason} It was the only good move here: everything else was clearly worse.`.replace(/  +/g, " ");
   startStepper([before, after], [played], [intro], "happy");
   const card = stepper;
   try {
@@ -886,7 +887,7 @@ export async function openStrategy() {
       // spoken to the side to move, unless you've picked a side
       const viewer = listener() ?? position.turn;
       texts = moves.map((move, i) => narrateMove(positions[i], move, viewer));
-      if (moves.length && isSacrifice(positions[0], moves[0], positions[1])) texts[0] = `There's a brilliant idea here! ${texts[0]}`;
+      if (moves.length && isSacrifice(positions[0], moves[0], positions[1])) texts[0] = `There's a masterstroke here! ${texts[0]}`;
       else if (texts.length) texts[0] = `The best plan: ${lowerFirst(texts[0])}`;
     }
     setBusy(false);
@@ -1092,7 +1093,7 @@ export function drawStats() {
     });
     for (const grade of GRADES) {
       const label = element("span", "stats-label stats-grade");
-      label.append(element("span", `grade-dot ${ratingClass(grade)}`), element("span", "", grade));
+      label.append(element("span", `grade-dot ${ratingClass(grade)}`), element("span", "", ratingName(grade)));
       row(label, sides.map((c) => {
         const cell = element("span", "stats-cell");
         const chip = element("span", `count-chip ${ratingClass(grade)}`, pending ? "??" : String(counts[c][grade] ?? 0));
@@ -1768,7 +1769,7 @@ export function drawCoach() {
     const brilliant = insight.brilliant;
     const fen = fenOf(base());
     if (!brilliant.found) {
-      section("Is there a brilliant move?", brilliant.text);
+      section("Is there a masterstroke?", brilliant.text);
     } else if (!brilliantShown.has(fen)) {
       const reveal = document.createElement("button");
       reveal.type = "button";
@@ -1779,14 +1780,14 @@ export function drawCoach() {
         refresh();
       });
       section(
-        "Is there a brilliant move? Yes!",
+        "Is there a masterstroke? Yes!",
         "There's a sacrifice here that works: you can offer up a piece and still come out on top.\n\n" +
           `Look at what your ${brilliant.role} can do: which move gives something away but opens the enemy king, ` +
           "forks, or wins more back? Check every capture, check and threat - and calculate what happens if they take.",
         reveal,
       );
     } else {
-      section("The brilliant move", `${brilliant.text}\n\nStockfish's line: ${brilliant.line}`);
+      section("The masterstroke", `${brilliant.text}\n\nStockfish's line: ${brilliant.line}`);
     }
   }
   if (insight.threat && !hidden) textSection(insight.threat.text);

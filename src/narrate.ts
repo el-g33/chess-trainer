@@ -107,10 +107,10 @@ export function pinnedBy(position: Chess, square: number): number | undefined {
 // ---------------------------------------------------------------------------
 
 const PRAISE: Record<string, string[]> = {
-  Brilliant: ["Brilliant! A sacrifice that really works.", "Wow, what a move! That sacrifice is spot on."],
-  Great: ["Great find! That was the move to play.", "Great move: you found the strong one."],
+  Brilliant: ["A masterstroke! A sacrifice that really works.", "Wow, what a move! That sacrifice is spot on."],
+  Great: ["The key move! That was the one to play.", "Key move: you found the one that holds."],
   Best: ["That's the best move.", "Spot on, that's the move.", "Perfect, that's the best move."],
-  Excellent: ["Very nice, almost the best move.", "Excellent, that keeps things going your way."],
+  Excellent: ["Very nice, almost the best move.", "Strong, that keeps things going your way."],
   Good: ["Good, solid move.", "That's a sensible choice.", "Fine move, nothing wrong with that."],
   Book: ["Straight out of the opening book.", "Good theory: that's a known move.", "Right on track with the opening."],
   Forced: ["That was the only move.", "No choice there, and you found it."],
@@ -118,8 +118,8 @@ const PRAISE: Record<string, string[]> = {
 
 // The same, said about your opponent's move
 const THEIR_PRAISE: Record<string, string> = {
-  Brilliant: "A brilliant sacrifice from them.",
-  Great: "A great move by them.",
+  Brilliant: "A masterstroke from them: a sacrifice that works.",
+  Great: "The key move from them.",
   Best: "They found the best move.",
   Excellent: "A strong move: almost their best.",
   Good: "A solid move from them.",
@@ -187,7 +187,7 @@ function neutralVerdict(review: Review, after: Chess, afterEval: Evaluation | un
   const me = mover === "white" ? "White" : "Black";
   const other = mover === "white" ? "Black" : "White";
   const praise: Record<string, string> = {
-    Brilliant: `A brilliant sacrifice by ${me}!`, Great: `A great move by ${me}.`, Best: `${me} found the best move.`,
+    Brilliant: `A masterstroke by ${me}!`, Great: `The key move by ${me}.`, Best: `${me} found the best move.`,
     Excellent: `A strong move by ${me}.`, Good: `A solid move by ${me}.`, Book: "A known opening move.", Forced: `That was ${me}'s only move.`,
   };
   if (praise[review.rating]) return praise[review.rating];
@@ -376,8 +376,8 @@ export function moveInWords(before: Chess, move: NormalMove, listener: Color | n
 /** "an inaccuracy", "the best move", ... for "Your move was ..." */
 export function ratingWords(rating: string): string {
   const words: Record<string, string> = {
-    Brilliant: "brilliant", Great: "a great move", Best: "the best move", Excellent: "excellent", Good: "good",
-    Book: "a known opening move", Forced: "the only move", Inaccuracy: "an inaccuracy", Mistake: "a mistake",
+    Brilliant: "a masterstroke", Great: "a key move", Best: "the top move", Excellent: "strong", Good: "solid",
+    Book: "a known opening move", Forced: "the only move", Inaccuracy: "imprecise", Mistake: "a mistake",
     Miss: "a missed chance", "Missed Win": "a missed win", Blunder: "a blunder",
   };
   return words[rating] ?? rating.toLowerCase();

@@ -24,12 +24,12 @@
   --soft: #f3f6fb; /* quiet panels: notes, the demo */
   --danger: #c62828;
   /* The ratings worth noticing in the move list (each at least 4.5:1 on the card) */
-  --r-brilliant: #0b7a6b;
-  --r-great: #2559a8;
-  --r-best: #2e7d32;
+  --r-brilliant: #6236d9;
+  --r-great: #3a4bb8;
+  --r-best: #246f46;
   --r-inaccuracy: #8a6500;
   --r-mistake: #b4530a;
-  --r-miss: #a02c7e;
+  --r-miss: #93305f;
   --r-blunder: #c0231b;
   --danger-soft: #fdecea;
   --good: #1b7f3b;
@@ -866,10 +866,10 @@ body.practice .bottom-buttons button {
 .r-brilliant { color: var(--r-brilliant); }
 .r-great { color: var(--r-great); }
 .r-best { color: var(--r-best); }
-.r-excellent { color: #5e9431; }
-.r-good { color: #5c7347; }
-.r-book { color: #a0703f; }
-.r-forced { color: #6e8c62; }
+.r-excellent { color: #3f7a52; }
+.r-good { color: #5e7a65; }
+.r-book { color: #6e5438; }
+.r-forced { color: #6b6f76; }
 .r-inaccuracy { color: var(--r-inaccuracy); }
 .r-mistake { color: var(--r-mistake); }
 .r-miss,

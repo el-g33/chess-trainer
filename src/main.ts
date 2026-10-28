@@ -65,7 +65,7 @@ export const OPPONENT_ARROW = "#C62828"; // your opponent's moves in the line
 export const THREAT_ARROW = "#E67E22"; // your opponent's threat (dashed)
 export const GUESS_ARROW = "#1565C0"; // your quiz guess
 export const DEVIATE_ARROW = "#C9A227"; // leaving your opening plan
-export const BRILLIANT_ARROW = "#26C2A3"; // the brilliant move, once shown
+export const BRILLIANT_ARROW = "#7C4DFF"; // the masterstroke, once shown
 const BEST_ARROW = "#5E6B73"; // Stockfish's own choice where your opening plan differs (dashed)
 export const ARROWS_AT_ONCE = 4; // how many moves of Stockfish's line are drawn at a time
 

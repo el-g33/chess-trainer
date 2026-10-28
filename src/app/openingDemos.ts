@@ -26,6 +26,7 @@ import { readPgn, today } from "../pgn";
 import {
   type GamePhase, PROGRESS_MIN, SLIP_THEMES, SLIP_WORDS, type SlipKind, picture, saveSummary,
 } from "../progress";
+import { withRatingNames } from "../ratingNames";
 import { type Review, fenOf, winningChance } from "../review";
 import { play } from "../sounds";
 
@@ -1152,7 +1153,7 @@ export function drawProgress() {
   const parts: string[] = [];
   if (seen.strongest) parts.push(`Your ${PHASE_WORDS[seen.strongest]} is your strongest phase.`);
   if (seen.weakest) parts.push(`Most of your points slip away in the ${PHASE_WORDS[seen.weakest]}` +
-    (top && top.kind !== "other" ? `, usually from ${lowerFirst(SLIP_WORDS[top.kind]).replace(/ \(a miss\)$/i, "")}.` : "."));
+    (top && top.kind !== "other" ? `, usually from ${lowerFirst(SLIP_WORDS[top.kind]).replace(/ \(a missed chance\)$/i, "")}.` : "."));
   say(parts.join(" ") || "Here's how your recent games add up.");
 
   // The trend
@@ -1238,7 +1239,7 @@ export function drawProgress() {
   if (top && themes.length) {
     const phase: TrainPhase = seen.weakest === "endgame" ? "endgame" : "middlegame";
     const level = PUZZLE_LEVELS.find(([v]) => v === puzzleLevel)?.[1] ?? "";
-    suggest(`Puzzles: ${lowerFirst(SLIP_WORDS[top.kind]).replace(/ \(a miss\)$/i, "")}`, `${level} level`, "Start puzzles",
+    suggest(`Puzzles: ${lowerFirst(SLIP_WORDS[top.kind]).replace(/ \(a missed chance\)$/i, "")}`, `${level} level`, "Start puzzles",
       () => void startPuzzles(phase, puzzleLevel, themes));
   }
   if (seen.weakest) {
@@ -1338,10 +1339,10 @@ export function depthCard(pending: boolean): HTMLElement {
     const SMALL = /^\S+ (Best|Excellent|Good|Book|Forced) → (Best|Excellent|Good|Book|Forced)$/;
     const big = (changes ?? []).filter((c) => !SMALL.test(c));
     const small = (changes ?? []).length - big.length;
-    const smallWords = small ? `${small} small one${small === 1 ? "" : "s"} (Good, Excellent and Best swapping places)` : "";
+    const smallWords = small ? `${small} small one${small === 1 ? "" : "s"} (Solid, Strong and Top move swapping places)` : "";
     if (changes?.length) {
       line.append(toggle(`${changes.length} rating${changes.length === 1 ? "" : "s"} changed ${depthOpen ? "▴" : "›"}`));
-      note = big.length ? `What changed: ${big.join(", ")}.${small ? ` Also ${smallWords}.` : ""}` : `${cap(smallWords)}. None of the slips changed.`;
+      note = big.length ? `What changed: ${withRatingNames(big.join(", "))}.${small ? ` Also ${smallWords}.` : ""}` : `${cap(smallWords)}. None of the slips changed.`;
     } else {
       line.append(element("span", "depth-count", changes ? "no ratings changed" : "every move checked longer"));
     }

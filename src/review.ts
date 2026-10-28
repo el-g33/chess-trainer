@@ -31,6 +31,7 @@ import {
   moveIdeas,
   pawns,
 } from "./coach";
+import { ratingName } from "./ratingNames";
 
 // (largest drop in winning chances, rating, annotation)
 const RATINGS: [number, string, string][] = [
@@ -200,7 +201,7 @@ export function reviewMove(before: Chess, move: NormalMove, evals: Map<string, E
   } else if (rating === "Brilliant") {
     const piece = after.board.get(sacrifice!)!;
     lines.push(
-      `${played}!! - Brilliant! A sacrifice that works: your ${piece.role} ` +
+      `${played}!! - Masterstroke! A sacrifice that works: your ${piece.role} ` +
         `on ${makeSquare(sacrifice!)} can be taken, but this is still the best move.`,
     );
     lines.push(...bullets(playedIdeas));
@@ -208,13 +209,13 @@ export function reviewMove(before: Chess, move: NormalMove, evals: Map<string, E
     const others = beforeEval.second
       ? ` The next best move, ${makeSan(before, beforeEval.second)}, would have been much worse.`
       : "";
-    lines.push(`${played}! - Great move. The only good move here.${others}`);
+    lines.push(`${played}! - Key move. The only good move here.${others}`);
     lines.push(...bullets(playedIdeas));
   } else if (rating === "Best") {
-    lines.push(sameMove(move, best) ? `${played} - Best move.` : `${played} - Best move: as good as any.`);
+    lines.push(sameMove(move, best) ? `${played} - Top move.` : `${played} - Top move: as good as any.`);
     lines.push(...bullets(playedIdeas));
   } else if (rating === "Excellent" || rating === "Good") {
-    lines.push(`${played} - ${rating} move.`);
+    lines.push(`${played} - ${ratingName(rating)} move.`);
     lines.push(...bullets(playedIdeas));
     lines.push(`Stockfish slightly preferred ${bestSan}.`);
   } else {
@@ -224,7 +225,7 @@ export function reviewMove(before: Chess, move: NormalMove, evals: Map<string, E
       const had = mateForMover > 0 ? `you had a forced checkmate in ${mateForMover}` : "you had a winning position";
       lines.push(`${played} - Missed win: ${had}.`);
     } else {
-      lines.push(`${played}${symbol} - ${rating}.`);
+      lines.push(`${played}${symbol} - ${ratingName(rating)}.`);
     }
     // The clearest way to show what went wrong: the opponent's best reply.
     const reply = afterGameOver ? undefined : afterEval!.best;
@@ -263,7 +264,7 @@ export function addMisses(reviews: (Review | undefined)[]): (Review | undefined)
       const rest = newline < 0 ? "" : review.text.slice(newline + 1);
       const played = heading.split(" ")[0].replace(/[?!]+$/, "");
       const text =
-        `${played} - Miss. Your opponent's last move was ${previous.rating === "Inaccuracy" ? "a slip" : "a mistake"}, and ` +
+        `${played} - Missed chance. Your opponent's last move was ${previous.rating === "Inaccuracy" ? "a slip" : "a mistake"}, and ` +
         `${review.bestSan} would have punished it.\n${rest}`;
       result[i] = { ...review, rating: "Miss", symbol: "?", text };
     }

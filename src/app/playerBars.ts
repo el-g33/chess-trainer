@@ -12,6 +12,7 @@ import { LESSONS } from "../lessons";
 import { analyser, base, currentPly, gameMoves, ratingsOn, shown } from "../main";
 import { reviewOpeningChoice } from "../openingPlan";
 import { type OpeningInfo, firstMoveOf, setupProgress, systemFor } from "../openings";
+import { ratingName } from "../ratingNames";
 import { type Review, fenOf, isDrawnPosition } from "../review";
 import { play } from "../sounds";
 import { tourOpen } from "../tour";
@@ -293,7 +294,7 @@ export function drawGameReport(reviews: (Review | undefined)[], info: OpeningInf
       if (i) line.append(" · ");
       const span = document.createElement("span");
       span.className = ratingClass(rating);
-      span.textContent = `${rating} ${tally.get(rating)}`;
+      span.textContent = `${ratingName(rating)} ${tally.get(rating)}`;
       line.append(span);
     });
     counts.append(line);
@@ -317,7 +318,7 @@ export const ratingClass = (rating: string) => "r-" + rating.toLowerCase().repla
 
 /** The ratings worth noticing in the move list, and their marks. */
 export const MOVE_MARKS: Record<string, string> = {
-  Brilliant: "!!", Great: "!", Best: "★", Inaccuracy: "?!", Mistake: "?", Miss: "×", "Missed Win": "×", Blunder: "??",
+  Brilliant: "!!", Great: "!", Best: "◆", Inaccuracy: "?!", Mistake: "?", Miss: "⊘", "Missed Win": "⊘", Blunder: "??",
 };
 
 export function drawReview(reviews: (Review | undefined)[], info: OpeningInfo[]) {
@@ -352,7 +353,7 @@ export function drawReview(reviews: (Review | undefined)[], info: OpeningInfo[])
       if (choiceNote) notes.push(choiceNote);
       if (moveInfo.book || notes.length) {
         const name = moveInfo.opening ? moveInfo.opening[1] : "known theory";
-        paragraph(moveInfo.book ? `Book move (${name})` : "Opening", "review-opening");
+        paragraph(moveInfo.book ? `Theory (${name})` : "Opening", "review-opening");
         paragraph(notes.map((note) => `• ${note}`).join("\n"), "review-notes");
       }
     }

@@ -61,8 +61,8 @@ export async function findBrilliant(engine: CoachEngine, position: Chess): Promi
   return {
     found: false,
     text: bestChance >= 97
-      ? "No brilliant move needed: you're already winning comfortably, so the simple, safe moves are best."
-      : "No brilliant move here - no sacrifice works in this position, so play solidly.",
+      ? "No masterstroke needed: you're already winning comfortably, so the simple, safe moves are best."
+      : "No masterstroke here - no sacrifice works in this position, so play solidly.",
   };
 }
 
@@ -77,8 +77,8 @@ export function missedBrilliant(
   if (isSacrifice(before, best, afterMove(before, best)) === undefined) return undefined;
   const review = reviewMove(before, best, evals);
   if (review?.rating !== "Brilliant") return undefined;
-  const heading = review.text.split("\n")[0].replace(/^\S+!! - Brilliant! /, "");
-  return `Missed brilliant: ${makeSan(before, best)}!! - ${heading}`;
+  const heading = review.text.split("\n")[0].replace(/^\S+!! - Masterstroke! /, "");
+  return `Missed masterstroke: ${makeSan(before, best)}!! - ${heading}`;
 }
 
 /** The positions to score so missedBrilliant() can decide: after each best

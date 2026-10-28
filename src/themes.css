@@ -5,12 +5,12 @@
 /* -- Midnight ember: near-black slate with one ember-orange accent ---------- */
 
 :root[data-ui="ember"] {
-  --r-brilliant: #3fe0c5;
-  --r-great: #8dbcf0;
+  --r-brilliant: #b39dff;
+  --r-great: #9aa8ff;
   --r-best: #7fd6a0;
   --r-inaccuracy: #f2cf4a;
   --r-mistake: #ffa04d;
-  --r-miss: #ff86cf;
+  --r-miss: #f08cbf;
   --r-blunder: #ff6b5e;
   color-scheme: dark;
   --bg: #16181e;
@@ -43,12 +43,12 @@
 /* -- Warm stone: taupe, cream and espresso cards, soft orange --------------- */
 
 :root[data-ui="stone"] {
-  --r-brilliant: #096d60;
-  --r-great: #2559a8;
-  --r-best: #276b2b;
+  --r-brilliant: #6236d9;
+  --r-great: #3a4bb8;
+  --r-best: #246f46;
   --r-inaccuracy: #806000;
   --r-mistake: #a54b08;
-  --r-miss: #a02c7e;
+  --r-miss: #93305f;
   --r-blunder: #c0231b;
   --bg: #9a908a;
   --card: #f2eeea;
@@ -75,12 +75,12 @@
 /* -- Forest club: deep club-room green, brass accents --------------------- */
 
 :root[data-ui="forest"] {
-  --r-brilliant: #3fe0c5;
-  --r-great: #8dbcf0;
+  --r-brilliant: #b39dff;
+  --r-great: #9aa8ff;
   --r-best: #7fd6a0;
   --r-inaccuracy: #f2cf4a;
   --r-mistake: #ffa04d;
-  --r-miss: #ff86cf;
+  --r-miss: #f08cbf;
   --r-blunder: #ff6b5e;
   color-scheme: dark;
   --bg: #1d2b24;
@@ -113,12 +113,12 @@
 /* -- Rose quartz: soft blush, berry accent --------------------------------- */
 
 :root[data-ui="rose"] {
-  --r-brilliant: #096d60;
-  --r-great: #2559a8;
-  --r-best: #276b2b;
+  --r-brilliant: #6236d9;
+  --r-great: #3a4bb8;
+  --r-best: #246f46;
   --r-inaccuracy: #806000;
   --r-mistake: #a54b08;
-  --r-miss: #8a2c7e;
+  --r-miss: #93305f;
   --r-blunder: #c0231b;
   --bg: #e8d5d2;
   --card: #fff8f6;
@@ -145,12 +145,12 @@
 /* -- Violet glass: dusky indigo, translucent cards, cyan highlights --------- */
 
 :root[data-ui="violet"] {
-  --r-brilliant: #3fe0c5;
-  --r-great: #8dbcf0;
+  --r-brilliant: #b39dff;
+  --r-great: #9aa8ff;
   --r-best: #7fd6a0;
   --r-inaccuracy: #f2cf4a;
   --r-mistake: #ffa04d;
-  --r-miss: #ff9bd8;
+  --r-miss: #f08cbf;
   --r-blunder: #ff8a7e;
   color-scheme: dark;
   --bg: #33365e;
@@ -252,10 +252,10 @@
 }
 
 /* Move ratings, brighter so they read on the dark themes */
-:root[data-ui="ember"] .r-excellent, :root[data-ui="violet"] .r-excellent, :root[data-ui="forest"] .r-excellent { color: #8fd05a; }
-:root[data-ui="ember"] .r-good, :root[data-ui="violet"] .r-good, :root[data-ui="forest"] .r-good { color: #a8c48c; }
-:root[data-ui="ember"] .r-book, :root[data-ui="violet"] .r-book, :root[data-ui="forest"] .r-book { color: #e0a46a; }
-:root[data-ui="ember"] .r-forced, :root[data-ui="violet"] .r-forced, :root[data-ui="forest"] .r-forced { color: #a5c79a; }
+:root[data-ui="ember"] .r-excellent, :root[data-ui="violet"] .r-excellent, :root[data-ui="forest"] .r-excellent { color: #8fcf9f; }
+:root[data-ui="ember"] .r-good, :root[data-ui="violet"] .r-good, :root[data-ui="forest"] .r-good { color: #b3c7b8; }
+:root[data-ui="ember"] .r-book, :root[data-ui="violet"] .r-book, :root[data-ui="forest"] .r-book { color: #d4b48f; }
+:root[data-ui="ember"] .r-forced, :root[data-ui="violet"] .r-forced, :root[data-ui="forest"] .r-forced { color: #b4b8bf; }
 
 /* -- The matching boards (flat squares, light a8 at the top-left) ----------- */
 

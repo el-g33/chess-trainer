@@ -893,17 +893,17 @@ html body .board-area .board-controls {
 :root[data-ui="forest"] { --chip: #121a16; }
 :root[data-ui="rose"] { --chip: #3a2a2e; }
 
-.count-chip.r-brilliant, .grade-dot.r-brilliant { color: #3fd9bb; }
-.count-chip.r-great, .grade-dot.r-great { color: #8db8e8; }
+.count-chip.r-brilliant, .grade-dot.r-brilliant { color: #b39dff; }
+.count-chip.r-great, .grade-dot.r-great { color: #9aa8ff; }
 .count-chip.r-best, .grade-dot.r-best { color: #7fd6a0; }
-.count-chip.r-excellent, .grade-dot.r-excellent { color: #8fd05a; }
-.count-chip.r-good, .grade-dot.r-good { color: #a8c48c; }
-.count-chip.r-book, .grade-dot.r-book { color: #e0a46a; }
-.count-chip.r-forced, .grade-dot.r-forced { color: #a5c79a; }
+.count-chip.r-excellent, .grade-dot.r-excellent { color: #8fcf9f; }
+.count-chip.r-good, .grade-dot.r-good { color: #b3c7b8; }
+.count-chip.r-book, .grade-dot.r-book { color: #d4b48f; }
+.count-chip.r-forced, .grade-dot.r-forced { color: #b4b8bf; }
 .count-chip.r-inaccuracy, .grade-dot.r-inaccuracy { color: #f2c94c; }
 .count-chip.r-mistake, .grade-dot.r-mistake { color: #ff9f4a; }
-.count-chip.r-miss, .grade-dot.r-miss { color: #ff7f72; }
-.count-chip.r-missed-win, .grade-dot.r-missed-win { color: #e8c14a; }
+.count-chip.r-miss, .grade-dot.r-miss { color: #f08cbf; }
+.count-chip.r-missed-win, .grade-dot.r-missed-win { color: #d58fd0; }
 .count-chip.r-blunder, .grade-dot.r-blunder { color: #ff5a4a; }
 
 .rating-block {

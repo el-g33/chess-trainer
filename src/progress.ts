@@ -27,7 +27,7 @@ const RECENT = 10; // games the picture is made of
 export const SLIP_WORDS: Record<SlipKind, string> = {
   hanging: "Leaving a piece undefended",
   fork: "Walking into a fork",
-  miss: "Not punishing their slip (a Miss)",
+  miss: "Not punishing their slip (a missed chance)",
   mated: "Walking into a checkmate",
   "missed-mate": "Missing a checkmate",
   pawn: "Dropping pawns",

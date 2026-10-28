@@ -1,23 +1,24 @@
-// The move-rating icon drawn on the piece that just moved, in the desktop
-// app's hand-drawn style (theme.py badge): a disc in the rating's colour, a
-// faint white scribble, a wobbly ink outline drawn twice, and a small white
-// drawing or a mark like ?! in marker pen. Drawn in a 100 x 100 square (one
-// board square), in its top-right corner.
+// The move-rating badge drawn on the piece that just moved, in the desktop
+// app's hand-drawn style (theme.py badge) but the app's own shape and colours:
+// a rounded square tag in the rating's colour, a faint white scribble, a
+// wobbly ink outline drawn twice, and a small white drawing or a mark like ?!
+// in marker pen. Drawn in a 100 x 100 square (one board square), in its
+// top-right corner. (The names shown for the ratings are in ratingNames.ts.)
 
-// (symbol, icon colour, move-list text colour) - the same as RATING_STYLE
+// (symbol, badge colour, move-list text colour)
 export const RATING_STYLE: Record<string, [string, string, string]> = {
-  Brilliant: ["!!", "#26C2A3", "#159C82"],
-  Great: ["!", "#749BBF", "#4F7AA3"],
-  Best: ["icon:star", "#81B64C", "#5E9431"],
-  Excellent: ["icon:thumb", "#81B64C", "#5E9431"],
-  Good: ["icon:check", "#77915F", "#5C7347"],
-  Book: ["icon:book", "#D5A47D", "#A0703F"],
-  Forced: ["icon:arrow", "#96AF8B", "#6E8C62"],
-  Inaccuracy: ["?!", "#F7C631", "#B88F00"],
-  Mistake: ["?", "#FFA459", "#E07A1F"],
-  Miss: ["icon:x", "#FF7769", "#E05A4C"],
-  "Missed Win": ["icon:minus", "#DBAC16", "#A6800A"],
-  Blunder: ["??", "#FA412D", "#E0301E"],
+  Brilliant: ["!!", "#7C4DFF", "#6236D9"], // Masterstroke
+  Great: ["!", "#4C5FD5", "#3A4BB8"], // Key move
+  Best: ["icon:diamond", "#2F8F5B", "#246F46"], // Top move
+  Excellent: ["icon:up", "#5A9E6F", "#3F7A52"], // Strong
+  Good: ["icon:ring", "#7F9C86", "#5E7A65"], // Solid
+  Book: ["icon:lines", "#8A6D4D", "#6E5438"], // Theory
+  Forced: ["icon:arrow", "#8B8F96", "#6B6F76"], // Only move
+  Inaccuracy: ["?!", "#D9A21B", "#8A6500"], // Imprecise
+  Mistake: ["?", "#E0731F", "#B4530A"],
+  Miss: ["icon:slash", "#B5477A", "#93305F"], // Missed chance
+  "Missed Win": ["icon:slash", "#9C3D8A", "#7E2C6E"],
+  Blunder: ["??", "#C8312B", "#A8221C"],
   Checkmate: ["#", "#3A3330", "#3A3330"],
 };
 
@@ -45,39 +46,22 @@ function seeded(text: string): () => number {
 }
 
 /** A small drawing on a 24 x 24 grid (theme.py icon_svg). */
-function iconSvg(name: string, fill: string, detail: string): string {
+function iconSvg(name: string, fill: string): string {
   const line = (width = 3.4) =>
     `fill="none" stroke="${fill}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"`;
   switch (name) {
-    case "star": {
-      const points: string[] = [];
-      for (let i = 0; i < 10; i++) {
-        const radius = i % 2 === 0 ? 10 : 4.3;
-        const angle = (Math.PI * i) / 5 - Math.PI / 2;
-        points.push(`${(12 + radius * Math.cos(angle)).toFixed(2)},${(12.6 + radius * Math.sin(angle)).toFixed(2)}`);
-      }
-      return `<polygon points="${points.join(" ")}" fill="${fill}" stroke="${fill}" stroke-width="1.2" stroke-linejoin="round"/>`;
-    }
-    case "thumb":
-      return (
-        `<rect x="3" y="11" width="4" height="9" rx="1" fill="${fill}"/>` +
-        `<path d="M8.6 20V11.3l3.8-6.6c.6-1 2.2-.9 2.6.3.2.5.2 1.1 0 1.7l-1 3.3h5.4c1.3 0 2.2 ` +
-        `1.2 1.9 2.4l-1.8 6.4c-.3 1-1.2 1.7-2.2 1.7z" fill="${fill}"/>`
-      );
-    case "check":
-      return `<polyline points="4.5,12.8 9.8,18 19.5,6.8" ${line()}/>`;
-    case "x":
-      return `<line x1="6.5" y1="6.5" x2="17.5" y2="17.5" ${line()}/><line x1="17.5" y1="6.5" x2="6.5" y2="17.5" ${line()}/>`;
-    case "minus":
-      return `<line x1="5" y1="12" x2="19" y2="12" ${line(3.8)}/>`;
+    case "diamond":
+      return `<polygon points="12,3.5 20.5,12 12,20.5 3.5,12" fill="${fill}" stroke="${fill}" stroke-width="1.2" stroke-linejoin="round"/>`;
+    case "up":
+      return `<line x1="12" y1="19.5" x2="12" y2="5.5" ${line()}/><polyline points="6.5,11 12,5.3 17.5,11" ${line()}/>`;
+    case "ring":
+      return `<circle cx="12" cy="12" r="6.6" ${line(3.2)}/>`;
+    case "lines":
+      return `<line x1="5" y1="7" x2="19" y2="7" ${line(3)}/><line x1="5" y1="12" x2="19" y2="12" ${line(3)}/><line x1="5" y1="17" x2="15" y2="17" ${line(3)}/>`;
+    case "slash":
+      return `<circle cx="12" cy="12" r="7" ${line(2.8)}/><line x1="7" y1="17" x2="17" y2="7" ${line(2.8)}/>`;
     case "arrow":
       return `<line x1="4.5" y1="12" x2="17" y2="12" ${line()}/><polyline points="12,6.5 17.8,12 12,17.5" ${line()}/>`;
-    case "book":
-      return (
-        `<path d="M12 7.6C9.9 6 6.4 5.6 3.8 6.4v11.4c2.6-.8 6.1-.4 8.2 1.2 2.1-1.6 5.6-2 8.2-1.2` +
-        `V6.4c-2.6-.8-6.1-.4-8.2 1.2z" fill="${fill}"/>` +
-        `<line x1="12" y1="7.6" x2="12" y2="19" stroke="${detail}" stroke-width="0.9"/>`
-      );
   }
   return "";
 }
@@ -106,13 +90,22 @@ export function badgeSvg(rating: string): string {
     flip = !flip;
   }
 
-  const wobblyCircle = (radius: number, wobble: number, turn: number) => {
+  // The tag's outline: a rounded square, a little wobbly, as if drawn by hand
+  const corner = r * 0.42;
+  const wobblySquare = (half: number, wobble: number, shift: number) => {
     const points: string[] = [];
-    for (let i = 0; i < 25; i++) {
-      const a = (2 * Math.PI * i) / 24 + turn;
-      const rr = radius * (1 + jitter() * wobble);
-      points.push(at(rr * Math.cos(a), rr * Math.sin(a)));
+    const edge = half - corner;
+    const steps = 6;
+    // round the four corners, joined by the straight sides between them
+    const centres: [number, number, number][] = [[edge, -edge, -Math.PI / 2], [edge, edge, 0], [-edge, edge, Math.PI / 2], [-edge, -edge, Math.PI]];
+    for (const [x, y, start] of centres) {
+      for (let i = 0; i <= steps; i++) {
+        const a = start + (Math.PI / 2) * (i / steps) + shift;
+        const rr = corner * (1 + jitter() * wobble * 3);
+        points.push(at(x + rr * Math.cos(a) + jitter() * half * wobble, y + rr * Math.sin(a) + jitter() * half * wobble));
+      }
     }
+    points.push(points[0]);
     return points.join(" ");
   };
 
@@ -125,9 +118,9 @@ export function badgeSvg(rating: string): string {
     const y = cy - 12 * scale;
     drawing =
       `<g transform="translate(${(x + scale * 0.9).toFixed(2)} ${(y + scale * 1.1).toFixed(2)}) scale(${scale.toFixed(3)})">` +
-      `${iconSvg(icon, darker(colour), darker(colour))}</g>` +
+      `${iconSvg(icon, darker(colour))}</g>` +
       `<g transform="translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(${scale.toFixed(3)})">` +
-      `${iconSvg(icon, "#FFFFFF", darker(colour, 0.55))}</g>`;
+      `${iconSvg(icon, "#FFFFFF")}</g>`;
   }
 
   let mark = "";
@@ -141,14 +134,14 @@ export function badgeSvg(rating: string): string {
   }
 
   return (
-    `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${colour}"/>` +
+    `<rect x="${cx - r}" y="${cy - r}" width="${2 * r}" height="${2 * r}" rx="${corner}" fill="${colour}"/>` +
     `<polyline points="${scribble.join(" ")}" fill="none" stroke="#FFFFFF" stroke-opacity="0.22" ` +
     `stroke-width="${(d * 0.05).toFixed(1)}" stroke-linecap="round" stroke-linejoin="round" ` +
     `transform="rotate(-35 ${cx} ${cy})"/>` +
     drawing +
-    `<polyline points="${wobblyCircle(r, 0.04, 0)}" fill="none" stroke="${INK}" ` +
+    `<polyline points="${wobblySquare(r, 0.012, 0)}" fill="none" stroke="${INK}" ` +
     `stroke-width="${(d * 0.045).toFixed(1)}" stroke-opacity="0.85" stroke-linecap="round" stroke-linejoin="round"/>` +
-    `<polyline points="${wobblyCircle(r * 0.96, 0.055, 0.4)}" fill="none" stroke="${INK}" ` +
+    `<polyline points="${wobblySquare(r * 0.96, 0.018, 0.05)}" fill="none" stroke="${INK}" ` +
     `stroke-width="${(d * 0.025).toFixed(1)}" stroke-opacity="0.5" stroke-linecap="round"/>` +
     mark
   );
