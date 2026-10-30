@@ -10,11 +10,11 @@ import { makeSquare, makeUci, opposite, parseUci } from "chessops/util";
 import { accuracyRating, divide, gameAccuracy, phaseAccuracy } from "../accuracy";
 import { type Mood, avatarSvg } from "../avatar";
 import { type Score, isCastling, afterMove as positionAfter } from "../coach";
-import { DEMOS, type Demo, demoFor, demoSteps, introMoves } from "../demos";
+import { DEMOS, type Demo, demoFor, demoSteps } from "../demos";
 import { Game } from "../game";
 import { icon } from "../icons";
 import type { TrainPhase } from "../lessons";
-import { analyser, coachAnalysis, currentPly, gameMoves, ratingsOn } from "../main";
+import { OPPONENT_ARROW, YOUR_ARROW, analyser, coachAnalysis, currentPly, gameMoves, ratingsOn } from "../main";
 import {
   MASTERED, type Mistake, type MistakeKind, type MistakeLine, type MistakePhase, addMistakes, comesBack,
   today as dayNumber, dueMistakes, loadMistakes, mistakeCounts, mistakeId, recordAttempt, saveLines,
@@ -73,8 +73,8 @@ export function loadDemoLine(index: number, intro = true) {
   demo.line = index;
   demo.steps = demoSteps(demo.demo, index);
   set.game(new Game());
-  // the introduction shows the opening's basic setup; play brings the whole line
-  for (const move of intro ? introMoves(demo.demo, index) : demo.steps.map((step) => step.move)) game.play(move);
+  // the introduction is on the starting position; play brings the whole line
+  if (!intro) for (const step of demo.steps) game.play(step.move);
   set.plyNotes(new Map());
   set.analysis(null);
   set.preview(null);
@@ -197,8 +197,10 @@ export function movePicture(before: Chess, after: Chess, move: NormalMove, yours
     shapes.push({ orig: makeSquare(square) as Key, brush: yours ? "you" : "them" });
   };
   if (!isCastling(before, move)) {
+    // the squares it now controls: a small dot on each (calmer than an arrow to every one)
+    const colour = yours ? YOUR_ARROW : OPPONENT_ARROW;
     for (const square of controlledSquares(after, move.to)) {
-      shapes.push({ orig: makeSquare(move.to) as Key, dest: makeSquare(square) as Key, brush: yours ? "control" : "controlThem" });
+      shapes.push({ orig: makeSquare(square) as Key, customSvg: { html: `<circle cx="50" cy="50" r="13" fill="${colour}" opacity="0.6"/>` } });
     }
   }
   for (const square of chainOf(after, move.to)) mark(square);

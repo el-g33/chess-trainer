@@ -138,6 +138,22 @@ export function moveButton(ply: number, review: Review): CoachButton | null {
 }
 export const STRATEGY: CoachButton = { ico: "target", label: "Strategy", run: () => void openStrategy(), kind: "accent" };
 
+/** An opening lesson's first words: short, then play. */
+function lessonIntro(): string {
+  if (!demo) return "";
+  const lines = demo.demo.lines;
+  if (demo.line > 0) return `Next, the ${lines[demo.line].title}. Whenever you're ready.`;
+  const name = openingShortName(demo.demo.opening);
+  return lines.length > 1
+    ? `Let's go through the ${name}, its main lines and some variations. Whenever you're ready.`
+    : `Let's go through the ${name} and its main line. Whenever you're ready.`;
+}
+
+/** The first sentence of a note (the bubble's line; the whole note is behind the dots). */
+export function firstSentence(note: string): string {
+  return note.trim().match(/^.+?[.!?](?=\s|$)/)?.[0] ?? note.trim();
+}
+
 /** What the coach says about the position on screen. */
 export function coachSays(reviews: (Review | undefined)[]): CoachSay {
   if (silentJump) return { mood: "talk", text: "", buttons: [], key: "silent" };
@@ -150,31 +166,30 @@ export function coachSays(reviews: (Review | undefined)[]): CoachSay {
   if (puzzle) return puzzleSays();
   if (lesson) return { mood: "talk", text: LESSONS[lesson.phase][lesson.index].title, buttons: [] };
   if (demo?.intro) {
-    const lines = demo.demo.lines;
-    const count = lines.length === 1 ? "one line" : `${lines.length} lines`;
-    const start = `The ${openingShortName(demo.demo.opening)} has ${count}. We'll go through all of them, starting with the main line.`;
-    const text = demo.line === 0
-      ? `${start} ${demo.demo.intro} Here's how it starts. Ready when you are: press play.`
-      : `${lines[demo.line].about ?? demo.demo.intro} When you're ready, let's go: press play.`;
+    // short, on the starting position: the opening's own words wait behind the dots
     const play: CoachButton = { ico: "play", label: "Play the line", run: startDemoLine, kind: "accent" };
-    return { mood: "talk", text, buttons: [play], key: `demo:${demo.line}:intro` };
+    return { mood: "talk", text: lessonIntro(), buttons: [play, TELL_MORE], key: `demo:${demo.line}:intro` };
   }
   if (demo) {
     const ply = currentPly();
     const step = ply ? demo.steps[ply - 1] : undefined;
-    const lines = demo.demo.lines;
     let text: string;
+    let more = false; // the note says more than its first sentence: the rest behind the dots
     if (!ply && !demo.playing) {
-      const count = lines.length === 1 ? "one line" : `${lines.length} lines`;
-      const start = `The ${openingShortName(demo.demo.opening)} has ${count}. We'll go through all of them, starting with the main line.`;
-      text = demo.line === 0 ? `${start} ${demo.demo.intro}` : lines[demo.line].about ?? demo.demo.intro;
+      text = lessonIntro();
+      more = true;
     } else if (!ply) {
       text = "Here we go.";
+    } else if (step!.note) {
+      text = firstSentence(step!.note);
+      more = text.length < step!.note.trim().length;
     } else {
-      text = step!.note ?? narrateMove(game.positionAt(ply - 1), step!.move, null);
+      // no note: what the move does, in a few words (the picture shows the rest)
+      text = ideaWords(game.positionAt(ply - 1), step!.move, null);
     }
     const atEnd = ply >= game.length;
     const buttons: CoachButton[] = atEnd ? [{ ico: "bulb", label: "What you get", run: () => void showWhatYouGet(), kind: "accent" }] : [];
+    if (more) buttons.push(TELL_MORE);
     return { mood: step?.note || !ply ? "talk" : "happy", text, buttons, key: `demo:${demo.line}:${ply}` };
   }
   if (mode === "play") {
@@ -390,7 +405,7 @@ export function quizInWords(): string[] {
 export function openMore() {
   if (demo) {
     const ply = currentPly();
-    const note = ply ? demo.steps[ply - 1].note : demo.demo.intro;
+    const note = ply ? demo.steps[ply - 1].note : demo.demo.lines[demo.line].about ?? demo.demo.intro;
     showOverlay("talk", [para(note ?? "Watch how the line goes.")], [CLOSE]);
     return;
   }
