@@ -40,7 +40,7 @@ function momentWords(review: Review, viewer: Color | null, mover: Color): { text
     if (review.rating === "Miss" || review.rating === "Missed Win") return { text: "A chance they missed", sign: "escape", ico: "shield" };
     return { text: review.rating === "Blunder" ? "Their blunder: your chance" : "Their mistake: your chance", sign: "chance", ico: "gift" };
   }
-  if (review.rating === "Miss") return { text: viewer === null ? `${whose} missed chance` : "A chance you missed", sign: "amber", ico: "hazard" };
+  if (review.rating === "Miss") return { text: viewer === null ? `${whose} missed chance` : "Your missed chance", sign: "amber", ico: "hazard" };
   if (review.rating === "Missed Win") return { text: viewer === null ? `${whose} missed win` : "A win you missed", sign: "orange", ico: "hazard" };
   if (review.rating === "Blunder") return { text: `${whose} blunder`, sign: "red", ico: "hazard" };
   return { text: `${whose} mistake`, sign: "orange", ico: "hazard" };

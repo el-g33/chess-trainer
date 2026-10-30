@@ -211,7 +211,7 @@ export function showPuzzle(index: number) {
   start.play(all[0]);
   Object.assign(puzzle, {
     index, side: start.turn, solution: all.slice(1), step: 0, state: "solving", missed: false, hints: 0,
-    themes: row[4].split(" "), note: `${colourName(start.turn)} to move. Find the best move.`,
+    themes: row[4].split(" "), note: `${colourName(start.turn)} to move: find the strongest move.`,
   });
   set.orientation(start.turn);
   if (menuOpen) hideMenu();
@@ -771,7 +771,7 @@ export function exploreSays(reviews: (Review | undefined)[]): CoachSay {
   }
   if (ply === 0) {
     const text = theirs ? (auto ? "It's their move first. Here it comes..." : "It's their move. Move for them on the board, or let them reply.")
-      : "Your move. Play what you think is best and I'll rate it. Tap the bulb when you want my best move.";
+      : "Your move. I'll rate it; the bulb shows mine.";
     return { mood: "talk", text, buttons };
   }
   const review = reviews[ply - 1];

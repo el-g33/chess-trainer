@@ -247,12 +247,13 @@ export function coachSays(reviews: (Review | undefined)[]): CoachSay {
   // the move's own button, a sign of what kind of move it was (none for a quiet one)
   const more = moveButton(ply, review);
   const buttons = more ? [more, STRATEGY] : [STRATEGY];
-  // Your slips saved as puzzles: said at each one, and offered at the end of the game
+  // Your slips saved as puzzles: said once, at the first, and offered at the end of the game
   const saved = reviewing && savedFromReview?.key === gameKey() ? savedFromReview : null;
-  if (saved?.plies.includes(ply)) text += " I've saved this one to Your mistakes.";
+  if (saved?.plies[0] === ply) text += " I've saved it to Your mistakes, with any others.";
   if (saved?.plies.length && ply === game.length) {
     const count = saved.plies.length;
-    text += ` That's the game. Want to try ${count === 1 ? "your slip" : `your ${count} slips`} now, while ${count === 1 ? "it's" : "they're"} fresh?`;
+    // (the end of the game: the offer alone, not a verdict on the last move as well)
+    text = `That's the game. Try ${count === 1 ? "your slip" : `your ${count} slips`} now, while ${count === 1 ? "it's" : "they're"} fresh?`;
     // (the puzzle button in place of Strategy: the strip keeps its size, so the words keep their room)
     buttons.splice(0, buttons.length, { ico: "puzzle", label: "Try them now", run: practiseGameSlips, kind: "accent" }, more ?? STRATEGY);
   }
@@ -945,7 +946,8 @@ export async function explainGreat(ply: number) {
   const piece = before.board.get(played.from)!;
   const attacked = before.kingAttackers(played.from, opposite(mover), before.board.occupied).nonEmpty();
   const reason = attacked && piece.role !== "king" ? `It gets ${whoseOf(mover, viewer)} ${NAME[piece.role]} out of danger.` : why && why !== "it's a useful waiting move" ? `${cap(why)}.` : "";
-  const intro = `The key move! ${narrateMove(before, played, viewer)} ${reason} The only good move here.`.replace(/  +/g, " ");
+  // (the board shows the move: the words say why it was the one)
+  const intro = `The key move, and the only good one. ${reason}`.trim();
   startStepper([before, after], [played], [intro], "happy");
   const card = stepper;
   try {

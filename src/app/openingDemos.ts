@@ -645,7 +645,7 @@ export function drillLineDone(answered = false) {
   if (d.round === 1) {
     const s = d.scores[0];
     d.state = "between";
-    d.note = `Main line done: ${s.right} of ${s.moves} moves first time. Let's do that again, this time I'll mix it up - good luck!`;
+    d.note = `${s.right} of ${s.moves} first time. Again, but this time I'll mix it up.`;
     d.mood = "happy";
     refresh();
     return;
