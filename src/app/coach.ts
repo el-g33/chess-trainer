@@ -218,7 +218,8 @@ export function coachSays(reviews: (Review | undefined)[]): CoachSay {
   }
   if (quiz?.answered && quiz.result) {
     const [correct, text] = quiz.result;
-    const short = correct ? "Yes, that's their idea. Well spotted!" : "Not quite. Tap the dots and I'll show you.";
+    const short = correct ? "Yes, that's their idea. Well spotted!"
+      : quiz.guess ? "Not quite. Tap the dots and I'll show you." : "Here's their idea: tap the dots to see it.";
     void text;
     return { mood: correct ? "happy" : "worried", text: short, buttons: [TELL_MORE, { ico: "close", label: "Done", run: () => { set.quiz(null); refresh(); }, kind: "soft" }] };
   }
@@ -406,6 +407,7 @@ export function quizInWords(): string[] {
   const threat = asked.threat!;
   const idea = threat.threatMove && threat.passed ? narrateMove(threat.passed, threat.threatMove, threat.you) : "";
   if (asked.result![0]) return [`Yes, that's their idea! ${idea}`.trim()];
+  if (!asked.guess) return [idea ? `Here's their idea. ${idea}` : "There was no real threat here."];
   const kind = asked.explanation?.kind;
   const first = kind === "mistake" ? "That move wouldn't be a threat: it would be a mistake for them, and you could punish it."
     : kind === "smaller-threat" ? "That's a threat too, but a smaller one."
@@ -1984,21 +1986,19 @@ export function drawCoach() {
   } else if (quiz && !quiz.answered) {
     const them = colourName(quiz.threat!.them);
     section(
-      "Quiz: spot your opponent's idea",
-      `Imagine you skip your move and ${them} gets to play again. What would they play?\n\n` +
-        `Click one of ${them}'s pieces, then the square it would move to.\n\n` +
-        `Take your time: look at what each of ${them}'s pieces attacks, and what is undefended on your side.`,
-      textBlock('Stuck? Click "Give up - show answer".', "coach-note"),
+      "Spot their idea",
+      `If you skipped your move, what would ${them} play? Move one of their pieces on the board.` + "\n\n" +
+        "Look at what each of their pieces attacks, and what's left unguarded on your side.",
+      textBlock('Stuck? "Give up - show answer" shows it.', "coach-note"),
     );
   } else if (quiz?.answered) {
-    const [correct, text] = quiz.result!;
-    const parts: HTMLElement[] = [textBlock(text, correct ? "coach-right" : "coach-wrong")];
+    // the same plain words as the bubble's card; the moves play out on the board
+    const correct = quiz.result![0];
+    const [first, ...rest] = quizInWords();
+    const parts: HTMLElement[] = [textBlock(first, correct ? "coach-right" : "coach-wrong"), ...rest.map((line) => textBlock(line))];
     if (quiz.explaining) parts.push(textBlock("Let me see what your guess would do…", "coach-note"));
-    if (quiz.explanation) {
-      parts.push(textBlock(quiz.explanation.text));
-      parts.push(textBlock("Blue arrow: your guess. Green arrow: your best answer. Use the ‹ › buttons below to play it out.", "coach-note"));
-    }
-    section("Quiz result", ...parts);
+    if (quiz.explanation?.line.length) parts.push(textBlock("Use ‹ › below to play it out.", "coach-note"));
+    section("Spot their idea", ...parts);
   }
 
   // No spoilers while a quiz question is open

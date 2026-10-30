@@ -128,10 +128,9 @@ export function onQuizButton() {
   if (quizWaiting()) {
     // Give up: reveal the answer
     quizScore[1] += 1;
-    const answer = quiz!.threat!.threatSan;
     quiz!.answered = true;
     quiz!.guess = undefined;
-    quiz!.result = [false, `The idea Stockfish found is ${answer} (orange arrow).`];
+    quiz!.result = [false, "Here's their idea."];
     refresh();
   } else {
     void startTask("quiz");
