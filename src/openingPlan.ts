@@ -159,7 +159,7 @@ async function chooseMove(
   if (sameAsBest) {
     note = pick.candidate.kind === "adapt"
       ? `Adapt: ${pick.candidate.adaptation!.why}`
-      : `${capital(kindWords(pick.candidate, system))} - and also Stockfish's choice.`;
+      : `${capital(kindWords(pick.candidate, system))} - and the strongest move too.`;
   } else if (deviate) {
     const drop = dropsMaterial ? ` - and after ${openingSan} your opponent could win material back` : "";
     note =

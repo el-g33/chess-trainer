@@ -39,6 +39,15 @@ const replayOf = (recorded: Recording): CoachEngine => ({
   },
 });
 
+// Where the web app says it in its own words (the same idea, plainer): the
+// desktop's text, reworded the same way, so the rest is still compared exactly
+function webWording(text: string): string {
+  return text
+    .replace("• No tactics in their moves in Stockfish's line: a quiet, positional sequence.", "• No tactics in their moves here: a quiet, positional line.")
+    .replace("• No tactics in your moves in Stockfish's line: improve your pieces and keep everything protected.",
+      "• No tactics in your moves here: improve your pieces and keep everything protected.");
+}
+
 function compare(label: string, desktop: unknown, web: unknown) {
   checks++;
   if (JSON.stringify(desktop) !== JSON.stringify(web)) {
@@ -59,7 +68,7 @@ for (const item of cases.cases) {
       { serious: threat.serious, move: threat.threatMove ? makeUci(threat.threatMove) : null, good: [...threat.goodGuesses].sort() });
     const plan = await planAhead(replay, position);
     compare(`Plan text, ${item.fen}`, item.plan.text, plan.text);
-    compare(`Ideas text, ${item.fen}`, item.ideas, explainIdeas(position, threat, plan));
+    compare(`Ideas text, ${item.fen}`, webWording(item.ideas), explainIdeas(position, threat, plan));
     for (const grade of item.grades) {
       const guess = toMove(threat.passed!, grade.guess);
       compare(`Quiz grade ${grade.guess}, ${item.fen}`, grade.result, gradeGuess(threat, guess));

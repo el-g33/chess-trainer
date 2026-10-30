@@ -358,7 +358,7 @@ export function drawReview(reviews: (Review | undefined)[], info: OpeningInfo[])
       }
     }
     if (!ratingsOn()) paragraph("Move ratings are switched off.");
-    else if (ply === 0) paragraph("Make a move, or click a move in the list, to see what Stockfish thinks of it.");
+    else if (ply === 0) paragraph("Make a move, or tap a move in the list, to see what I think of it.");
     else if (!reviews[ply - 1]) paragraph("Stockfish is checking this move...");
     else {
       showRating(reviews[ply - 1]!);

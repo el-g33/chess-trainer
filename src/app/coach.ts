@@ -48,7 +48,7 @@ import {
 import { analysisLineText, goTo } from "./moves";
 import {
   cap, depthCard, drillSays, lowerFirst, openingShortName, practiceSays, scheduleDemo, showWhatYouGet, startDemoLine,
-  practiseGameSlips,
+  movePicture, practiseGameSlips,
 } from "./openingDemos";
 import { importGames, importing, importNote, reviewImported } from "./onlineGames";
 import { openPgnDialog, openSave } from "./pgnScreens";
@@ -352,7 +352,7 @@ export function quizInWords(): string[] {
   const first = kind === "mistake" ? "That move wouldn't be a threat: it would be a mistake for them, and you could punish it."
     : kind === "smaller-threat" ? "That's a threat too, but a smaller one."
     : "That move doesn't threaten anything serious.";
-  return idea ? [first, `Their real idea: ${lowerFirst(idea)}`] : [first];
+  return idea ? [first, idea] : [first];
 }
 
 /** Tell me more: the full review of the move (or the demo note, or the quiz result). */
@@ -397,13 +397,47 @@ export function explainMove(ply: number, review: Review) {
   if (review.rating === "Great") return void explainGreat(ply);
   if (WORTH_SHOWING.has(review.rating) && review.bestSan) return void explainSlip(ply, review);
   if (notTheBest(ply, review)) return void showBestLine(ply);
+  void explainGoodMove(ply, review);
+}
+
+/** A move's idea in a few words, straight in: "Brings the knight out and
+ *  eyes the centre." (no "Their idea:" - the arrows show whose move it is) */
+export function ideaWords(before: Chess, move: NormalMove, viewer: Color | null): string {
+  return `${cap(whyMove(before, move, viewer).replace(/^it /, ""))}.`;
+}
+
+/** Tell me more on a good move: one picture of what it does - the squares the
+ *  piece now controls, the pawn chain, the square it takes away - and a few
+ *  words. Only a move that sets something up (a check, or a piece it can now
+ *  win) is played on, a few moves, to show what it sets up. */
+export async function explainGoodMove(ply: number, review: Review) {
   const before = game.positionAt(ply - 1);
   const played = game.moves[ply - 1].move;
-  const you = listener();
-  const mine = !you || game.moverOf(ply) === you;
-  const why = whyMove(before, played, mine ? game.moverOf(ply) : you);
-  const text = `${review.rating === "Book" ? "A known opening move" : mine ? "Why it's good" : "Their idea"}: ${why}.`;
-  startStepper([before, positionAfter(before, played)], [played], [text], moodForRating(review.rating), undefined, true);
+  const after = positionAfter(before, played);
+  const mover = game.moverOf(ply);
+  const viewer: Color | null = watching() ? null : listener() ?? mover;
+  const yours = viewer === null || mover === viewer;
+  const hits = after.isCheck() ? [] : targetsOf(after, played.to);
+  const setsUp = after.isCheck() || hits.length > 0;
+  const shapes: DrawShape[] = [
+    ...movePicture(before, after, played, yours, viewer),
+    ...hits.map((square): DrawShape => ({ orig: makeSquare(square) as Key, brush: "threat" })),
+  ];
+  const text = review.rating === "Book" ? `Known opening theory. ${ideaWords(before, played, viewer)}` : ideaWords(before, played, viewer);
+  const card = startStory({ position: after, shapes }, text, moodForRating(review.rating), setsUp ? ["The move", "What it sets up"] : []);
+  if (!setsUp || after.isEnd()) return;
+  try {
+    // what it sets up: the line from here, a few moves
+    const next = await coachLine(after, 1.5);
+    const line = wholeLine(after, next?.pv ?? [], 3);
+    if (!next || !line.length) return;
+    const pages = linePages(after, line, viewer);
+    pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(after, line, next.score, mover, viewer)}`;
+    extendPages(card, pages.frames, pages.texts, 1);
+  } catch (error) {
+    set.errorText(`Something went wrong: ${error}`);
+    refresh();
+  }
 }
 
 /** A good move that wasn't Stockfish's top choice. */
@@ -560,9 +594,9 @@ export async function showBestLine(ply: number) {
   const mover = game.moverOf(ply);
   const viewer: Color | null = watching() ? null : listener() ?? mover;
   const mine = viewer === null || mover === viewer;
-  const why = `${cap(whyMove(before, played, viewer))}.`;
-  const card = startStory({ position: positionAfter(before, played), shapes: moveShapes(before, played, viewer) }, why,
-    moodForRating(review.rating), [mine ? "Why it's good" : "Their idea", "Best move"]);
+  const after = positionAfter(before, played);
+  const card = startStory({ position: after, shapes: movePicture(before, after, played, mine, viewer) }, ideaWords(before, played, viewer),
+    moodForRating(review.rating), ["This move", "Top move"]);
   try {
     const line = await coachLine(before, 1.5, [best]);
     const moves = wholeLine(before, line?.pv.length ? line.pv : [best], 3);
@@ -672,7 +706,7 @@ export async function explainBrilliant(ply: number) {
   const whose = whoseOf(mover, viewer);
   const intro = `A masterstroke! ${narrateMove(before, played, viewer)}`;
   const trapped = piece !== undefined && takes.length > 0;
-  let first = `${intro} A bold move that Stockfish confirms.`;
+  let first = `${intro} Bold, and it holds up.`;
   if (trapped) {
     // who can take it: the cheapest piece that can
     const taker = takes.map((m) => after.board.get(m.from)!.role).sort((a, b) => MATERIAL[a] - MATERIAL[b])[0];
@@ -723,7 +757,7 @@ export async function explainGreat(ply: number) {
   const piece = before.board.get(played.from)!;
   const attacked = before.kingAttackers(played.from, opposite(mover), before.board.occupied).nonEmpty();
   const reason = attacked && piece.role !== "king" ? `It gets ${whoseOf(mover, viewer)} ${NAME[piece.role]} out of danger.` : why && why !== "it's a useful waiting move" ? `${cap(why)}.` : "";
-  const intro = `The key move! ${narrateMove(before, played, viewer)} ${reason} It was the only good move here: everything else was clearly worse.`.replace(/  +/g, " ");
+  const intro = `The key move! ${narrateMove(before, played, viewer)} ${reason} The only good move here.`.replace(/  +/g, " ");
   startStepper([before, after], [played], [intro], "happy");
   const card = stepper;
   try {
@@ -928,7 +962,7 @@ export async function openStrategy() {
     if (known) {
       moves = known.moves;
       texts = [...known.texts];
-      texts[0] = `The ${known.name.replace(/ \(.*\)$/, "")} plan: ${lowerFirst(texts[0])}`;
+      // (the opening's own words for its plan)
       positions = [position];
       for (const move of moves) positions.push(positionAfter(positions[positions.length - 1], move));
     } else {
@@ -938,16 +972,15 @@ export async function openStrategy() {
       // spoken to the side to move, unless you've picked a side
       const viewer = listener() ?? position.turn;
       texts = moves.map((move, i) => narrateMove(positions[i], move, viewer));
-      if (moves.length && isSacrifice(positions[0], moves[0], positions[1])) texts[0] = `There's a masterstroke here! ${texts[0]}`;
-      else if (texts.length) texts[0] = `The best plan: ${lowerFirst(texts[0])}`;
+      if (moves.length && isSacrifice(positions[0], moves[0], positions[1])) texts[0] = `A masterstroke! ${texts[0]}`;
     }
     setBusy(false);
     // (the plan's own first move isn't an alternative to itself)
     const alternative = found && !(moves[0] && makeUci(found.move) === makeUci(moves[0])) ? found : undefined;
-    const extra: CoachButton = alternative
+    const extra: CoachButton | undefined = alternative
       ? { ico: style === "attacking" ? "hazard" : "bulb", label: style === "attacking" ? "A sharper way" : "A more positional way",
           kind: "accent", labelled: true, run: () => showStyleAlternative(position, alternative.pv, style) }
-      : QUIZ;
+      : reviewing ? undefined : QUIZ; // (the threat quiz is for a game going on, not a review)
     if (alternative && texts.length) texts[texts.length - 1] += ` There's also a ${style === "attacking" ? "sharper" : "more positional"} way that's nearly as good.`;
     startStepper(positions, moves, texts, "talk", extra);
   } catch (error) {
@@ -966,9 +999,9 @@ export function showStyleAlternative(position: Chess, pv: NormalMove[], style: S
   const story = talkLine(position, line, viewer);
   const texts = [...story.texts];
   texts[0] = style === "attacking"
-    ? `A sharper way: ${lowerFirst(moveInWords(position, line[0], viewer))} It's nearly as strong, and it puts more pressure on their king.`
-    : `A more positional way: ${lowerFirst(moveInWords(position, line[0], viewer))} It's nearly as strong, and it keeps your position solid.`;
-  startStepper(story.positions, line, texts, "talk", QUIZ);
+    ? `${cap(moveInWords(position, line[0], viewer))} Nearly as strong, with more pressure on their king.`
+    : `${cap(moveInWords(position, line[0], viewer))} Nearly as strong, and solid.`;
+  startStepper(story.positions, line, texts, "talk", reviewing ? undefined : QUIZ);
 }
 
 // -- The move strip (phones) and the views (board, statistics, history) --------
@@ -1692,7 +1725,7 @@ export function turnText(): string {
   if (plan && preview) {
     const step = plan.steps[preview.step - 1];
     const who = step.who === "You" ? "you play" : "your opponent plays";
-    return `Previewing Stockfish's line (not played): move ${preview.step} of ${plan.steps.length}, ${who} ${step.san}`;
+    return `Preview (not played): move ${preview.step} of ${plan.steps.length}, ${who} ${step.san}`;
   }
   if (viewPly !== null) return "Looking back - the game itself is unchanged";
   if (quizWaiting()) return `Quiz: move one of ${colourName(quiz!.threat!.them)}'s pieces to show their idea`;
@@ -1838,7 +1871,7 @@ export function drawCoach() {
         reveal,
       );
     } else {
-      section("The masterstroke", `${brilliant.text}\n\nStockfish's line: ${brilliant.line}`);
+      section("The masterstroke", `${brilliant.text}\n\nThe line: ${brilliant.line}`);
     }
   }
   if (insight.threat && !hidden) textSection(insight.threat.text);

@@ -184,14 +184,11 @@ export function openingShortName(name: string): string {
 /** On each move of a demo: what the piece now controls, the pawn chain it
  *  builds, and the square a quiet move takes away. At the start: where the
  *  pieces are heading. */
-export function demoShapes(): DrawShape[] {
-  if (!demo || demo.intro) return [];
-  const ply = currentPly();
-  if (ply === 0) return []; // the start: nothing drawn (the introduction showed where the pieces go)
-  const before = game.positionAt(ply - 1);
-  const after = game.positionAt(ply);
-  const move = game.moves[ply - 1].move;
-  const yours = before.turn === orientation;
+/** What a move does, as a picture: arrows to the squares the piece now
+ *  controls (the centre, and pieces it hits), the pawn chain it builds, and
+ *  the square it takes away from them. (The lessons, and Tell me more on a
+ *  good move in a review.) */
+export function movePicture(before: Chess, after: Chess, move: NormalMove, yours: boolean, viewer: Color | null): DrawShape[] {
   const shapes: DrawShape[] = [];
   const marked = new Set<number>();
   const mark = (square: number) => {
@@ -205,7 +202,19 @@ export function demoShapes(): DrawShape[] {
     }
   }
   for (const square of chainOf(after, move.to)) mark(square);
-  for (const square of quietIdea(before, move, orientation)?.squares ?? []) mark(square);
+  for (const square of quietIdea(before, move, viewer)?.squares ?? []) mark(square);
+  return shapes;
+}
+
+export function demoShapes(): DrawShape[] {
+  if (!demo || demo.intro) return [];
+  const ply = currentPly();
+  if (ply === 0) return []; // the start: nothing drawn (the introduction showed where the pieces go)
+  const before = game.positionAt(ply - 1);
+  const after = game.positionAt(ply);
+  const move = game.moves[ply - 1].move;
+  const yours = before.turn === orientation;
+  const shapes = movePicture(before, after, move, yours, orientation);
   // The moves and squares this note talks about
   const label = demo.steps[ply - 1]?.label;
   for (const item of (label && demo.demo.lines[demo.line].arrows?.[label]) || []) {

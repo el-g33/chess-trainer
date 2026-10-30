@@ -382,13 +382,13 @@ export function explainIdeas(position: Chess, threat: Threat, plan: Plan, extra:
   if (threat.threatSan && threat.serious) lines.push(`• Their threat right now: ${threat.threatSan} (see the orange arrow).`);
   lines.push(...theirIdeas.map((idea) => `• ${idea}`));
   if (lines[lines.length - 1] === "Your opponent's ideas") {
-    lines.push("• No tactics in their moves in Stockfish's line: a quiet, positional sequence.");
+    lines.push("• No tactics in their moves here: a quiet, positional line.");
   }
 
   lines.push("", "Your ideas");
   lines.push(...yourIdeas.map((idea) => `• ${idea}`));
   if (lines[lines.length - 1] === "Your ideas") {
-    lines.push("• No tactics in your moves in Stockfish's line: improve your pieces and keep everything protected.");
+    lines.push("• No tactics in your moves here: improve your pieces and keep everything protected.");
   }
 
   lines.push("", "About the position");

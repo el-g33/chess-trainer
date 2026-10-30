@@ -54,7 +54,7 @@ export async function explainGuess(engine: CoachEngine, threat: Threat, guess: N
       text:
         `${guessSan} isn't a threat - it would actually be a mistake for ${them}. ` +
         `You could punish it with ${replySan} (${replyWords})${why}, and you'd be about ${Math.round(-cost)}% better off than now.` +
-        (lineText ? `\nStockfish's line after ${guessSan}: ${lineText}` : ""),
+        (lineText ? `\nHow it goes on after ${guessSan}: ${lineText}` : ""),
     };
   }
   if (cost >= THREAT_COST) {
