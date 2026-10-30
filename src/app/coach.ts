@@ -463,7 +463,7 @@ export async function explainGoodMove(ply: number, review: Review) {
     const line = wholeLine(after, next?.pv ?? [], 3);
     if (!next || !line.length) return;
     const pages = linePages(after, line, viewer);
-    pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(after, line, next.score, mover, viewer)}`;
+    endWith(pages.texts, lineOutcome(after, line, next.score, mover, viewer));
     extendPages(card, pages.frames, pages.texts, 1);
   } catch (error) {
     set.errorText(`Something went wrong: ${error}`);
@@ -533,7 +533,11 @@ export function showStory(card: Stepper) {
   refresh();
 }
 
-/** A slip, in three parts: why it isn't the best, what it allows, better was. */
+/** A slip, told in as many pages as it needs. A simple take (they can just
+ *  take something, and nothing takes back) is one page: the take, and why
+ *  it's free. A real tactic plays out its moves. Then, for your own slip (or
+ *  a big one of theirs), the better move - and its line only when the slip
+ *  wasn't a simple one. The card never repeats what the bubble just said. */
 export async function explainSlip(ply: number, review: Review) {
   const before = game.positionAt(ply - 1);
   const after = game.positionAt(ply);
@@ -541,69 +545,86 @@ export async function explainSlip(ply: number, review: Review) {
   const mover = game.moverOf(ply);
   const viewer: Color | null = watching() ? null : listener() ?? mover;
   const mine = viewer === null || mover === viewer;
-  const beforeEval = analyser.evals.get(fenOf(before));
-  const afterEval = analyser.evals.get(fenOf(after));
-  const info = openingInfo();
-  const danger = dangerAfter(review, before, after, beforeEval, afterEval, !!info[ply - 1]?.book, viewer);
-  const reply = after.isEnd() ? undefined : afterEval?.best;
-  // Why: what it costs in a few words; the arrow shows their idea, and Next plays it out
-  // (the chips above the text name each part, so the text needn't)
-  const why = danger ? danger.text : "It's a small slip.";
-  const shapes = moveShapes(before, played, viewer).slice(0, 1);
-  if (reply) {
-    shapes.push({ orig: makeSquare(reply.from) as Key, dest: arrowEnd(after, reply), brush: mine ? "them" : "you" });
-    if (after.board.get(reply.to)) shapes.push({ orig: makeSquare(reply.to) as Key, brush: "threat" });
-  }
   const theirSlip = !mine && viewer !== null;
   if (theirSlip && (review.rating === "Miss" || review.rating === "Missed Win")) return void explainEscape(ply, review);
-  const card = startStory({ position: after, shapes }, why, moodForRating(review.rating),
-    theirSlip ? ["Why", "Their better option", "How it goes on"] : ["Why", "Your better option", "How it goes on"]);
+  const reply = after.isEnd() ? undefined : analyser.evals.get(fenOf(after))?.best;
+  const shapes = moveShapes(before, played, viewer).slice(0, 1);
+  const card = startStory({ position: after, shapes }, "", moodForRating(review.rating), []); // (filled in below, shown once ready)
   // Yours: at the end, a go at finding the better move yourself
   if (!theirSlip) card.extra = { ico: "target", label: "Find it yourself", kind: "accent", labelled: true, run: () => findItYourself(ply) };
   moveSound(makeSan(before, played), before.turn);
+  const frames: StepFrame[] = [];
+  const texts: string[] = [];
+  const chapterOf: number[] = [];
+  const chapters: string[] = [];
+  const add = (heading: string, more: StepFrame[], words: string[]) => {
+    if (!chapters.includes(heading)) chapters.push(heading);
+    frames.push(...more);
+    texts.push(...words);
+    chapterOf.push(...more.map(() => chapters.indexOf(heading)));
+  };
+  let simple = false;
   try {
-    // What it allows: the best line after the move, played on until the
-    // material the first page promised is actually won
     if (reply) {
       const punish = await coachLine(after, 1.5);
-      const promised = danger ? promisedGain(danger.text) : 0;
-      const won = promised ? lineToGain(after, punish?.pv ?? [], opposite(mover), promised) : undefined;
-      // (the longer of the two: the pawn may only be the start of it)
-      const plain = wholeLine(after, punish?.pv ?? [], 3);
-      const line = won && won.length > plain.length ? won : plain;
-      // the first page says what the line really wins: no more, no less
-      let end = after;
-      for (const move of line) end = positionAfter(end, move);
-      const gain = materialFor(end, opposite(mover)) - materialFor(after, opposite(mover));
-      const queenGone = end.board.pieces(mover, "queen").size() < after.board.pieces(mover, "queen").size();
-      if (promised && gain >= 3 && queenGone && promised < 9) card.texts[0] = mine ? "You can lose your queen here." : "You can win their queen here.";
-      else if (promised && gain >= 3 && promised < 3) card.texts[0] = mine ? "You can lose a piece here." : "You can win a piece here.";
-      else if (promised && gain < promised) card.texts[0] = mine ? "This gives them the better game." : "This gives you the better game.";
-      if (punish && line.length) {
+      const pv = punish?.pv.length ? punish.pv : [reply];
+      const victim = after.board.get(reply.to);
+      const took = positionAfter(after, reply);
+      const next = pv[1] ? normalizeMove(took, pv[1]) as NormalMove : undefined;
+      // a simple take: it takes something of the mover's, and the answer neither takes back nor checks
+      simple = !!victim && victim.color === mover && !(next && (took.board.get(next.to) || positionAfter(took, next).isCheck()));
+      if (simple) {
+        add("Why", [{ position: took, shapes: moveShapes(after, reply, viewer).slice(0, 1) }], [freeTakeWords(after, reply, mover, viewer)]);
+      } else {
+        // a real tactic: its moves, played on until the material is won
+        const danger = dangerAfter(review, before, after, analyser.evals.get(fenOf(before)), analyser.evals.get(fenOf(after)), !!openingInfo()[ply - 1]?.book, viewer);
+        const promised = danger ? promisedGain(danger.text) : 0;
+        const won = promised ? lineToGain(after, pv, opposite(mover), promised) : undefined;
+        const plain = wholeLine(after, pv, 3);
+        const line = won && won.length > plain.length ? won : plain;
         const pages = linePages(after, line, viewer);
-        pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(after, line, punish.score, opposite(mover), viewer)}`;
-        extendPages(card, pages.frames, pages.texts, 0); // (what it allows is part of why)
+        if (punish) endWith(pages.texts, lineOutcome(after, line, punish.score, opposite(mover), viewer));
+        add("Why", pages.frames, pages.texts);
       }
     }
-    // Your better option: what the better move does
+    if (!frames.length) add("Why", [{ position: after, shapes }], ["It's a small slip."]);
+    // The better move: yours always; theirs only for a big slip that wasn't a simple take
     const best = parseSan(before, review.bestSan!) as NormalMove | undefined;
-    if (!best) return;
-    // (played on the board, with its picture: so How it goes on starts from the reply)
+    if (!best || (theirSlip && (simple || review.rating !== "Blunder"))) return;
+    const heading = viewer === null ? "The better move" : theirSlip ? "Their better option" : "Your better option";
     const afterBest = positionAfter(before, best);
-    extendPages(card, [{ position: afterBest, shapes: movePicture(before, afterBest, best, mine, viewer) }], [whyBetter(before, after, best, reply, viewer)], 1);
+    add(heading, [{ position: afterBest, shapes: movePicture(before, afterBest, best, mine, viewer) }], [whyBetter(before, after, best, reply, viewer)]);
+    if (simple) return; // (nothing more to see after a simple take)
     // How it goes on: the better move's line, from their reply
     const better = await coachLine(before, 1.5, [best]);
     const line = wholeLine(before, better?.pv.length ? better.pv : [best], 3);
     if (line.length < 2) return;
     const pages = linePages(afterBest, line.slice(1), viewer);
-    if (better) pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(before, line, better.score, mover, viewer)}`;
-    extendPages(card, pages.frames, pages.texts, 2);
+    if (better) endWith(pages.texts, lineOutcome(before, line, better.score, mover, viewer));
+    add("How it goes on", pages.frames, pages.texts);
   } catch (error) {
     set.errorText(`Something went wrong: ${error}`);
     refresh();
   } finally {
+    if (!frames.length) add("Why", [{ position: after, shapes }], ["It's a small slip."]);
+    card.frames = frames;
+    card.texts = texts;
+    card.chapterOf = chapterOf;
+    card.chapters = chapters.length > 1 ? chapters : []; // (one part needs no heading)
     showStory(card);
   }
+}
+
+/** Why a take is free, from the viewer's side: nothing guards it (or taking
+ *  still wins), and no strong answer. (What's taken, the bubble has said.) */
+function freeTakeWords(after: Chess, take: NormalMove, mover: Color, viewer: Color | null): string {
+  const guarded = after.kingAttackers(take.to, mover, after.board.occupied).nonEmpty();
+  const taker = opposite(mover);
+  if (viewer === null) {
+    return `${guarded ? "It's guarded, but taking still wins material" : `Nothing guards it, so ${colourName(taker)} can just take it`}, and ${colourName(mover)} has no good way to hit back.`;
+  }
+  if (viewer === taker) return `${guarded ? "It's guarded, but taking still wins material" : "Nothing guards it, so it's yours to take"}, and they've no good way to hit back.`;
+  return `${guarded ? "It was guarded, but taking still won them material" : "Nothing guarded it, so they could just take it"}, and you'd have no good way to hit back.`;
 }
 
 /** A chance they missed against you: what they could have played, shown
@@ -622,7 +643,7 @@ export async function explainEscape(ply: number, review: Review) {
     const moves = wholeLine(before, line?.pv.length ? line.pv : [best], 3);
     if (moves.length < 2) return;
     const pages = linePages(afterBest, moves.slice(1), viewer);
-    if (line) pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(before, moves, line.score, mover, viewer)}`;
+    if (line) endWith(pages.texts, lineOutcome(before, moves, line.score, mover, viewer));
     extendPages(card, pages.frames, pages.texts, 1);
   } catch (error) {
     set.errorText(`Something went wrong: ${error}`);
@@ -712,7 +733,7 @@ export async function showBestLine(ply: number) {
     const moves = wholeLine(before, line?.pv.length ? line.pv : [best], 3);
     const pages = linePages(before, moves, viewer);
     pages.texts[0] = cap(moveInWords(before, best, viewer));
-    if (line && moves.length > 1) pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(before, moves, line.score, mover, viewer)}`;
+    if (line && moves.length > 1) endWith(pages.texts, lineOutcome(before, moves, line.score, mover, viewer));
     extendPages(card, pages.frames, pages.texts, 1);
   } catch (error) {
     set.errorText(`Something went wrong: ${error}`);
@@ -733,6 +754,13 @@ export function materialFor(position: Chess, side: Color): number {
     total += (piece.color === side ? 1 : -1) * MATERIAL[piece.role];
   }
   return total;
+}
+
+/** "In the end, ..." on a line's last page (not when that page has just said checkmate). */
+export function endWith(texts: string[], outcome: string) {
+  const last = texts.length - 1;
+  if (last < 0 || (outcome.includes("checkmate") && /checkmate/i.test(texts[last]))) return;
+  texts[last] += ` In the end, ${outcome}`;
 }
 
 /** How a line ends for `side`, in words: checkmate, the biggest piece won, or
@@ -759,7 +787,11 @@ export function lineOutcome(start: Chess, line: NormalMove[], score: Score, side
     const who = viewer === null ? colourName(side) : you ? "you" : "they";
     return `${who} ${viewer === null ? "comes" : "come"} out ${gain >= 2 ? "two pawns" : "a pawn"} up.`;
   }
-  return `${verdictWords(score)}.`;
+  // from your side when you've picked one: "you're clearly better", not "White is"
+  const words = verdictWords(score);
+  if (viewer === null) return `${words}.`;
+  return `${words.replace(new RegExp(`^${colourName(viewer)} is`), "you're").replace(new RegExp(`^${colourName(opposite(viewer))} is`), "they're")
+    .replace(new RegExp(`^${colourName(viewer)} can`), "you can").replace(new RegExp(`^${colourName(opposite(viewer))} can`), "they can")}.`;
 }
 
 /** The first `count` moves of a line, carried on while pieces are still
@@ -841,7 +873,7 @@ export async function explainBrilliant(ply: number) {
       const best = await coachLine(after, 1);
       const trap = best?.pv[0] && makeUci(best.pv[0]) !== makeUci(line[0]);
       const texts = story.texts.map((text, i) => i === 0 ? `If ${viewer === null ? colourName(opposite(mover)) : "they"} take${viewer === null ? "s" : ""} it: ${lowerFirst(text)}` : text);
-      texts[texts.length - 1] += ` In the end, ${lineOutcome(after, line, taken.score, mover, viewer)}`;
+      endWith(texts, lineOutcome(after, line, taken.score, mover, viewer));
       if (trap) texts[texts.length - 1] += viewer === null ? ` So ${colourName(opposite(mover))} shouldn't take it.` : " So they shouldn't take it.";
       extendStepper(card, story.positions.slice(1), line, texts);
       return;
@@ -852,7 +884,7 @@ export async function explainBrilliant(ply: number) {
     const line = wholeLine(after, best.pv, 4);
     const story = talkLine(after, line, viewer);
     const texts = [...story.texts];
-    texts[texts.length - 1] += ` In the end, ${lineOutcome(after, line, best.score, mover, viewer)}`;
+    endWith(texts, lineOutcome(after, line, best.score, mover, viewer));
     extendStepper(card, story.positions.slice(1), line, texts);
   } catch (error) {
     set.errorText(`Something went wrong: ${error}`);
