@@ -16,6 +16,7 @@ import { overlayOpen } from "./coach";
 import { $, fenInput } from "./dom";
 import { refresh } from "./draw";
 import { afterMove, coachMyOpening, maybeOpponentMove } from "./matches";
+import { momentStep } from "./keyMoments";
 import { drillMove, practiceMove } from "./openingDemos";
 import { reviewPgnGame } from "./pgnScreens";
 import { moveSound } from "./startMenu";
@@ -210,6 +211,7 @@ export function navigate(where: "first" | "back" | "forward" | "last") {
     else while (analysis.ahead.length) analysisForward();
     return;
   }
+  if ((where === "back" || where === "forward") && momentStep(where)) return; // (key moments only: the next one)
   if (where === "first") goTo(0);
   else if (where === "back") goTo(currentPly() - 1);
   else if (where === "forward") goTo(currentPly() + 1);

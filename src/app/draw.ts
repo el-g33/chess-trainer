@@ -27,6 +27,7 @@ import {
 import {
   $, coachPanel, demoPanel, evalBar, modeTitle, planModeRow, reviewArea, showDemoButton, undoButton,
 } from "./dom";
+import { drawMomentsBar } from "./keyMoments";
 import { drawPrep, drawStatsBack } from "./matches";
 import { drawWhatIf, movableColour, premoveColour } from "./moves";
 import { checkDeeper, demoShapes, drawDemo, drawDrillSetup, drillShapes, practiceShapes } from "./openingDemos";
@@ -66,6 +67,7 @@ export function refresh() {
   drawDemo();
   drawPrep(reviews);
   drawStatsBack();
+  drawMomentsBar();
 }
 
 /** Show the parts of the page that belong to the current mode. */

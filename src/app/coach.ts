@@ -45,6 +45,7 @@ import { arrowEnd, refresh } from "./draw";
 import {
   gameKey, jumpToGrade, onReviewGame, startReview, stopPreparing, watching, withBook, restoreAnalysis,
 } from "./matches";
+import { keyMomentsCard } from "./keyMoments";
 import { analysisLineText, goTo } from "./moves";
 import {
   cap, depthCard, drillSays, lowerFirst, openingShortName, practiceSays, scheduleDemo, showWhatYouGet, startDemoLine,
@@ -76,7 +77,8 @@ export interface CoachButton {
   ico: string;
   label: string;
   run: () => void;
-  kind?: "accent" | "soft" | "hazard" | `hazard ${string}`;
+  kind?: "accent" | "soft" | "hazard" | `hazard ${string}` | `sign ${string}`;
+  more?: boolean; // the move's own button (it pulses while its card is worked out)
   labelled?: boolean; // shows its label as well as the icon
 }
 
@@ -105,7 +107,29 @@ export function listener(): Color | null {
   return null;
 }
 
-export const TELL_MORE: CoachButton = { ico: "dots", label: "Tell me more", run: () => openMore() };
+export const TELL_MORE: CoachButton = { ico: "dots", label: "Tell me more", run: () => openMore(), more: true };
+
+/** The move's own button, as a sign of what kind of move it was: a warning
+ *  for a slip (coloured by what it costs), a gift for their slip, a star for
+ *  a masterstroke or key move, the bulb for a good move with a better one,
+ *  an arrow for a move that sets something up. A quiet move gets none. */
+export function moveButton(ply: number, review: Review): CoachButton | null {
+  const before = game.positionAt(ply - 1);
+  const after = game.positionAt(ply);
+  const viewer: Color | null = watching() ? null : listener();
+  const theirs = viewer !== null && game.moverOf(ply) !== viewer;
+  const run = () => openMore();
+  if (WORTH_SHOWING.has(review.rating) && review.bestSan) {
+    if (theirs) return { ico: "gift", label: "Your chance", run, kind: "sign chance", more: true };
+    const danger = dangerAfter(review, before, after, analyser.evals.get(fenOf(before)), analyser.evals.get(fenOf(after)), !!openingInfo()[ply - 1]?.book, viewer);
+    return { ico: "hazard", label: "What went wrong", run, kind: `hazard ${danger?.level ?? "yellow"}`, more: true };
+  }
+  if (review.rating === "Brilliant" || review.rating === "Great") return { ico: "star", label: "Why it works", run, kind: "sign star", more: true };
+  if (notTheBest(ply, review)) return { ico: "bulb", label: "See the best move", run: () => void showBestLine(ply), kind: "sign idea", more: true };
+  const played = game.moves[ply - 1].move;
+  if (!after.isEnd() && (after.isCheck() || targetsOf(after, played.to).length)) return { ico: "setup", label: "What it sets up", run, kind: "sign setup", more: true };
+  return null;
+}
 export const STRATEGY: CoachButton = { ico: "target", label: "Strategy", run: () => void openStrategy(), kind: "accent" };
 
 /** What the coach says about the position on screen. */
@@ -188,9 +212,9 @@ export function coachSays(reviews: (Review | undefined)[]): CoachSay {
   const before = game.positionAt(ply - 1);
   const after = game.positionAt(ply);
   let text = verdict(review, before, after, analyser.evals.get(fenOf(after)), listener(), ply, watching());
-  // a good move that wasn't the best: the bulb (why it's good, then the best move) instead of Tell me more
-  const more: CoachButton = notTheBest(ply, review) ? { ico: "bulb", label: "See the best move", run: () => void showBestLine(ply) } : TELL_MORE;
-  const buttons = [more, STRATEGY];
+  // the move's own button, a sign of what kind of move it was (none for a quiet one)
+  const more = moveButton(ply, review);
+  const buttons = more ? [more, STRATEGY] : [STRATEGY];
   // Your slips saved as puzzles: said at each one, and offered at the end of the game
   const saved = reviewing && savedFromReview?.key === gameKey() ? savedFromReview : null;
   if (saved?.plies.includes(ply)) text += " I've saved this one to Your mistakes.";
@@ -198,7 +222,7 @@ export function coachSays(reviews: (Review | undefined)[]): CoachSay {
     const count = saved.plies.length;
     text += ` That's the game. Want to try ${count === 1 ? "your slip" : `your ${count} slips`} now, while ${count === 1 ? "it's" : "they're"} fresh?`;
     // (the puzzle button in place of Strategy: the strip keeps its size, so the words keep their room)
-    buttons.splice(0, buttons.length, { ico: "puzzle", label: "Try them now", run: practiseGameSlips, kind: "accent" }, more);
+    buttons.splice(0, buttons.length, { ico: "puzzle", label: "Try them now", run: practiseGameSlips, kind: "accent" }, more ?? STRATEGY);
   }
   return { mood: moodForRating(review.rating), text, buttons };
 }
@@ -223,6 +247,7 @@ export function iconButton(button: CoachButton, size = 18): HTMLButtonElement {
   element.setAttribute("aria-label", button.label);
   element.innerHTML = icon(button.ico, size);
   element.addEventListener("click", button.run);
+  if (button.more) element.dataset.more = "";
   return element;
 }
 
@@ -1253,14 +1278,8 @@ export function drawStats() {
          division.end !== undefined ? `endgame from move ${moveNumber(division.end)}` : "no endgame"].join(" · ") +
         ". A phase needs 3 moves from a player to be scored."));
   }
-  if (reviewing) {
-    const start = element("div", "stats-start");
-    const button = iconButton({ ico: "play", label: "Start the review", run: startReview, kind: "accent" }, 18);
-    button.classList.add("labelled");
-    button.append(element("span", "", "Start the review"));
-    start.append(button);
-    box.append(start);
-  }
+  // the game's turning points, and the two ways in: just those, or every move
+  if (reviewing) box.append(keyMomentsCard(withBook(list), startReview));
 
   box.append(card);
   if (reviewing) box.append(depthCard(pending));

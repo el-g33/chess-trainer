@@ -88,6 +88,12 @@ button.round.hazard {
   color: var(--hazard-fg);
 }
 
+/* The move's own button, a sign of what kind of move it was */
+button.round.sign.chance { background: #2f7fd8; color: #fff; }
+button.round.sign.star { background: #2e9e5b; color: #fff; }
+button.round.sign.idea { background: #f2d24b; color: #3a2a00; }
+button.round.sign.setup { background: var(--button); color: var(--text); border: 1px solid var(--line); }
+
 button.round.labelled {
   width: auto;
   padding: 0 14px 0 10px;
@@ -1212,6 +1218,53 @@ button.round.hazard.red { background: #d93025; color: #fff; }
   margin-bottom: 12px;
 }
 
+/* Key moments: the game's turning points, on the summary */
+.key-moments {
+  margin-bottom: 12px;
+}
+.key-moments-title {
+  margin: 0 0 6px;
+  font-weight: 700;
+}
+.key-moment {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+  text-align: left;
+}
+.moment-words {
+  flex: 1;
+  font-size: 0.9rem;
+}
+.moment-go {
+  color: var(--muted);
+}
+.moment-sign {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  flex: none;
+}
+.moment-sign.star { background: #2e9e5b; color: #fff; }
+.moment-sign.chance { background: #2f7fd8; color: #fff; }
+.moment-sign.amber { background: #f0a020; color: #3a2000; }
+.moment-sign.orange { background: #ff7a5a; color: #3a0d00; }
+.moment-sign.red { background: #d93025; color: #fff; }
+.key-moments .stats-start {
+  gap: 8px;
+  margin: 10px 0 0;
+}
+
 /* The move strip scrolls inside its own box; it mustn't widen the page */
 .board-area,
 .moves-area {
@@ -2058,7 +2111,7 @@ body.demo-intro .move-strip {
 }
 
 /* Tell me more while its pages are worked out: the button pulses */
-body.story-loading #strip-actions button[aria-label="Tell me more"] {
+body.story-loading #strip-actions button[data-more] {
   animation: story-loading 0.9s ease-in-out infinite alternate;
 }
 @keyframes story-loading {
