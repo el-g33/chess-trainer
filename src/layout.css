@@ -2057,33 +2057,19 @@ body.demo-intro .move-strip {
   font-weight: 700;
 }
 
-/* A move's story in parts: Why, What it allows, Better was */
+/* A move's story in parts: the heading of the part on show (Why, What it allows, ...) */
 .step-chapters {
   grid-area: chapters;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
   margin-bottom: 4px;
   padding-right: 36px; /* room for the page count */
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 .step-chapters[hidden] {
   display: none;
-}
-.step-chapters button {
-  min-height: 0;
-  padding: 2px 9px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--line);
-  color: var(--muted);
-  font-size: 0.78rem;
-}
-.step-chapters button.on {
-  background: var(--accent);
-  color: #fff;
-}
-.step-chapters button:disabled {
-  opacity: 0.45;
 }
 
 /* Settings: which version this is (to tell whether an update has arrived) */

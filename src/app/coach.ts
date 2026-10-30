@@ -885,20 +885,11 @@ export function drawStepper() {
   box.hidden = !stepper;
   if (!stepper) return;
   $("step-count").textContent = stepCount() > 1 ? `${stepper.step}/${stepCount()}` : "";
-  // the parts of the story, the current one lit (a tap jumps to it)
+  // the part of the story this page is about ("Why", "What it allows", ...): only that one
   const chapters = $("step-chapters");
-  const card = stepper;
-  chapters.hidden = !card.chapters;
-  chapters.replaceChildren(...(card.chapters ?? []).map((label, i) => {
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.textContent = label;
-    const first = card.chapterOf?.indexOf(i) ?? -1;
-    chip.classList.toggle("on", card.chapterOf?.[card.step - 1] === i);
-    chip.disabled = first < 0; // (still being worked out)
-    chip.addEventListener("click", () => stepTo(first + 1));
-    return chip;
-  }));
+  const heading = stepper.chapters?.[stepper.chapterOf?.[stepper.step - 1] ?? -1];
+  chapters.hidden = !heading;
+  chapters.textContent = heading ?? "";
   for (const id of ["step-back", "step-next"]) $(id).hidden = stepCount() < 2;
   stepTyper.type(stepper.texts[stepper.step - 1] ?? "");
   const frame = stepper.frames?.[stepper.step - 1];
