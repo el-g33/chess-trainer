@@ -300,6 +300,9 @@ Object.assign(ground.state.drawable.brushes, {
   them: { key: "them", color: OPPONENT_ARROW, opacity: 0.85, lineWidth: 10 },
   threat: { key: "threat", color: THREAT_ARROW, opacity: 0.9, lineWidth: 10 },
   guess: { key: "guess", color: GUESS_ARROW, opacity: 0.85, lineWidth: 10 },
+  // a piece's range: thin lines, a quieter colour than the move itself
+  scope: { key: "scope", color: "#3b7dd8", opacity: 0.6, lineWidth: 4 },
+  scopeThem: { key: "scopeThem", color: "#e57373", opacity: 0.6, lineWidth: 4 },
   deviate: { key: "deviate", color: DEVIATE_ARROW, opacity: 0.9, lineWidth: 10 },
   best: { key: "best", color: BEST_ARROW, opacity: 0.55, lineWidth: 7 },
   brilliant: { key: "brilliant", color: BRILLIANT_ARROW, opacity: 0.9, lineWidth: 10 },

@@ -19,7 +19,7 @@ import {
   MASTERED, type Mistake, type MistakeKind, type MistakeLine, type MistakePhase, addMistakes, comesBack,
   today as dayNumber, dueMistakes, loadMistakes, mistakeCounts, mistakeId, recordAttempt, saveLines,
 } from "../mistakes";
-import { controlledSquares, dangerAfter, moveInWords, narrateMove, quietIdea, ratingWords, targetsOf } from "../narrate";
+import { dangerAfter, pieceReach, moveInWords, narrateMove, quietIdea, ratingWords, targetsOf } from "../narrate";
 import { type Opening, REPERTOIRE, firstMoveOf, goalWords, menuName, setupProgress, systemFor } from "../openings";
 import { type Mark, chainOf, whatYouGet } from "../outlook";
 import { readPgn, today } from "../pgn";
@@ -197,15 +197,19 @@ export function movePicture(before: Chess, after: Chess, move: NormalMove, yours
     shapes.push({ orig: makeSquare(square) as Key, brush: yours ? "you" : "them" });
   };
   if (!isCastling(before, move)) {
-    // the squares it now controls: a small dot on each (calmer than an arrow to every one)
-    const colour = yours ? YOUR_ARROW : OPPONENT_ARROW;
-    for (const square of controlledSquares(after, move.to)) {
-      shapes.push({ orig: makeSquare(square) as Key, customSvg: { html: `<circle cx="50" cy="50" r="13" fill="${colour}" opacity="0.6"/>` } });
-    }
+    // what it now covers: a pawn's or knight's squares as dots, a long-range piece's lines as thin arrows
+    const reach = pieceReach(after, move.to);
+    for (const square of reach.dots) shapes.push(reachDot(square, yours));
+    for (const end of reach.lines) shapes.push({ orig: makeSquare(move.to) as Key, dest: makeSquare(end) as Key, brush: yours ? "scope" : "scopeThem" });
   }
   for (const square of chainOf(after, move.to)) mark(square);
   for (const square of quietIdea(before, move, viewer)?.squares ?? []) mark(square);
   return shapes;
+}
+
+/** A small dot on a square a piece covers. */
+export function reachDot(square: number, yours: boolean): DrawShape {
+  return { orig: makeSquare(square) as Key, customSvg: { html: `<circle cx="50" cy="50" r="13" fill="${yours ? YOUR_ARROW : OPPONENT_ARROW}" opacity="0.6"/>` } };
 }
 
 export function demoShapes(): DrawShape[] {
@@ -239,14 +243,16 @@ export async function showWhatYouGet() {
     const pages = await whatYouGet(coachAnalysis, position, orientation);
     setBusy(false);
     if (!demo) return refresh();
-    const brush = (mark: Mark) => (mark === "bad" ? "them" : mark === "plan" ? "guess" : "you");
+    const brush = (mark: Mark) => (mark === "bad" ? "them" : mark === "plan" ? "guess" : mark === "scope" ? "scope" : "you");
     const frames: StepFrame[] = pages.map((page) => ({
       position,
       shapes: [
-        ...page.arrows.map(([from, to, mark]): DrawShape => ({ orig: makeSquare(from) as Key, dest: arrowEnd(position, { from, to }), brush: brush(mark) })),
-        ...page.squares.map(([square, mark]): DrawShape => ({ orig: makeSquare(square) as Key, brush: brush(mark) })),
+        ...page.arrows.map(([from, to, mark]): DrawShape => ({ orig: makeSquare(from) as Key, dest: mark === "scope" ? makeSquare(to) as Key : arrowEnd(position, { from, to }), brush: brush(mark) })),
+        ...page.squares.map(([square, mark]): DrawShape => (mark === "scope" ? reachDot(square, true) : { orig: makeSquare(square) as Key, brush: brush(mark) })),
       ],
     }));
+    // the headings: each part once, in order
+    const chapters = [...new Set(pages.map((page) => page.part))];
     const line = demo.line;
     const more = line + 1 < demo.demo.lines.length;
     const chosen = demo.demo;
@@ -256,7 +262,8 @@ export async function showWhatYouGet() {
           { ico: "target", label: "Drill it", kind: "accent", labelled: true, run: () => { closeStepper(); startDrill(chosen); } },
           { ico: "knight", label: "Practice match", labelled: true, run: () => { closeStepper(); onDemoTry(); } },
         ];
-    set.stepper({ positions: frames.map((f) => f.position), moves: [], texts: pages.map((p) => p.text), step: 1, mood: "talk", extra, frames });
+    set.stepper({ positions: frames.map((f) => f.position), moves: [], texts: pages.map((p) => p.text), step: 1, mood: "talk", extra, frames,
+      chapters, chapterOf: pages.map((page) => chapters.indexOf(page.part)) });
     refresh();
   } catch (error) {
     set.errorText(`Something went wrong: ${error}`);

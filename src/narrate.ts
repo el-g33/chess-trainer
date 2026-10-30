@@ -248,6 +248,32 @@ export function controlledSquares(position: Chess, square: number): number[] {
   return [...new Set([...centre, ...targetsOf(position, square)])];
 }
 
+/** What a piece covers, for a picture: a pawn's two diagonal squares and a
+ *  knight's squares as dots; for a long-range piece, the far end of each line
+ *  it can move along (two squares or more), drawn as a thin line. */
+export function pieceReach(position: Chess, square: number): { dots: number[]; lines: number[] } {
+  const piece = position.board.get(square);
+  if (!piece || piece.role === "king") return { dots: [], lines: [] };
+  if (piece.role === "pawn" || piece.role === "knight") return { dots: [...attacks(piece, square, position.board.occupied)], lines: [] };
+  const straight = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const diagonal = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+  const directions = piece.role === "rook" ? straight : piece.role === "bishop" ? diagonal : [...straight, ...diagonal];
+  const lines: number[] = [];
+  for (const [df, dr] of directions) {
+    let [f, r, steps, end] = [square & 7, square >> 3, 0, -1];
+    for (;;) {
+      f += df;
+      r += dr;
+      if (f < 0 || f > 7 || r < 0 || r > 7) break;
+      end = r * 8 + f;
+      steps++;
+      if (position.board.occupied.has(end)) break;
+    }
+    if (steps >= 2) lines.push(end);
+  }
+  return { dots: [], lines };
+}
+
 /** Why a move is good, in a short clause: "it develops your knight and controls the centre". */
 export function whyMove(before: Chess, move: NormalMove, listener: Color | null): string {
   const piece = before.board.get(move.from);

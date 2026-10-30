@@ -3,20 +3,21 @@
 // watch out for. The plans and the verdict come from Stockfish; the shape
 // and the targets from looking at the board.
 
-import { attacks } from "chessops/attacks";
+import { attacks, between } from "chessops/attacks";
 import { Chess } from "chessops/chess";
 import { makeSan } from "chessops/san";
 import type { Color, NormalMove, Role } from "chessops/types";
 import { opposite } from "chessops/util";
 
 import { PIECE_VALUES } from "./coach";
-import { moveInWords } from "./narrate";
+import { pieceReach } from "./narrate";
 import { verdictWords } from "./review";
 import type { CoachEngine } from "./strategy";
 
-export type Mark = "good" | "bad" | "plan";
+export type Mark = "good" | "bad" | "plan" | "scope"; // scope: a piece's range (thin lines, small dots)
 
 export interface OutlookPage {
+  part: string; // the heading: "Your position", "Your plan", "Watch out"
   text: string;
   arrows: [from: number, to: number, mark: Mark][];
   squares: [square: number, mark: Mark][];
@@ -82,21 +83,57 @@ function planWords(position: Chess, move: NormalMove): string {
   return `a ${NAMES[piece.role]} move`;
 }
 
-/** Stockfish's top moves for one side, with words for them. */
-async function plansFor(engine: CoachEngine, position: Chess, side: Color, you: Color, count = 3): Promise<{ move: NormalMove; san: string; words: string; said: string }[]> {
+interface Plan {
+  move: NormalMove;
+  san: string;
+  step: string; // "bring your queen out", "castle, getting the king safe"
+  reach: { dots: number[]; lines: number[] }; // what the piece covers once there
+}
+
+/** Stockfish's top moves for one side, with plain words for each. */
+async function plansFor(engine: CoachEngine, position: Chess, side: Color, you: Color, count = 3): Promise<Plan[]> {
   const from = passTo(position, side);
   if (!from) return [];
   const seen = new Set<string>();
-  const found: { move: NormalMove; san: string; words: string; said: string }[] = [];
+  const found: Plan[] = [];
   for (const line of await engine.analyse(from, 1.2, count)) {
     const move = line.pv[0];
     if (!move || seen.has(`${move.from}-${move.to}`)) continue;
     seen.add(`${move.from}-${move.to}`);
-    // the move and why, from your side of the board
-    const said = moveInWords(from, move, you);
-    found.push({ move, san: `${side === "black" ? "..." : ""}${makeSan(from, move)}`, words: planWords(from, move), said });
+    const after = from.clone();
+    after.play(move);
+    found.push({ move, san: `${side === "black" ? "..." : ""}${makeSan(from, move)}`, step: stepWords(from, move, you), reach: pieceReach(after, move.to) });
   }
   return found;
+}
+
+/** Why their move matters, when it's clear: it blocks the piece you have
+ *  aimed at their king, or it attacks one of your pieces. ("" if neither.) */
+function watchReason(position: Chess, move: NormalMove, you: Color, aim: { from: number; to: number; role: Role } | null): string {
+  if (aim && (between(aim.from, aim.to).has(move.to) || move.to === aim.to)) return `, to block your ${NAMES[aim.role]}`;
+  const theirs = passTo(position, opposite(you));
+  const piece = theirs?.board.get(move.from);
+  if (!theirs || !piece) return "";
+  const occupied = theirs.board.occupied.without(move.from).with(move.to);
+  const hit = [...attacks(piece, move.to, occupied)]
+    .map((square) => theirs.board.get(square))
+    .filter((target) => target && target.color === you && target.role !== "pawn" && PIECE_VALUES[target.role] > PIECE_VALUES[piece.role] - 1)
+    .sort((a, b) => PIECE_VALUES[b!.role] - PIECE_VALUES[a!.role])[0];
+  return hit ? `, attacking your ${NAMES[hit.role]}` : "";
+}
+
+/** A move as a plain step, from your side: "push your c-pawn", "bring their knight out". */
+function stepWords(position: Chess, move: NormalMove, you: Color): string {
+  const piece = position.board.get(move.from);
+  if (!piece) return "make a move";
+  const whose = piece.color === you ? "your" : "their";
+  const other = piece.color === you ? "their" : "your";
+  const victim = position.board.get(move.to);
+  if (piece.role === "king" && (Math.abs(file(move.to) - file(move.from)) > 1 || victim?.color === piece.color)) return "castle, getting the king safe";
+  if (victim && victim.color !== piece.color) return `take ${other} ${NAMES[victim.role]}`;
+  if (piece.role === "pawn") return `push ${whose} ${"abcdefgh"[file(move.from)]}-pawn`;
+  const home = rank(move.from) === (piece.color === "white" ? 0 : 7);
+  return home ? `bring ${whose} ${NAMES[piece.role]} out` : `move ${whose} ${NAMES[piece.role]} to a better square`;
 }
 
 /** A bishop or queen of yours that points at a square next to their king. */
@@ -179,57 +216,49 @@ function looseTarget(position: Chess, you: Color): { square: number; role: Role;
   return null;
 }
 
-/** The three pages: the shape, strengths and ideas, and what to watch out for. */
+/** The position at the end of a line, one idea a page, each with its own
+ *  picture and one sentence: the verdict, your pawns, your king, your next
+ *  step (and the piece's range once it's there), an attack, a knight square,
+ *  then their idea and anything left unguarded. Only the ideas that apply. */
 export async function whatYouGet(engine: CoachEngine, position: Chess, you: Color): Promise<OutlookPage[]> {
   const them = opposite(you);
   const [line] = await engine.analyse(position, 1.5, 1);
   const score = line?.score ?? { cp: 0 };
   const yours = await plansFor(engine, position, you, you);
   const theirs = await plansFor(engine, position, them, you);
+  const pages: OutlookPage[] = [];
+  const page = (part: string, text: string, arrows: OutlookPage["arrows"] = [], squares: OutlookPage["squares"] = []) =>
+    pages.push({ part, text, arrows, squares });
 
-  // 1. The shape: the pawn chain, the king
+  // Your position: the verdict, the pawns, the king
+  const verdict = verdictWords(score); // "the position is roughly equal" / "White is slightly better"
+  page("Your position", verdict.startsWith("the position") ? `This position${verdict.slice("the position".length)}.` : `${verdict} here.`);
   const chain = pawnChains(position, you)[0];
+  if (chain && chain.length >= 3) page("Your position", "Your pawns form a strong chain, each one guarding the next.", [], chain.map((s) => [s, "good"]));
   const king = position.board.kingOf(you);
   const homeRank = you === "white" ? 0 : 7;
   const castled = king !== undefined && rank(king) === homeRank && (file(king) >= 6 || file(king) <= 2);
-  // "This position is roughly equal." / "White is slightly better here."
-  const verdict = verdictWords(score);
-  const shape: string[] = [verdict.startsWith("the position") ? `This position${verdict.slice("the position".length)}.` : `${verdict} here.`];
-  if (chain && chain.length >= 3) shape.push("Your pawns form a strong chain, each one guarding the next.");
-  shape.push(castled ? "Your king is safely castled." : "Castling is next, to get your king safe.");
-  const shapePage: OutlookPage = { text: shape.join(" "), arrows: [], squares: chain && chain.length >= 3 ? chain.map((s) => [s, "good"]) : [] };
+  const next = yours[0];
+  const castlesNext = next?.step.startsWith("castle");
+  if (castled && king !== undefined) page("Your position", "Your king is safely castled.", [], [[king, "good"]]);
+  else if (!castlesNext) page("Your position", "Castle soon, to get your king safe.");
 
-  // 2. Strengths and ideas
-  const strengths: string[] = [];
-  const strongArrows: OutlookPage["arrows"] = [];
-  const strongSquares: OutlookPage["squares"] = [];
+  // Your plan: the next step (its arrow, then the piece's range from there), an attack, a knight square
+  if (next) {
+    page("Your plan", `A good next step is to ${next.step}.`,
+      [[next.move.from, next.move.to, "plan"], ...next.reach.lines.map((end): [number, number, Mark] => [next.move.to, end, "scope"])],
+      next.reach.dots.map((s): [number, Mark] => [s, "scope"]));
+  }
   const aim = aimAtKing(position, you);
-  if (aim) {
-    strengths.push(`Your ${NAMES[aim.role]} is aimed at their king.`);
-    strongArrows.push([aim.from, aim.to, "good"]);
-  }
+  if (aim) page("Your plan", `Your ${NAMES[aim.role]} is aimed at their king.`, [[aim.from, aim.to, "good"]]);
   const post = outpost(position, you);
-  if (post !== null && strengths.length < 2) {
-    strengths.push("There's a safe square for a knight, where no pawn can chase it away.");
-    strongSquares.push([post, "good"]);
-  }
-  if (yours.length) {
-    strengths.push(`A good next step: ${yours[0].said.replace(/^./, (c) => c.toLowerCase())}`);
-    for (const plan of yours) strongArrows.push([plan.move.from, plan.move.to, "plan"]);
-  }
-  const strengthPage: OutlookPage = { text: strengths.join(" ") || "A solid position, with no weaknesses.", arrows: strongArrows, squares: strongSquares };
+  if (post !== null) page("Your plan", "There's a safe square for a knight, where no pawn can chase it away.", [], [[post, "good"]]);
 
-  // 3. Watch out
-  const watch: string[] = [];
-  const watchArrows: OutlookPage["arrows"] = theirs.map((p) => [p.move.from, p.move.to, "bad"]);
-  const watchSquares: OutlookPage["squares"] = [];
-  if (theirs.length) watch.push(`Watch out: ${theirs[0].said.replace(/^./, (c) => c.toLowerCase())}`);
+  // Watch out: their best idea, and anything left unguarded
+  const danger = theirs[0];
+  if (danger) page("Watch out", `Watch out: they want to ${danger.step}${watchReason(position, danger.move, you, aim)}.`, [[danger.move.from, danger.move.to, "bad"]]);
   const target = looseTarget(position, you);
-  if (target) {
-    watch.push(`Nothing guards your ${NAMES[target.role]}${target.by ? `, and ${target.by} would attack it` : ""}.`);
-    watchSquares.push([target.square, "bad"]);
-  }
-  const watchPage: OutlookPage = { text: watch.join(" ") || "Nothing serious to watch out for yet.", arrows: watchArrows, squares: watchSquares };
-
-  return [shapePage, strengthPage, watchPage];
+  if (target) page("Watch out", `Nothing guards your ${NAMES[target.role]}${target.by ? ", and they could attack it" : ""}.`, [], [[target.square, "bad"]]);
+  if (!danger && !target) page("Watch out", "Nothing serious to watch out for yet.");
+  return pages;
 }
