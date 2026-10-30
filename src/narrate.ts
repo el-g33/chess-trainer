@@ -67,10 +67,11 @@ export function narrateMove(before: Chess, move: NormalMove, listener: Color | n
   const victimOwner = victim ? owner(victim.color, listener) : "";
   let text: string;
   if (victim) text = `${subject} takes ${victimOwner} ${NAMES[victim.role]}`;
-  else if (piece.role === "pawn") text = `${subject} moves up`;
+  else if (piece.role === "pawn") text = `${subject} pushes forward`;
+  else if (piece.role === "king") text = `${subject} steps ${before.isCheck() ? "out of check" : "aside"}`;
   else if ((piece.color === "white" ? move.from >> 3 === 0 : move.from >> 3 === 7) && piece.role !== "rook" && piece.role !== "queen")
     text = `${subject} comes out`;
-  else text = `${subject} moves`;
+  else text = piece.role === "knight" ? `${subject} jumps in` : `${subject} moves`;
 
   const target = (role: Role) => `${owner(opposite(piece.color), listener)} ${NAMES[role]}`;
   // A pin: the piece it hits can't move, because their king stands behind it
@@ -409,11 +410,14 @@ export function quietIdea(before: Chess, move: NormalMove, listener: Color | nul
  *  their pawn." or "Your pawn moves up. It takes a key square away from their
  *  bishop." (the "why" is left out when it only repeats the words). */
 export function moveInWords(before: Chess, move: NormalMove, listener: Color | null): string {
+  // One sentence, never two: a move that does something (takes, hits, checks,
+  // castles...) says that; a quiet one says what it's for ("Develops your
+  // knight and controls the centre.") - the arrow on the board shows which piece
   const said = narrateMove(before, move, listener);
+  const plain = /^\S+ \S+ (moves|pushes forward|comes out|jumps in)\.$/.test(said);
   const why = whyMove(before, move, listener);
-  const repeats = (before.board.get(move.to) && (why.startsWith("it wins") || why.startsWith("it takes"))) || (said.includes("check") && why === "it gives check")
-    || said.includes("castle") || said.includes("Checkmate") || why === "it's a useful waiting move";
-  return repeats || !why ? said : `${said} ${cap(why)}.`;
+  if (!plain || !why || why === "it's a useful waiting move") return said;
+  return `${cap(why.replace(/^it /, ""))}.`;
 }
 
 /** "an inaccuracy", "the best move", ... for "Your move was ..." */

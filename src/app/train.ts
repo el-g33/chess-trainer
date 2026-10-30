@@ -19,11 +19,11 @@ import { LEVELS, shortName } from "../levels";
 import { analyser, base, coachAnalysis, currentPly, ground } from "../main";
 import { controlledSquares, moveInWords, narrateMove, quietIdea, ratingWords, verdict } from "../narrate";
 import { readPgn, today } from "../pgn";
-import { type Review, fenOf, verdictWords } from "../review";
+import { type Review, fenOf } from "../review";
 import { play } from "../sounds";
 import { planAhead } from "../strategy";
 
-import { type CoachButton, type CoachSay, type StepFrame, TELL_MORE, closeStepper, startStepper } from "./coach";
+import { type CoachButton, type CoachSay, type StepFrame, TELL_MORE, closeStepper, coachVerdict, startStepper } from "./coach";
 import { $, levelBox, menu } from "./dom";
 import { arrowEnd, refresh } from "./draw";
 import { afterMove } from "./matches";
@@ -683,7 +683,7 @@ export async function showIdeas() {
       moveFrame(walk, move, text, false);
       walk = positionAfter(walk, move);
     });
-    if (line.length > 1 && score) texts[texts.length - 1] += ` In the end, ${verdictWords(score)}.`;
+    if (line.length > 1 && score) texts[texts.length - 1] += ` In the end, ${coachVerdict(score, user)}.`;
     setBusy(false);
     if (!frames.length || !explore) return refresh();
     set.stepper({ positions: frames.map((f) => f.position), moves: [], texts, step: 1, mood: "talk", extra: SIMULATE, frames });

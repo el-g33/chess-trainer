@@ -9,9 +9,8 @@ import { makeSan } from "chessops/san";
 import type { Color, NormalMove, Role } from "chessops/types";
 import { opposite } from "chessops/util";
 
-import { PIECE_VALUES } from "./coach";
+import { PIECE_VALUES, type Score, scoreLeader } from "./coach";
 import { pieceReach } from "./narrate";
-import { verdictWords } from "./review";
 import type { CoachEngine } from "./strategy";
 
 export type Mark = "good" | "bad" | "plan" | "scope"; // scope: a piece's range (thin lines, small dots)
@@ -111,6 +110,16 @@ function watchReason(position: Chess, move: NormalMove, you: Color, aim: { from:
   return hit ? `, attacking your ${NAMES[hit.role]}` : "";
 }
 
+/** The verdict on the position you get, as a coach says it. */
+function positionWords(score: Score, you: Color): string {
+  const leader = scoreLeader(score);
+  if (!leader) return "A level position: the opening has done its job.";
+  const yours = (leader === "White") === (you === "white");
+  const size = score.mate !== undefined ? 9 : Math.abs(score.cp) / 100;
+  const how = size < 1 ? "a little better" : size < 2 ? "clearly better" : "on top";
+  return yours ? `You come out of the opening ${how}.` : `They come out of the opening ${how}: there's work to do.`;
+}
+
 /** A move as a plain step, from your side: "push your c-pawn", "bring their knight out". */
 function stepWords(position: Chess, move: NormalMove, you: Color): string {
   const piece = position.board.get(move.from);
@@ -181,8 +190,7 @@ export async function whatYouGet(engine: CoachEngine, position: Chess, you: Colo
     pages.push({ part, text, arrows, squares });
 
   // Your position: the verdict, the pawns, the king
-  const verdict = verdictWords(score); // "the position is roughly equal" / "White is slightly better"
-  page("Your position", verdict.startsWith("the position") ? `This position${verdict.slice("the position".length)}.` : `${verdict} here.`);
+  page("Your position", positionWords(score, you));
   const chain = pawnChains(position, you)[0];
   if (chain && chain.length >= 3) page("Your position", "Your pawns form a strong chain, each one guarding the next.", [], chain.map((s) => [s, "good"]));
   const king = position.board.kingOf(you);

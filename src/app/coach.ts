@@ -14,7 +14,7 @@ import {
   type BackupContents, backupDue, backupNote, dataCounts, makeBackup, noteBackup, readBackup, restoreBackup,
   snoozeReminder,
 } from "../backup";
-import { type Score, colourName, isCastling, afterMove as positionAfter } from "../coach";
+import { type Score, colourName, isCastling, pawns, scoreLeader, afterMove as positionAfter } from "../coach";
 import { DEMOS, demoSteps } from "../demos";
 import type { LikelyMove } from "../explore";
 import { Game } from "../game";
@@ -722,7 +722,7 @@ export function whyBetter(before: Chess, after: Chess, best: NormalMove, reply: 
       const us = opposite(instead.turn);
       costly = !!piece && then.kingAttackers(same.to, us, then.board.occupied).nonEmpty() && VALUE[piece.role] > (taken ? VALUE[taken.role] : 0);
     }
-    if (gone || costly) text += " And it stops the reply you just saw.";
+    if (gone || costly) text += " It also stops the reply you just saw.";
   }
   return text;
 }
@@ -814,11 +814,24 @@ export function lineOutcome(start: Chess, line: NormalMove[], score: Score, side
     const who = viewer === null ? colourName(side) : you ? "you" : "they";
     return `${who} ${viewer === null ? "comes" : "come"} out ${gain >= 2 ? "two pawns" : "a pawn"} up.`;
   }
-  // from your side when you've picked one: "you're clearly better", not "White is"
-  const words = verdictWords(score);
-  if (viewer === null) return `${words}.`;
-  return `${words.replace(new RegExp(`^${colourName(viewer)} is`), "you're").replace(new RegExp(`^${colourName(opposite(viewer))} is`), "they're")
-    .replace(new RegExp(`^${colourName(viewer)} can`), "you can").replace(new RegExp(`^${colourName(opposite(viewer))} can`), "they can")}.`;
+  return `${coachVerdict(score, viewer)}.`;
+}
+
+/** Where a position stands, as a coach says it (not an engine's scale), from
+ *  your side when you've picked one: "it's level", "you're a little better",
+ *  "they're winning", "White can force checkmate". */
+export function coachVerdict(score: Score, viewer: Color | null): string {
+  const leader = scoreLeader(score);
+  if (!leader) return "it's level";
+  const side: Color = leader === "White" ? "white" : "black";
+  const who = viewer === null ? leader : side === viewer ? "you" : "they";
+  const be = viewer === null ? `${leader} is` : side === viewer ? "you're" : "they're";
+  if (score.mate !== undefined) return `${who} can force checkmate`;
+  const size = Math.abs(pawns(score.cp));
+  if (size < 1) return `${be} a little better`;
+  if (size < 2) return `${be} clearly better`;
+  if (size < 4) return `${be} on top, close to winning`;
+  return `${be} winning`;
 }
 
 /** The first `count` moves of a line, carried on while pieces are still
