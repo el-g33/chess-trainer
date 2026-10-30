@@ -10,7 +10,7 @@ import { setTypeSpeed } from "../talk";
 import { tourOpen } from "../tour";
 
 import {
-  backUp, checkForUpdates, closeOverlay, closeStepper, onHome, onNewGame, openMore, overlay,
+  backUp, checkForUpdates, closeOverlay, closeStepper, onNewGame, openMore, overlay,
   overlayOpen, restartIntoUpdate, restoreFromFile, setHistoryFromReview, stepTo, stepTyper, stripTyper,
 } from "./coach";
 import { drawLookRows } from "./lookPickers";
@@ -24,8 +24,9 @@ import {
 } from "./dom";
 import { refresh } from "./draw";
 import { toggleHelp } from "./featureTour";
+import { stepBack } from "./backNav";
 import { everyMove, momentsOnly } from "./keyMoments";
-import { backToStats, onResign, onReviewGame, stopPreparing } from "./matches";
+import { onResign, onReviewGame, stopPreparing } from "./matches";
 import { exitAnalysis, goTo, navigate, onUndo, readFen } from "./moves";
 import { loadDemoLine, onDemoExit, onDemoPlay, onDemoTry, onNavPlay, onShowDemo } from "./openingDemos";
 import { openPgnDialog, pgnText, readPgnText, saveCopy, saveDownload } from "./pgnScreens";
@@ -151,7 +152,7 @@ export function wireButtons() {
   for (const button of document.querySelectorAll(".nav-play")) button.addEventListener("click", onNavPlay);
   for (const button of document.querySelectorAll(".var-prev")) button.addEventListener("click", () => demo && demo.line > 0 && loadDemoLine(demo.line - 1));
   for (const button of document.querySelectorAll(".var-next")) button.addEventListener("click", () => demo && demo.line + 1 < demo.demo.lines.length && loadDemoLine(demo.line + 1));
-  $("home-button").addEventListener("click", () => void onHome());
+  $("home-button").addEventListener("click", () => void stepBack()); // one step back, like the phone's own back
   $("check-updates").addEventListener("click", () => void checkForUpdates());
   $("data-backup").addEventListener("click", () => void backUp());
   $("data-restore").addEventListener("click", () => $<HTMLInputElement>("data-file").click());
@@ -159,7 +160,6 @@ export function wireButtons() {
   $("update-restart").addEventListener("click", () => void restartIntoUpdate());
   $("update-later").addEventListener("click", () => { $("update-toast").hidden = true; });
   $("prep-back").addEventListener("click", () => { stopPreparing(); showMenu(); });
-  $("review-summary").addEventListener("click", backToStats);
   $("mode-moments").addEventListener("click", momentsOnly);
   $("mode-every").addEventListener("click", everyMove);
   for (const tab of document.querySelectorAll<HTMLButtonElement>(".view-tabs button")) {

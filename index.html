@@ -89,7 +89,7 @@
         <!-- 2a. Play against the coach -->
         <section class="screen" data-screen="play" hidden>
           <div class="setup-head">
-            <button type="button" class="home-link setup-back"><span data-ico="home" data-ico-size="18"></span> Home</button>
+            <button type="button" class="back-round setup-back" aria-label="Back" title="Back"><span data-ico="back"></span></button>
             <h2>Play</h2>
             <button type="button" class="setup-start accent" data-start="play">Start</button>
           </div>
@@ -118,7 +118,7 @@
         <!-- 2b. Practice: learn an opening, or a practice match -->
         <section class="screen" data-screen="practice" hidden>
           <div class="setup-head">
-            <button type="button" class="home-link setup-back"><span data-ico="home" data-ico-size="18"></span> Home</button>
+            <button type="button" class="back-round setup-back" aria-label="Back" title="Back"><span data-ico="back"></span></button>
             <h2>Practice match</h2>
             <button type="button" class="setup-start accent" data-start="practice" disabled>Start</button>
           </div>
@@ -140,7 +140,7 @@
         <!-- 2c. Game review: a game from a PGN -->
         <section class="screen" data-screen="analysis" hidden>
           <div class="setup-head">
-            <button type="button" class="home-link setup-back"><span data-ico="home" data-ico-size="18"></span> Home</button>
+            <button type="button" class="back-round setup-back" aria-label="Back" title="Back"><span data-ico="back"></span></button>
             <h2>Game review</h2>
             <button type="button" class="setup-start accent" data-start="analysis" disabled>Start</button>
           </div>
@@ -175,7 +175,7 @@
         <!-- 2d. Train: principles, puzzles and your own positions -->
         <section class="screen" data-screen="progress" hidden>
           <div class="setup-head">
-            <button type="button" class="home-link setup-back"><span data-ico="home" data-ico-size="18"></span> Home</button>
+            <button type="button" class="back-round setup-back" aria-label="Back" title="Back"><span data-ico="back"></span></button>
             <h2>Your progress</h2>
             <span></span>
           </div>
@@ -184,7 +184,7 @@
 
         <section class="screen" data-screen="train" hidden>
           <div class="setup-head">
-            <button type="button" class="home-link setup-back"><span data-ico="home" data-ico-size="18"></span> Home</button>
+            <button type="button" class="back-round setup-back" aria-label="Back" title="Back"><span data-ico="back"></span></button>
             <h2>Training</h2>
             <span></span>
           </div>
@@ -233,7 +233,7 @@
     <!-- The game screen -->
     <main id="game">
       <header class="game-top">
-        <button type="button" id="home-button" class="icon-button home-button" aria-label="Home" title="Home"><span data-ico="home"></span></button>
+        <button type="button" id="home-button" class="back-round" aria-label="Back" title="Back"><span data-ico="back"></span></button>
         <button type="button" id="new-game" class="new-game accent"><span data-ico="plus" data-ico-size="18"></span>New<span class="ng-long">&nbsp;game</span></button>
         <nav class="view-tabs" aria-label="Views">
           <button type="button" data-view="board" class="on" aria-label="Board" title="Board"><span data-ico="board"></span></button>
@@ -258,7 +258,7 @@
         <div class="board-col">
         <!-- Reviewing: back to the summary, and key moments only or every move -->
         <div id="review-bar" class="whatif-bar review-bar" hidden>
-          <button type="button" id="review-summary" class="review-back">‹ Summary</button>
+          <span class="review-label">Reviewing</span>
           <div id="review-mode" class="review-mode" role="group" aria-label="Which moves">
             <button type="button" id="mode-moments"></button>
             <button type="button" id="mode-every">Every move</button>

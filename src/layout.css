@@ -1128,9 +1128,24 @@ body {
   touch-action: manipulation; /* no double-tap zoom */
 }
 
-.home-button {
-  background: transparent;
+/* Back: one round button, top left, on every screen (the same as the phone's back) */
+.back-round {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  min-height: 0;
+  padding: 0;
   border: 0;
+  border-radius: 999px;
+  background: var(--round-bg);
+  color: var(--round-fg);
+  flex: none;
+}
+.back-round:hover:not(:disabled) {
+  background: var(--round-bg);
+  filter: brightness(1.15);
 }
 
 /* The play / pause / replay button and the variation buttons: demos only */
@@ -1229,13 +1244,8 @@ button.round.hazard.red { background: #d93025; color: #fff; }
 .review-mode[hidden] {
   display: none;
 }
-.review-back {
-  min-height: 0;
-  padding: 3px 6px;
-  border: 0;
-  background: none;
-  color: var(--text);
-  font-size: 0.88rem;
+.review-label {
+  padding-left: 6px;
 }
 .review-mode {
   display: flex;

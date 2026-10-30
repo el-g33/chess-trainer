@@ -6,7 +6,7 @@
 import { closeOverlay, closeStepper, onHome, overlayOpen } from "./coach";
 import { $, menu } from "./dom";
 import { refresh } from "./draw";
-import { analysis, menuOpen, set, stepper, viewTrail } from "./state";
+import { analysis, currentView, menuOpen, reviewing, set, stepper, viewTrail } from "./state";
 
 /** One step back inside the app; false when there's nowhere left to go (Home). */
 export function stepBack(): boolean {
@@ -32,14 +32,14 @@ export function stepBack(): boolean {
   if (menuOpen) {
     // the screen's own way back: a list's back first, then its Home link
     const visible = (element: HTMLElement) => element.offsetParent !== null;
-    const links = [...menu.querySelectorAll<HTMLElement>(".home-link")].filter(visible);
+    const links = [...menu.querySelectorAll<HTMLElement>(".home-link, .setup-back")].filter(visible);
     const back = links.find((link) => !link.classList.contains("setup-back")) ?? links[0];
     if (!back) return false; // Home itself
     back.click();
     return true;
   }
-  // in a game: the view you came from, else Home (which asks first if a game is on)
-  const previous = viewTrail.pop();
+  // in a game: the view you came from; a review's board goes back to its summary; else Home (which asks first if a game is on)
+  const previous = viewTrail.pop() ?? (reviewing && currentView === "board" ? "stats" : undefined);
   if (previous) {
     set.viewBack(previous);
     refresh();
