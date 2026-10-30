@@ -248,18 +248,21 @@ export function controlledSquares(position: Chess, square: number): number[] {
   return [...new Set([...centre, ...targetsOf(position, square)])];
 }
 
-/** What a piece covers, for a picture: a pawn's two diagonal squares and a
- *  knight's squares as dots; for a long-range piece, the far end of each line
- *  it can move along (two squares or more), drawn as a thin line. */
+/** What a piece covers, for a picture - kept to what matters: the central
+ *  squares it now controls (c3 to f6, not ones your own pieces stand on), as
+ *  dots; a bishop instead shows its forward diagonals, as thin lines to
+ *  their far ends (two squares or more), since its reach is what it's for. */
 export function pieceReach(position: Chess, square: number): { dots: number[]; lines: number[] } {
   const piece = position.board.get(square);
   if (!piece || piece.role === "king") return { dots: [], lines: [] };
-  if (piece.role === "pawn" || piece.role === "knight") return { dots: [...attacks(piece, square, position.board.occupied)], lines: [] };
-  const straight = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-  const diagonal = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
-  const directions = piece.role === "rook" ? straight : piece.role === "bishop" ? diagonal : [...straight, ...diagonal];
+  if (piece.role !== "bishop") {
+    const reach = attacks(piece, square, position.board.occupied).diff(position.board[piece.color]);
+    return { dots: [...reach].filter((s) => (s & 7) >= 2 && (s & 7) <= 5 && s >> 3 >= 2 && s >> 3 <= 5), lines: [] };
+  }
   const lines: number[] = [];
-  for (const [df, dr] of directions) {
+  // (its forward diagonals: what it's eyeing, not the way back home)
+  const ahead = piece.color === "white" ? 1 : -1;
+  for (const [df, dr] of [[1, ahead], [-1, ahead]]) {
     let [f, r, steps, end] = [square & 7, square >> 3, 0, -1];
     for (;;) {
       f += df;

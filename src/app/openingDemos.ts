@@ -19,7 +19,7 @@ import {
   MASTERED, type Mistake, type MistakeKind, type MistakeLine, type MistakePhase, addMistakes, comesBack,
   today as dayNumber, dueMistakes, loadMistakes, mistakeCounts, mistakeId, recordAttempt, saveLines,
 } from "../mistakes";
-import { dangerAfter, pieceReach, moveInWords, narrateMove, quietIdea, ratingWords, targetsOf } from "../narrate";
+import { dangerAfter, pieceReach, moveInWords, narrateMove, ratingWords, targetsOf } from "../narrate";
 import { type Opening, REPERTOIRE, firstMoveOf, goalWords, menuName, setupProgress, systemFor } from "../openings";
 import { type Mark, chainOf, whatYouGet } from "../outlook";
 import { readPgn, today } from "../pgn";
@@ -188,7 +188,7 @@ export function openingShortName(name: string): string {
  *  controls (the centre, and pieces it hits), the pawn chain it builds, and
  *  the square it takes away from them. (The lessons, and Tell me more on a
  *  good move in a review.) */
-export function movePicture(before: Chess, after: Chess, move: NormalMove, yours: boolean, viewer: Color | null): DrawShape[] {
+export function movePicture(before: Chess, after: Chess, move: NormalMove, yours: boolean, _viewer: Color | null): DrawShape[] {
   const shapes: DrawShape[] = [];
   const marked = new Set<number>();
   const mark = (square: number) => {
@@ -202,8 +202,8 @@ export function movePicture(before: Chess, after: Chess, move: NormalMove, yours
     for (const square of reach.dots) shapes.push(reachDot(square, yours));
     for (const end of reach.lines) shapes.push({ orig: makeSquare(move.to) as Key, dest: makeSquare(end) as Key, brush: yours ? "scope" : "scopeThem" });
   }
-  for (const square of chainOf(after, move.to)) mark(square);
-  for (const square of quietIdea(before, move, viewer)?.squares ?? []) mark(square);
+  // a pawn move: the chain it's part of (only the moving piece is pictured, nothing else's next move)
+  if (after.board.get(move.to)?.role === "pawn") for (const square of chainOf(after, move.to)) mark(square);
   return shapes;
 }
 
@@ -220,17 +220,8 @@ export function demoShapes(): DrawShape[] {
   const after = game.positionAt(ply);
   const move = game.moves[ply - 1].move;
   const yours = before.turn === orientation;
-  const shapes = movePicture(before, after, move, yours, orientation);
-  // The moves and squares this note talks about
-  const label = demo.steps[ply - 1]?.label;
-  for (const item of (label && demo.demo.lines[demo.line].arrows?.[label]) || []) {
-    const threat = item.endsWith("!");
-    const brush = threat ? "them" : "guess";
-    const squares = item.replace(/[@!]/g, "");
-    if (item.startsWith("@")) shapes.push({ orig: squares as Key, brush });
-    else shapes.push({ orig: squares.slice(0, 2) as Key, dest: squares.slice(2, 4) as Key, brush });
-  }
-  return shapes;
+  // just the move's own picture: other pieces' next moves would crowd it
+  return movePicture(before, after, move, yours, orientation);
 }
 
 /** The end of a line: the position you get, explained with Stockfish - its
