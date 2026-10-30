@@ -417,10 +417,8 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
     // not possible here (e.g. not https): the site still works online
   });
 }
-engine.ready.then(
-  () => {
-    engineStatus.textContent = "";
-    engineStatus.hidden = true;
-  },
-  () => (engineStatus.textContent = "Stockfish couldn't start in this browser."),
-);
+// Nothing to say while the engine loads (the coach waits for it); only if it can't start
+engine.ready.catch(() => {
+  engineStatus.textContent = "The coach couldn't start in this browser. Try updating it, or another browser.";
+  engineStatus.hidden = false;
+});
