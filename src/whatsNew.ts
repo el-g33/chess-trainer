@@ -11,6 +11,13 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.7",
+    items: [
+      { icon: "bulb", title: "Why the better move is better", text: "When you open a slip in a review, I now explain what the better move does, the reply it takes away, and what your move cost." },
+      { icon: "target", title: "Find it yourself", text: "At the end, step back to before your move and play the better one; I'll tell you if you've found it." },
+    ],
+  },
+  {
     version: "3.6",
     items: [
       { icon: "rapid", title: "Pre-moves", text: "In a timed game, set up your next move while the coach is thinking: it plays the moment the coach has moved." },
