@@ -8,6 +8,7 @@ import { opposite, parseSquare } from "chessops/util";
 
 import { colourName, variationSan } from "../coach";
 import { Game } from "../game";
+import { icon } from "../icons";
 import { analysing, base, currentPly, freeBoard, ground, quizWaiting } from "../main";
 import { fenOf } from "../review";
 
@@ -220,7 +221,7 @@ export function drawWhatIf() {
   bar.hidden = !analysis;
   document.querySelector(".board-area")!.classList.toggle("whatif", analysis !== null);
   if (!analysis) return;
-  $("whatif-text").textContent = "Analysis board";
+  $("whatif-text").innerHTML = `${icon("search", 18)}<span>Trying moves</span>`;
 }
 
 export function exitAnalysis() {

@@ -1503,19 +1503,28 @@ body {
   }
 }
 
-/* What if: a blue bar in place of the top player bar, so nothing moves */
+/* What if: a quiet bar in place of the top player bar - the same size and
+   place, so nothing moves - with a magnifying glass and the way back */
 .whatif-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   height: 34px;
-  padding: 0 4px 0 12px;
+  padding: 0 4px 0 10px;
   border-radius: var(--radius);
-  background: #2c6bb3;
-  color: #fff;
-  font-weight: 600;
-  font-size: 0.9rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+#whatif-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+#whatif-text svg {
+  color: var(--text);
 }
 
 .whatif-bar[hidden],
@@ -1528,14 +1537,14 @@ body {
   padding: 3px 12px;
   border: 0;
   border-radius: 999px;
-  background: #fff;
-  color: #2c6bb3;
+  background: var(--accent);
+  color: var(--on-accent, #fff);
   font-weight: 700;
   font-size: 0.85rem;
 }
 
 #whatif-exit:hover:not(:disabled) {
-  background: #e8f0fa;
+  background: var(--accent-hover, var(--accent));
 }
 
 /* -- Train ------------------------------------------------------------------------ */
@@ -1744,9 +1753,6 @@ body.editing #bar-bottom {
   border-radius: var(--radius);
 }
 
-#whatif-text {
-  font-style: italic;
-}
 
 /* Your position: the opponent's likely moves, with their chances */
 .step-odds {

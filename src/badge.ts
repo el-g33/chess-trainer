@@ -1,4 +1,7 @@
-// The move-rating badge drawn on the piece that just moved: "Spark shapes" -
+// The move-rating badge drawn on the piece that just moved, in one of two
+// styles (BADGE_STYLE): "Sticker pop" - a bright sticker with a white edge and
+// a soft shadow, tipped at a slight angle, with the rating's mark (!! ? ??) or
+// a simple white shape - or "Spark shapes" -
 // each rating its own symbol (a star for a masterstroke, a lightning bolt for
 // a key move, a burst for a blunder...) on a round badge in the top-right
 // corner of the square. It's drawn to stand out on the theme: on the light
@@ -94,9 +97,75 @@ function symbolSvg(symbol: string, colour: string): string {
   return "";
 }
 
+export const BADGE_STYLE: "sticker" | "spark" = "sticker";
+
+// Sticker pop: each rating's mark, and how far its sticker is tipped (degrees)
+const STICKER: Record<string, [string, number]> = {
+  Brilliant: ["text:!!", -8], Great: ["text:!", 6], Best: ["diamond", -4], Excellent: ["up", 7], Good: ["ring", -6],
+  Book: ["lines", 5], Forced: ["arrow", -7], Inaccuracy: ["text:?!", 4], Mistake: ["text:?", -5], Miss: ["slash", 8],
+  "Missed Win": ["slash", -3], Blunder: ["text:??", 6], Checkmate: ["text:#", -4],
+};
+
+/** A sticker's white mark, on a 100 x 100 grid round its middle. */
+function stickerMark(mark: string): string {
+  const white = "#ffffff";
+  const stroke = (width: number) => `fill="none" stroke="${white}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"`;
+  if (mark.startsWith("text:")) {
+    const text = mark.slice(5);
+    return `<text x="50" y="55" text-anchor="middle" dominant-baseline="middle" font-family="Arial Black, Arial, sans-serif" ` +
+      `font-weight="900" font-size="${text.length > 1 ? 62 : 74}" fill="${white}" stroke="${white}" stroke-width="2" letter-spacing="-5">${text}</text>`;
+  }
+  switch (mark) {
+    case "diamond":
+      return `<polygon points="50,20 78,50 50,80 22,50" fill="${white}"/>`;
+    case "up":
+      return `<path d="M50 20 L78 50 H62 V80 H38 V50 H22 Z" fill="${white}" stroke="${white}" stroke-width="2" stroke-linejoin="round"/>`;
+    case "ring":
+      return `<circle cx="50" cy="50" r="22" ${stroke(11)}/>`;
+    case "lines":
+      return `<path d="M24 32 H76 M24 50 H76 M24 68 H62" ${stroke(10)}/>`;
+    case "arrow":
+      return `<path d="M22 50 H74 M56 30 L78 50 L56 70" ${stroke(11)}/>`;
+    case "slash":
+      return `<circle cx="50" cy="50" r="25" ${stroke(9)}/><path d="M33 67 L67 33" ${stroke(9)}/>`;
+  }
+  return "";
+}
+
+/** Sticker pop: a bright sticker with a white edge and a soft shadow, tipped a
+ *  little, in the top-right corner. */
+function stickerSvg(rating: string, colour: string): string {
+  const [mark, tilt] = STICKER[rating] ?? STICKER.Checkmate;
+  const size = 42; // of the 100-wide square
+  const cx = 100 - size / 2 - 1;
+  const cy = size / 2 + 1;
+  const x = cx - size / 2;
+  const y = cy - size / 2;
+  const edge = 3;
+  const inner = size - 2 * edge;
+  const scale = (inner * 0.98) / 100;
+  return (
+    `<g transform="rotate(${tilt} ${cx} ${cy})">` +
+    `<rect x="${x + 0.8}" y="${y + 2.2}" width="${size}" height="${size}" rx="${size * 0.26}" fill="#000" fill-opacity="0.28"/>` +
+    `<rect x="${x}" y="${y}" width="${size}" height="${size}" rx="${size * 0.26}" fill="#ffffff"/>` +
+    `<rect x="${x + edge}" y="${y + edge}" width="${inner}" height="${inner}" rx="${inner * 0.22}" fill="${colour}"/>` +
+    // a soft shine across the top
+    `<rect x="${x + edge}" y="${y + edge}" width="${inner}" height="${inner * 0.42}" rx="${inner * 0.22}" fill="#ffffff" fill-opacity="0.2"/>` +
+    `<g transform="translate(${(cx - 50 * scale).toFixed(2)} ${(cy - 50 * scale).toFixed(2)}) scale(${scale.toFixed(3)})">${stickerMark(mark)}</g>` +
+    `</g>`
+  );
+}
+
 /** The badge for a rating, as SVG for a 100 x 100 square, drawn for the
  *  theme now showing. */
 export function badgeSvg(rating: string): string {
+  if (BADGE_STYLE === "sticker") {
+    const theme = document.documentElement.dataset.ui ?? "stone";
+    // the rating's own bright colour (deeper where it would melt into Rose quartz's board)
+    const base = RATING_STYLE[rating][1];
+    const colour = theme === "rose" && (rating === "Miss" || rating === "Blunder") ? mix(base, "#000000", 0.18) : base;
+    return stickerSvg(rating, colour);
+  }
   const [symbol] = RATING_STYLE[rating];
   const theme = document.documentElement.dataset.ui ?? "stone";
   const look = LOOKS[theme] ?? LOOKS.stone;

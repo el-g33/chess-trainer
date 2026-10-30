@@ -236,11 +236,12 @@
 }
 
 /* Warm stone: big friendly numbers on the player bars */
-:root[data-ui="stone"] .player-bar {
+:root[data-ui="stone"] .player-bar,
+:root[data-ui="stone"] .whatif-bar {
   background: var(--card);
   border-radius: var(--radius);
   padding: 0 8px;
-  margin: 4px 0;
+  margin: 4px 0; /* (the what-if bar too, so the board doesn't move) */
 }
 
 :root[data-ui="stone"] .pb-clock {

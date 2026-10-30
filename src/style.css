@@ -441,15 +441,19 @@ body.practice #game {
 
 /* -- Board extras: analysis frame, the threat arrow dashed ------------------------- */
 
-/* In analysis the board is dulled and framed in blue (as the desktop) */
-#board.analysis cg-board::after {
+/* In analysis (moves that aren't the game) the board keeps its colours, just
+   lighter (a light wash over the squares), and the pieces are a little duller */
+#board.analysis cg-board::before {
   content: "";
   position: absolute;
   inset: 0;
-  border: 5px solid #2c6bb3;
-  background: rgba(74, 74, 74, 0.32);
+  background: rgba(255, 255, 255, 0.42);
   pointer-events: none;
-  z-index: 2;
+  z-index: 0;
+}
+
+#board.analysis cg-board piece {
+  opacity: 0.72;
 }
 
 cg-container svg.cg-shapes line[stroke="#E67E22" i] {
