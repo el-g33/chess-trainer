@@ -506,7 +506,7 @@ export async function explainSlip(ply: number, review: Review) {
   }
   const theirSlip = !mine && viewer !== null;
   const card = startStory({ position: after, shapes }, why, moodForRating(review.rating),
-    theirSlip ? ["Why", "What you can do", "Better for them", "How it goes on"] : ["Why", "What it allows", "Why it's better", "How it goes on"]);
+    theirSlip ? ["Why", "Their better option", "How it goes on"] : ["Why", "Why it's better", "How it goes on"]);
   // Yours: at the end, a go at finding the better move yourself
   if (!theirSlip) card.extra = { ico: "target", label: "Find it yourself", kind: "accent", labelled: true, run: () => findItYourself(ply) };
   moveSound(makeSan(before, played), before.turn);
@@ -527,21 +527,21 @@ export async function explainSlip(ply: number, review: Review) {
       if (punish && line.length) {
         const pages = linePages(after, line, viewer);
         pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(after, line, punish.score, opposite(mover), viewer)}`;
-        extendPages(card, pages.frames, pages.texts, 1);
+        extendPages(card, pages.frames, pages.texts, 0); // (what it allows is part of why)
       }
     }
     // Why it's better: the better move against the one played
     const best = parseSan(before, review.bestSan!) as NormalMove | undefined;
     if (!best) return;
     const bestShapes = moveShapes(before, best, viewer).slice(0, 1);
-    extendPages(card, [{ position: before, shapes: bestShapes }], [whyBetter(before, after, best, reply, review, dangerText, viewer, mine)], 2);
+    extendPages(card, [{ position: before, shapes: bestShapes }], [whyBetter(before, after, best, reply, review, dangerText, viewer, mine)], 1);
     // How it goes on: the better move's line
     const better = await coachLine(before, 1.5, [best]);
     const line = wholeLine(before, better?.pv.length ? better.pv : [best], 3);
     const pages = linePages(before, line, viewer);
     pages.texts[0] = cap(moveInWords(before, best, viewer));
     if (better && line.length > 1) pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(before, line, better.score, mover, viewer)}`;
-    extendPages(card, pages.frames, pages.texts, 3);
+    extendPages(card, pages.frames, pages.texts, 2);
   } catch (error) {
     set.errorText(`Something went wrong: ${error}`);
     refresh();

@@ -1,10 +1,14 @@
-// The coach's words, typed out a letter at a time and cut into pieces that
-// fit the bubble, so a long note never needs "Tell me more" to be read.
+// The coach's words, appearing quickly and cut into pieces that fit the
+// bubble, so a long note never needs "Tell me more" to be read.
 
-export const TYPE_MS = 33; // about 30 letters a second (Normal)
+export const TYPE_MS = 33; // the Normal setting's value (kept for saved settings)
 let typeMs = TYPE_MS;
 
-/** How fast the coach types: ms per letter (0 shows every sentence at once). */
+/** How fast the coach's words appear: the setting's value (50 Relaxed, 33
+ *  Normal, 16 Fast, 0 at once), as letters a second. */
+const LETTERS_A_SECOND: Record<number, number> = { 50: 70, 33: 180, 16: 400 };
+const FRAME_MS = 16;
+
 export function setTypeSpeed(ms: number) {
   typeMs = ms;
 }
@@ -93,19 +97,29 @@ export class Typer {
     clearInterval(this.timer);
     this.full = text;
     this.shown = reduceMotion() || typeMs === 0 ? text.length : 0;
-    this.element.textContent = text.slice(0, this.shown);
+    this.show();
     if (this.typed) {
       this.onTyped?.();
       return;
     }
+    const step = Math.max(1, Math.round(((LETTERS_A_SECOND[typeMs] ?? 180) * FRAME_MS) / 1000));
     this.timer = window.setInterval(() => {
-      this.shown = Math.min(this.full.length, this.shown + 1);
-      this.element.textContent = this.full.slice(0, this.shown);
+      this.shown = Math.min(this.full.length, this.shown + step);
+      this.show();
       if (this.typed) {
         clearInterval(this.timer);
         this.onTyped?.();
       }
-    }, typeMs);
+    }, FRAME_MS);
+  }
+
+  /** The words so far, with the rest there but unseen, so the bubble is its
+   *  full size from the first letter and doesn't grow as they appear. */
+  private show() {
+    const rest = document.createElement("span");
+    rest.className = "typer-rest";
+    rest.textContent = this.full.slice(this.shown);
+    this.element.replaceChildren(this.full.slice(0, this.shown), ...(rest.textContent ? [rest] : []));
   }
 
   /** Show it all at once (e.g. stepping to a piece by hand). */
@@ -113,7 +127,7 @@ export class Typer {
     if (this.typed) return;
     clearInterval(this.timer);
     this.shown = this.full.length;
-    this.element.textContent = this.full;
+    this.show();
     this.onTyped?.();
   }
 }

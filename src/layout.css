@@ -2057,6 +2057,11 @@ body.demo-intro .move-strip {
   font-weight: 700;
 }
 
+/* The coach's words still to appear: there, but unseen, so the bubble keeps its size */
+.typer-rest {
+  visibility: hidden;
+}
+
 /* A move's story in parts: the heading of the part on show (Why, What it allows, ...) */
 .step-chapters {
   grid-area: chapters;
