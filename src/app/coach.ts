@@ -511,10 +511,19 @@ export async function explainSlip(ply: number, review: Review) {
   if (!theirSlip) card.extra = { ico: "target", label: "Find it yourself", kind: "accent", labelled: true, run: () => findItYourself(ply) };
   moveSound(makeSan(before, played), before.turn);
   try {
-    // What it allows: Stockfish's best line after the move
+    // What it allows: the best line after the move, played on until the
+    // material the first page promised is actually won
+    let dangerText = danger?.text;
     if (reply) {
       const punish = await coachLine(after, 1.5);
-      const line = wholeLine(after, punish?.pv ?? [], 3);
+      const promised = danger ? promisedGain(danger.text) : 0;
+      const won = promised ? lineToGain(after, punish?.pv ?? [], opposite(mover), promised) : undefined;
+      const line = won ?? wholeLine(after, punish?.pv ?? [], 3);
+      if (promised && !won && stepper === card) {
+        // the line never wins it outright: say what it really costs
+        dangerText = mine ? "This gives them the better game." : "This gives you the better game.";
+        card.texts[0] = dangerText;
+      }
       if (punish && line.length) {
         const pages = linePages(after, line, viewer);
         pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(after, line, punish.score, opposite(mover), viewer)}`;
@@ -525,7 +534,7 @@ export async function explainSlip(ply: number, review: Review) {
     const best = parseSan(before, review.bestSan!) as NormalMove | undefined;
     if (!best) return;
     const bestShapes = moveShapes(before, best, viewer).slice(0, 1);
-    extendPages(card, [{ position: before, shapes: bestShapes }], [whyBetter(before, after, best, reply, review, danger?.text, viewer, mine)], 2);
+    extendPages(card, [{ position: before, shapes: bestShapes }], [whyBetter(before, after, best, reply, review, dangerText, viewer, mine)], 2);
     // How it goes on: the better move's line
     const better = await coachLine(before, 1.5, [best]);
     const line = wholeLine(before, better?.pv.length ? better.pv : [best], 3);
@@ -537,6 +546,30 @@ export async function explainSlip(ply: number, review: Review) {
     set.errorText(`Something went wrong: ${error}`);
     refresh();
   }
+}
+
+/** The material a warning promises: a pawn, a piece, the queen (0 for mate,
+ *  the centre or a vague cost, where the plain line says it). */
+function promisedGain(text: string): number {
+  if (/queen/.test(text)) return 9;
+  if (/pawn/.test(text)) return 1;
+  if (/piece|rook|bishop|knight|can be taken|can take their/.test(text)) return 3;
+  return 0;
+}
+
+/** A line played on until `side` is `amount` of material up on the start and
+ *  the trade is over (the next move takes nothing); undefined if it never is. */
+export function lineToGain(start: Chess, pv: NormalMove[], side: Color, amount: number): NormalMove[] | undefined {
+  let walk = start;
+  const line: NormalMove[] = [];
+  for (const move of pv.slice(0, 12)) {
+    line.push(move);
+    walk = positionAfter(walk, move);
+    const next = pv[line.length];
+    const settled = !next || !walk.board.get(next.to);
+    if (settled && materialFor(walk, side) - materialFor(start, side) >= amount) return line;
+  }
+  return undefined;
 }
 
 /** Why the better move beats the one played, in up to three short points:
@@ -642,6 +675,10 @@ export function lineOutcome(start: Chess, line: NormalMove[], score: Score, side
     const come = named ? "comes" : "come";
     if (lost === "queen") return `${who} ${win} ${whoseOf(them, viewer)} queen.`;
     return gain >= 5 ? `${who} ${come} out well ahead in material.` : `${who} ${come} out a ${lost ? NAME[lost] : "piece"} up.`;
+  }
+  if (gain >= 1) {
+    const who = viewer === null ? colourName(side) : you ? "you" : "they";
+    return `${who} ${viewer === null ? "comes" : "come"} out ${gain >= 2 ? "two pawns" : "a pawn"} up.`;
   }
   return `${verdictWords(score)}.`;
 }
