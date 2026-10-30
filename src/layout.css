@@ -1218,6 +1218,47 @@ button.round.hazard.red { background: #d93025; color: #fff; }
   margin-bottom: 12px;
 }
 
+/* Reviewing: a quiet bar above the board - back to the summary, and the
+   switch between key moments and every move (the theme's selection colour) */
+.review-bar {
+  margin-bottom: 4px;
+  padding: 0 3px 0 4px;
+}
+.review-bar[hidden],
+.review-mode[hidden] {
+  display: none;
+}
+.review-back {
+  min-height: 0;
+  padding: 3px 6px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 0.88rem;
+}
+.review-mode {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--button);
+}
+.review-mode button {
+  min-height: 0;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.review-mode button.on {
+  background: var(--sel-bg);
+  color: var(--sel-fg);
+}
+
 /* Key moments: the game's turning points, on the summary */
 .key-moments {
   margin-bottom: 12px;
@@ -2042,25 +2083,6 @@ body.replay-on .nav-play {
   cursor: pointer;
   text-decoration: underline dotted;
   text-underline-offset: 3px;
-}
-
-/* Back to the statistics, after jumping to a move from them */
-.stats-back-bar {
-  background: var(--accent);
-  color: var(--on-accent);
-}
-.stats-back-bar[hidden],
-.board-area.statsback #bar-top {
-  display: none;
-}
-#stats-back {
-  min-height: 0;
-  padding: 3px 12px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--card);
-  color: var(--text);
-  font-weight: 700;
 }
 
 /* An opening's introduction: just the finished setup, no move list yet */

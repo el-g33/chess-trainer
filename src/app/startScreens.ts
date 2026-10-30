@@ -26,7 +26,7 @@ import { drawProgress, openingShortName, startDemo } from "./openingDemos";
 import { saveSettings } from "./settings";
 import { menuMode } from "./startMenu";
 import {
-  demo, fenPosition, greeting, homeChoice, learnColour, learnOpening, matchColour, mode, pgnGames, set,
+  demo, fenPosition, freshViewTrail, greeting, homeChoice, learnColour, learnOpening, matchColour, mode, pgnGames, set,
 } from "./state";
 import { drawTrainScreen, levelCheckDone, setupTrain } from "./train";
 
@@ -281,6 +281,7 @@ export function startFromHome(kind: "play" | "practice") {
 
 export function hideMenu() {
   set.menuOpen(false);
+  freshViewTrail(); // a game opened from the menu: back starts from here
   menu.hidden = true;
   // The board may have changed size while hidden
   requestAnimationFrame(() => {

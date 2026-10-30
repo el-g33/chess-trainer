@@ -90,7 +90,17 @@ export let speech: Speech = { key: "", pieces: [""], index: 0, hold: 0, done: tr
 export let stripButtons: CoachButton[] = [];
 export let lastReviews: (Review | undefined)[] = [];
 export let stepper: Stepper | null = null;
-export let currentView: "board" | "stats" | "history" = "board";
+export type View = "board" | "stats" | "history";
+export let currentView: View = "board";
+// The views you came through in this game, for the phone's back gesture
+// (paused while a game is being opened from the menu, so it starts fresh)
+export const viewTrail: View[] = [];
+let trailPaused = false;
+export function freshViewTrail() {
+  viewTrail.length = 0;
+  trailPaused = true;
+  setTimeout(() => (trailPaused = false));
+}
 export let statsMore = false;
 export let currentGameId: string | null = null;
 export let historyColour: Color | "all" = "all";
@@ -171,7 +181,15 @@ export const set = {
   stripButtons: (value: typeof stripButtons) => (stripButtons = value),
   lastReviews: (value: typeof lastReviews) => (lastReviews = value),
   stepper: (value: typeof stepper) => (stepper = value),
-  currentView: (value: typeof currentView) => (currentView = value),
+  currentView: (value: typeof currentView) => {
+    if (value !== currentView && !trailPaused) {
+      viewTrail.push(currentView);
+      if (viewTrail.length > 20) viewTrail.shift();
+    }
+    currentView = value;
+  },
+  /** Back to an earlier view, without adding to the trail. */
+  viewBack: (value: typeof currentView) => (currentView = value),
   statsMore: (value: typeof statsMore) => (statsMore = value),
   currentGameId: (value: typeof currentGameId) => (currentGameId = value),
   historyColour: (value: typeof historyColour) => (historyColour = value),

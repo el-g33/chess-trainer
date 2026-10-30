@@ -42,6 +42,7 @@ import { startDemo, startDrill } from "./app/openingDemos";
 import { editorTap, startEditor, startLesson, startPuzzles } from "./app/train";
 import { refresh } from "./app/draw";
 import { installed } from "./app/coach";
+import { setupBackGesture } from "./app/backNav";
 import { buildMenu, showMenu } from "./app/startMenu";
 import { onBoardMove, onUndo } from "./app/moves";
 import { wireButtons } from "./app/buttons";
@@ -395,6 +396,7 @@ wireButtons();
 refresh();
 showMenu();
 setupWhatsNew(); // after an update: what's new
+setupBackGesture(); // the phone's back: a step back in the app, not out of it
 // Your games, mistakes and settings live in this browser's storage: ask it to
 // keep them, so it never clears them to save space (Chrome grants this quietly)
 void navigator.storage?.persist?.().catch(() => false);

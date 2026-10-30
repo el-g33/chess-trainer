@@ -256,6 +256,14 @@
         </div>
         <!-- Your opponent's bar above the board, yours below (they swap when the board flips) -->
         <div class="board-col">
+        <!-- Reviewing: back to the summary, and key moments only or every move -->
+        <div id="review-bar" class="whatif-bar review-bar" hidden>
+          <button type="button" id="review-summary" class="review-back">‹ Summary</button>
+          <div id="review-mode" class="review-mode" role="group" aria-label="Which moves">
+            <button type="button" id="mode-moments"></button>
+            <button type="button" id="mode-every">Every move</button>
+          </div>
+        </div>
         <div class="player-bar" id="bar-top">
           <span class="pb-name"></span><span class="pb-captured"></span><span class="pb-diff"></span>
           <span class="pb-clock" hidden></span>
@@ -264,16 +272,6 @@
         <div id="whatif-bar" class="whatif-bar" hidden>
           <span id="whatif-text"></span>
           <button type="button" id="whatif-exit">Back to game</button>
-        </div>
-        <!-- Came from a statistic: the way back -->
-        <div id="stats-back-bar" class="whatif-bar stats-back-bar" hidden>
-          <span>From your statistics</span>
-          <button type="button" id="stats-back">Back to statistics</button>
-        </div>
-        <!-- Going through the key moments only: where you are, and the way to every move -->
-        <div id="moments-bar" class="whatif-bar stats-back-bar" hidden>
-          <span id="moments-where"></span>
-          <button type="button" id="moments-every">Every move</button>
         </div>
         <div class="board-row">
           <div id="eval-bar" hidden aria-label="Evaluation">

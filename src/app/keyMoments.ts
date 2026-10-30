@@ -8,12 +8,12 @@ import { colourName } from "../coach";
 import { icon } from "../icons";
 import { currentPly } from "../main";
 import type { Review } from "../review";
-import { listener } from "./coach";
+import { listener, reviews } from "./coach";
 import { $ } from "./dom";
 import { refresh } from "./draw";
-import { GRADE_JUMP_PAUSE, backToStats, watching } from "./matches";
+import { GRADE_JUMP_PAUSE, backToStats, watching, withBook } from "./matches";
 import { goTo } from "./moves";
-import { currentView, game, reviewing, set } from "./state";
+import { analysis, currentView, demo, game, reviewing, set } from "./state";
 
 const MOST = 5;
 const SLIPS = ["Mistake", "Blunder", "Miss", "Missed Win"];
@@ -128,19 +128,38 @@ export function momentStep(where: "back" | "forward"): boolean {
   return true;
 }
 
-/** The bar above the board while going through them: where you are, and the way to every move. */
+/** The review bar above the board: back to the summary, and the switch
+ *  between key moments only and every move (none for a game without any). */
 export function drawMomentsBar() {
   if (!reviewing) moments = null;
-  const show = keyMomentsOn() && currentView === "board";
-  const bar = $("moments-bar");
-  bar.hidden = !show;
+  const show = reviewing && currentView === "board" && !analysis && !demo;
+  $("review-bar").hidden = !show;
   if (!show) return;
-  const list = moments!;
-  const at = list.findIndex((ply) => ply >= currentPly());
-  $("moments-where").textContent = `Key moment ${at < 0 ? list.length : at + 1} of ${list.length}`;
+  const plies = keyMoments(withBook(reviews()));
+  $("review-mode").hidden = !plies.length;
+  const on = keyMomentsOn();
+  const at = on ? moments!.findIndex((ply) => ply >= currentPly()) : -1;
+  $("mode-moments").textContent = on ? `Key moments ${at < 0 ? moments!.length : at + 1}/${moments!.length}` : "Key moments";
+  $("mode-moments").classList.toggle("on", on);
+  $("mode-every").classList.toggle("on", !on);
 }
 
+/** Every move: carry on from the move on screen, one at a time. */
 export function everyMove() {
   moments = null;
   refresh();
+}
+
+/** Key moments only: from the move on screen if it's one, else the next one ahead. */
+export function momentsOnly() {
+  if (keyMomentsOn()) return;
+  const plies = keyMoments(withBook(reviews()));
+  if (!plies.length) return;
+  const now = currentPly();
+  if (plies.includes(now)) {
+    moments = plies;
+    refresh();
+    return;
+  }
+  showMoment(plies.find((ply) => ply > now) ?? plies[plies.length - 1], plies);
 }

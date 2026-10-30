@@ -24,7 +24,7 @@ import {
 } from "./dom";
 import { refresh } from "./draw";
 import { toggleHelp } from "./featureTour";
-import { everyMove } from "./keyMoments";
+import { everyMove, momentsOnly } from "./keyMoments";
 import { backToStats, onResign, onReviewGame, stopPreparing } from "./matches";
 import { exitAnalysis, goTo, navigate, onUndo, readFen } from "./moves";
 import { loadDemoLine, onDemoExit, onDemoPlay, onDemoTry, onNavPlay, onShowDemo } from "./openingDemos";
@@ -159,8 +159,9 @@ export function wireButtons() {
   $("update-restart").addEventListener("click", () => void restartIntoUpdate());
   $("update-later").addEventListener("click", () => { $("update-toast").hidden = true; });
   $("prep-back").addEventListener("click", () => { stopPreparing(); showMenu(); });
-  $("stats-back").addEventListener("click", backToStats);
-  $("moments-every").addEventListener("click", everyMove);
+  $("review-summary").addEventListener("click", backToStats);
+  $("mode-moments").addEventListener("click", momentsOnly);
+  $("mode-every").addEventListener("click", everyMove);
   for (const tab of document.querySelectorAll<HTMLButtonElement>(".view-tabs button")) {
     tab.addEventListener("click", () => {
       set.currentView(tab.dataset.view as typeof currentView);

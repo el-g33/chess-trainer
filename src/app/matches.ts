@@ -33,7 +33,7 @@ import { openingInfo } from "./ratings";
 import { moveSound } from "./startMenu";
 import { resetBoard } from "./startScreens";
 import {
-  analysis, book, canReview, clock, clockHistory, clockTimes, currentView, deepMoves, deepNeeded, demo, fromStats,
+  book, canReview, clock, clockHistory, clockTimes, deepMoves, deepNeeded,
   game, gameHeaders, gradeJump, match, matchCounter, mode, plyNotes, prepProgress, prepWatch, prepWorked, preparing,
   preparingSince, reviewSide, reviewTitle, reviewing, set, silentJump, stepper, stopLoading, thinking,
 } from "./state";
@@ -437,10 +437,7 @@ export const GRADE_JUMP_PAUSE = 1000; // ms on the position before the move
 
 /** The bar back to the statistics, while you're on the board after a jump. */
 export function drawStatsBack() {
-  if (!reviewing) set.fromStats(false);
-  const show = fromStats && currentView === "board" && !analysis && !demo;
-  $("stats-back-bar").hidden = !show;
-  document.querySelector(".board-area")!.classList.toggle("statsback", show);
+  if (!reviewing) set.fromStats(false); // (the review bar's Summary is the way back now)
 }
 
 export function backToStats() {
