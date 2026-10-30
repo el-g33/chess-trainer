@@ -1585,3 +1585,12 @@ button.coach-face:hover:not(:disabled) {
     display: none !important;
   }
 }
+
+/* Installed on a phone (it opens as its own app): no pull-to-refresh, so a
+   swipe down can't reload the page and end a game by accident */
+@media (display-mode: standalone) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+}
