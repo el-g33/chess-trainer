@@ -120,8 +120,14 @@ export function moveButton(ply: number, review: Review): CoachButton | null {
   const theirs = viewer !== null && game.moverOf(ply) !== viewer;
   const run = () => openMore();
   if (WORTH_SHOWING.has(review.rating) && review.bestSan) {
-    if (theirs) return { ico: "gift", label: "Your chance", run, kind: "sign chance", more: true };
     const danger = dangerAfter(review, before, after, analyser.evals.get(fenOf(before)), analyser.evals.get(fenOf(after)), !!openingInfo()[ply - 1]?.book, viewer);
+    if (theirs) {
+      // they missed a chance against you: you got away with it (no gift in that)
+      if (review.rating === "Miss" || review.rating === "Missed Win") return { ico: "shield", label: "What you got away with", run, kind: "sign escape", more: true };
+      // a small slip of theirs is rarely a real chance: a gift only if it gives you something
+      if (review.rating === "Inaccuracy" && !danger) return null;
+      return { ico: "gift", label: "Your chance", run, kind: "sign chance", more: true };
+    }
     return { ico: "hazard", label: "What went wrong", run, kind: `hazard ${danger?.level ?? "yellow"}`, more: true };
   }
   if (review.rating === "Brilliant" || review.rating === "Great") return { ico: "star", label: "Why it works", run, kind: "sign star", more: true };
@@ -549,6 +555,7 @@ export async function explainSlip(ply: number, review: Review) {
     if (after.board.get(reply.to)) shapes.push({ orig: makeSquare(reply.to) as Key, brush: "threat" });
   }
   const theirSlip = !mine && viewer !== null;
+  if (theirSlip && (review.rating === "Miss" || review.rating === "Missed Win")) return void explainEscape(ply, review);
   const card = startStory({ position: after, shapes }, why, moodForRating(review.rating),
     theirSlip ? ["Why", "Their better option", "How it goes on"] : ["Why", "Your better option", "How it goes on"]);
   // Yours: at the end, a go at finding the better move yourself
@@ -591,6 +598,32 @@ export async function explainSlip(ply: number, review: Review) {
     const pages = linePages(afterBest, line.slice(1), viewer);
     if (better) pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(before, line, better.score, mover, viewer)}`;
     extendPages(card, pages.frames, pages.texts, 2);
+  } catch (error) {
+    set.errorText(`Something went wrong: ${error}`);
+    refresh();
+  } finally {
+    showStory(card);
+  }
+}
+
+/** A chance they missed against you: what they could have played, shown
+ *  played, and how it would have gone on. */
+export async function explainEscape(ply: number, review: Review) {
+  const before = game.positionAt(ply - 1);
+  const best = parseSan(before, review.bestSan!) as NormalMove | undefined;
+  if (!best) return;
+  const mover = game.moverOf(ply);
+  const viewer = listener();
+  const afterBest = positionAfter(before, best);
+  const card = startStory({ position: afterBest, shapes: movePicture(before, afterBest, best, false, viewer) },
+    ideaWords(before, best, viewer), moodForRating(review.rating), ["What they missed", "How it would have gone"]);
+  try {
+    const line = await coachLine(before, 1.5, [best]);
+    const moves = wholeLine(before, line?.pv.length ? line.pv : [best], 3);
+    if (moves.length < 2) return;
+    const pages = linePages(afterBest, moves.slice(1), viewer);
+    if (line) pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(before, moves, line.score, mover, viewer)}`;
+    extendPages(card, pages.frames, pages.texts, 1);
   } catch (error) {
     set.errorText(`Something went wrong: ${error}`);
     refresh();

@@ -137,7 +137,7 @@ function pick(options: string[], seed: number): string {
 export function verdict(review: Review, before: Chess, after: Chess,
   afterEval: Evaluation | undefined, you: Color | null, seed: number, neutral = false): string {
   const mover = before.turn;
-  if (neutral) return neutralVerdict(review, after, afterEval, mover);
+  if (neutral) return neutralVerdict(review, after, afterEval, mover, seed);
   const mine = !you || you === mover;
   const them = !you ? (mover === "white" ? "Black" : "White") : mine ? "them" : "you";
   if (PRAISE[review.rating]) {
@@ -145,8 +145,8 @@ export function verdict(review: Review, before: Chess, after: Chess,
     if (mine) return line;
     return you ? THEIR_PRAISE[review.rating] : line.replace("you found", "they found");
   }
-  if (review.rating === "Missed Win") return mine ? "You had a winning move there!" : "They missed a winning move there.";
-  if (review.rating === "Miss") return mine ? "You missed a chance to win material." : "They missed a chance to win material.";
+  if (review.rating === "Missed Win") return mine ? "You had a winning move there!" : pick(THEY_MISSED, seed);
+  if (review.rating === "Miss") return mine ? "You missed a chance to win material." : pick(THEY_MISSED, seed);
 
   // What the opponent can do now: Stockfish's best reply
   const reply = afterEval?.best;
@@ -178,12 +178,22 @@ export function verdict(review: Review, before: Chess, after: Chess,
     Mistake: ["Hmm, that hands over the advantage.", "That's a mistake: there was a much better move."],
     Blunder: ["Ouch, that's a big mistake.", "That one really hurts, I'm afraid."],
   };
-  const line = pick(generic[review.rating] ?? ["Interesting choice."], seed);
-  return mine ? line : line.replace("I'm afraid", "for them");
+  if (!mine) return pick(THEIR_SLIP[review.rating] ?? ["Not their best move."], seed);
+  return pick(generic[review.rating] ?? ["Interesting choice."], seed);
 }
 
+/** Their slip, said from your side of the board: how bad it was for them. */
+const THEIR_SLIP: Record<string, string[]> = {
+  Inaccuracy: ["A small slip from them.", "Not their best: there was something stronger.", "A loose move. Can you make it count?"],
+  Mistake: ["That's a mistake by them.", "Not a good move: that gives you the upper hand.", "They've slipped up. Your chance to take over."],
+  Blunder: ["A big mistake by them!", "That's a blunder: it could hand you the game.", "Ouch, for them. Can you see why?"],
+};
+
+/** They missed a chance against you: you got lucky. */
+const THEY_MISSED = ["Lucky you: they missed a strong move.", "They let you off the hook there.", "You got away with one."];
+
 /** The verdict for someone watching (no "you"): "White has allowed Black to win the rook." */
-function neutralVerdict(review: Review, after: Chess, afterEval: Evaluation | undefined, mover: Color): string {
+function neutralVerdict(review: Review, after: Chess, afterEval: Evaluation | undefined, mover: Color, seed: number): string {
   const me = mover === "white" ? "White" : "Black";
   const other = mover === "white" ? "Black" : "White";
   const praise: Record<string, string> = {
@@ -191,33 +201,35 @@ function neutralVerdict(review: Review, after: Chess, afterEval: Evaluation | un
     Excellent: `A strong move by ${me}.`, Good: `A solid move by ${me}.`, Book: "A known opening move.", Forced: `That was ${me}'s only move.`,
   };
   if (praise[review.rating]) return praise[review.rating];
-  if (review.rating === "Missed Win") return `${me} had a winning move there.`;
-  if (review.rating === "Miss") return `${me} missed a chance to win material.`;
+  if (review.rating === "Missed Win" || review.rating === "Miss") {
+    return pick([`${me} missed a strong move there.`, `${other} got away with one: ${me} missed a chance.`], seed);
+  }
   const reply = afterEval?.best;
   const score = afterEval?.score;
   if (score?.mate !== undefined && (mover === "white" ? score.mate < 0 : score.mate > 0)) return `${me} walks into a checkmate.`;
   if (reply) {
     const victim = after.board.get(reply.to);
     const piece = after.board.get(reply.from);
-    if (victim && victim.color === mover && PIECE_VALUES[victim.role] >= 3) return `${me} has allowed ${other} to win the ${NAMES[victim.role]}.`;
+    if (victim && victim.color === mover && PIECE_VALUES[victim.role] >= 3) return `${me} lets ${other} win the ${NAMES[victim.role]}.`;
     const replyAfter = after.clone();
     replyAfter.play(reply);
-    if (replyAfter.isCheck()) return `${me} has allowed ${other} to hit back with a check.`;
+    if (replyAfter.isCheck()) return `${me} lets ${other} hit back with a check.`;
     const hits = targets(replyAfter, reply.to);
     if (piece && piece.role !== "pawn" && hits.length && !victim) {
       const developing = (piece.color === "white" ? reply.from >> 3 === 0 : reply.from >> 3 === 7);
-      if (developing) return `${me} has let ${other} develop with tempo.`;
-      if (hits.length >= 2) return `${me} has allowed a fork.`;
-      return `${me} has allowed ${other} to attack the ${NAMES[hits[0]]}.`;
+      if (developing) return `${me} lets ${other} develop with tempo.`;
+      if (hits.length >= 2) return `${me} walks into a fork.`;
+      return `${me} lets ${other} attack the ${NAMES[hits[0]]}.`;
     }
-    if (victim && victim.color === mover) return `${me} has given ${other} a free ${NAMES[victim.role]}.`;
+    if (victim && victim.color === mover) return `${me} gives ${other} a free ${NAMES[victim.role]}.`;
   }
-  const generic: Record<string, string> = {
-    Inaccuracy: `Playable, but ${me} had something stronger.`,
-    Mistake: `${me} hands over the advantage.`,
-    Blunder: `A big mistake by ${me}.`,
+  // how bad it was, said from the outside, by the colour of the pieces
+  const generic: Record<string, string[]> = {
+    Inaccuracy: [`A small slip by ${me}.`, `Not ${me}'s best: there was something stronger.`, `A loose move by ${me}.`],
+    Mistake: [`That's a mistake by ${me}.`, `Not a good move by ${me}: ${other} takes over.`, `${me} slips up here.`],
+    Blunder: [`A big mistake by ${me}!`, `That's a blunder by ${me}.`, `Ouch, a costly move by ${me}.`],
   };
-  return generic[review.rating] ?? "Interesting choice.";
+  return pick(generic[review.rating] ?? ["Interesting choice."], seed);
 }
 
 // ---------------------------------------------------------------------------

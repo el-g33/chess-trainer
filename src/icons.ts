@@ -33,6 +33,7 @@ const PATHS: Record<string, string> = {
   chart: '<path d="M4 20h16M7 20v-6M12 20V8M17 20v-9"/>',
   history: '<path d="M4 12a8 8 0 1 0 2.4-5.7M4 4.5v3.5h3.5"/><path d="M12 8v4.5l3 2"/>',
   board: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h16M12 4v16"/><path d="M4 4h8v8H4zM12 12h8v8h-8z" fill="currentColor" fill-opacity=".25" stroke="none"/>',
+  shield: '<path d="M12 3l7.5 3v5.5c0 4.5-3.2 8.2-7.5 9.5-4.3-1.3-7.5-5-7.5-9.5V6z"/><path d="M8.8 12.2l2.2 2.2 4.2-4.4"/>',
   star: '<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z"/>',
   gift: '<path d="M4 11h16v9.5H4zM3 7.5h18V11H3zM12 7.5v13M12 7.5C10.5 4 7 3.5 7 5.8 7 7.5 12 7.5 12 7.5zM12 7.5c1.5-3.5 5-4 5-1.7 0 1.7-5 1.7-5 1.7z"/>',
   setup: '<path d="M4 19v-4.5a6 6 0 0 1 6-6h9.5M15.5 4.5l4 4-4 4"/>',

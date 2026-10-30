@@ -92,6 +92,7 @@ button.round.hazard {
 button.round.sign.chance { background: #2f7fd8; color: #fff; }
 button.round.sign.star { background: #2e9e5b; color: #fff; }
 button.round.sign.idea { background: #f2d24b; color: #3a2a00; }
+button.round.sign.escape { background: #5f6b7a; color: #fff; }
 button.round.sign.setup { background: var(--button); color: var(--text); border: 1px solid var(--line); }
 
 button.round.labelled {
@@ -1298,6 +1299,7 @@ button.round.hazard.red { background: #d93025; color: #fff; }
 }
 .moment-sign.star { background: #2e9e5b; color: #fff; }
 .moment-sign.chance { background: #2f7fd8; color: #fff; }
+.moment-sign.escape { background: #5f6b7a; color: #fff; }
 .moment-sign.amber { background: #f0a020; color: #3a2000; }
 .moment-sign.orange { background: #ff7a5a; color: #3a0d00; }
 .moment-sign.red { background: #d93025; color: #fff; }

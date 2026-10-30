@@ -37,13 +37,13 @@ function momentWords(review: Review, viewer: Color | null, mover: Color): { text
   if (review.rating === "Brilliant") return { text: `${whose} masterstroke`, sign: "star", ico: "star" };
   if (review.rating === "Great") return { text: `${whose} key move`, sign: "star", ico: "star" };
   if (theirs) {
-    const text = review.rating === "Miss" || review.rating === "Missed Win" ? "A chance they missed" : "Their slip: your chance";
-    return { text, sign: "chance", ico: "gift" };
+    if (review.rating === "Miss" || review.rating === "Missed Win") return { text: "A chance they missed", sign: "escape", ico: "shield" };
+    return { text: review.rating === "Blunder" ? "Their blunder: your chance" : "Their mistake: your chance", sign: "chance", ico: "gift" };
   }
   if (review.rating === "Miss") return { text: viewer === null ? `${whose} missed chance` : "A chance you missed", sign: "amber", ico: "hazard" };
   if (review.rating === "Missed Win") return { text: viewer === null ? `${whose} missed win` : "A win you missed", sign: "orange", ico: "hazard" };
-  if (review.rating === "Blunder") return { text: `${whose} big slip`, sign: "red", ico: "hazard" };
-  return { text: `${whose} slip`, sign: "orange", ico: "hazard" };
+  if (review.rating === "Blunder") return { text: `${whose} blunder`, sign: "red", ico: "hazard" };
+  return { text: `${whose} mistake`, sign: "orange", ico: "hazard" };
 }
 
 let moments: number[] | null = null; // going through the key moments only
