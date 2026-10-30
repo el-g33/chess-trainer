@@ -12,7 +12,6 @@ import { Chess, normalizeMove } from "chessops/chess";
 import type { Color, NormalMove } from "chessops/types";
 import { parseUci } from "chessops/util";
 
-import "@fontsource/permanent-marker/latin-400.css";
 import {
   coachEngine, mode, game, match, viewPly, analysis, preview, clock, clockTimes, demo, reviewing, quiz, puzzle,
   explore, editor, drill, stepper, checkingUpdates, set,
@@ -413,8 +412,6 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
     // not possible here (e.g. not https): the site still works online
   });
 }
-// Load the marker font now, so the first ?! mark doesn't appear in a plain font
-void document.fonts?.load('bold 20px "Permanent Marker"').catch(() => {});
 engine.ready.then(
   () => {
     engineStatus.textContent = "";
