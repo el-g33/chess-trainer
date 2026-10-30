@@ -11,6 +11,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.8",
+    items: [
+      { icon: "flag", title: "Key moments", text: "A review picks out your game's turning points. Go through just those or every move, and switch whenever you like." },
+      { icon: "bulb", title: "Explanations that fit the move", text: "Tap a move's sign to see why. A simple take is one picture; the moves play out only when there's a real tactic." },
+      { icon: "user", title: "From your side", text: "When your opponent slips, the coach says so from your point of view, and how bad it was." },
+      { icon: "book", title: "Clearer opening lessons", text: "Each move is pictured with one short line, and the end of a line shows your plan, their answer and the weak spots on both sides." },
+      { icon: "back", title: "Back means back", text: "Your phone's back gesture now steps back through the app instead of closing it." },
+      { icon: "eye", title: "A streamlined look", text: "Move signs, a calmer board for trying moves and quicker coach words, for a better experience." },
+    ],
+  },
+  {
     version: "3.7",
     items: [
       { icon: "bulb", title: "Why the better move is better", text: "When you open a slip in a review, I now explain what the better move does, the reply it takes away, and what your move cost." },
