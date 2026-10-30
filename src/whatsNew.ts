@@ -15,6 +15,7 @@ export const RELEASES: Release[] = [
     items: [
       { icon: "bulb", title: "Why the better move is better", text: "When you open a slip in a review, I now explain what the better move does, the reply it takes away, and what your move cost." },
       { icon: "target", title: "Find it yourself", text: "At the end, step back to before your move and play the better one; I'll tell you if you've found it." },
+      { icon: "eye", title: "A streamlined look", text: "Livelier move badges, matched to your theme, for a better experience." },
     ],
   },
   {
