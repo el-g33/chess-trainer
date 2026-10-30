@@ -41,7 +41,7 @@ function knightsTour(stage: HTMLElement, caption: HTMLElement): Stop {
   const knight = piece("knight", "white");
   box.append(knight);
   stage.append(box);
-  caption.textContent = "Stockfish is checking every move...";
+  caption.textContent = "Checking every move…";
   const route: [number, number][] = [[0, 0], [1, 2], [3, 3], [2, 1]];
   let i = 0;
   place(knight, 0, 0, cell);

@@ -48,7 +48,7 @@ import {
 import { keyMomentsCard } from "./keyMoments";
 import { analysisLineText, goTo } from "./moves";
 import {
-  cap, depthCard, drillSays, lowerFirst, openingShortName, practiceSays, scheduleDemo, showWhatYouGet, startDemoLine,
+  cap, depthCard, drillSays, openingShortName, practiceSays, scheduleDemo, showWhatYouGet, startDemoLine,
   movePicture, practiseGameSlips,
 } from "./openingDemos";
 import { importGames, importing, importNote, reviewImported } from "./onlineGames";
@@ -167,7 +167,7 @@ export function firstSentence(note: string): string {
 /** What the coach says about the position on screen. */
 export function coachSays(reviews: (Review | undefined)[]): CoachSay {
   if (silentJump) return { mood: "talk", text: "", buttons: [], key: "silent" };
-  if (busy) return { mood: "think", text: statusMessage || "Hmm, let me think...", buttons: [] };
+  if (busy) return { mood: "think", text: statusMessage || "Let me think…", buttons: [] };
   if (editor) return { mood: "talk", text: editor.pick
     ? "Tap squares to place it, or tap it again to put it away. Done when you're ready."
     : "Drag pieces to move them (off the board to remove), or pick a piece below to add. Done when you're ready.", buttons: [] };
@@ -207,7 +207,7 @@ export function coachSays(reviews: (Review | undefined)[]): CoachSay {
     if (match) {
       const yours = game.position.turn === match.user;
       return thinking || !yours
-        ? { mood: "think", text: "Let me think...", buttons: [] }
+        ? { mood: "think", text: "Let me think…", buttons: [] }
         : { mood: "talk", text: game.length ? "Your move." : "Your move. Good luck!", buttons: [] };
     }
     if (canReview) return { mood: "happy", text: "Good game! Shall we go through it together?", buttons: [{ ico: "search", label: "Review the game", run: onReviewGame, kind: "accent" }] };
@@ -225,7 +225,7 @@ export function coachSays(reviews: (Review | undefined)[]): CoachSay {
   if (analysis) {
     const review = ratingsOn() ? analysisReview() : undefined;
     if (!analysis.line.length) return { mood: "talk", text: "Try any move to see what would have happened.", buttons: [] };
-    if (!review) return { mood: "think", text: "Let me check that move...", buttons: [] };
+    if (!review) return { mood: "think", text: "Let me check that move…", buttons: [] };
     const line = analysis.line;
     const before = line.positionAt(line.length - 1);
     const after = line.positionAt(line.length);
@@ -240,7 +240,7 @@ export function coachSays(reviews: (Review | undefined)[]): CoachSay {
   if (!ratingsOn()) return { mood: "talk", text: "Move ratings are off.", buttons: [STRATEGY] };
   if (ply === 0) return { mood: "talk", text: game.length ? "The starting position." : "Make a move and I'll tell you what I think.", buttons: [STRATEGY] };
   const review = reviews[ply - 1];
-  if (!review) return { mood: "think", text: "Hmm, let me check that move...", buttons: [STRATEGY] };
+  if (!review) return { mood: "think", text: "Let me check that move…", buttons: [STRATEGY] };
   const before = game.positionAt(ply - 1);
   const after = game.positionAt(ply);
   let text = verdict(review, before, after, analyser.evals.get(fenOf(after)), listener(), ply, watching());
@@ -481,7 +481,7 @@ export async function explainGoodMove(ply: number, review: Review) {
     ...movePicture(before, after, played, yours, viewer),
     ...hits.map((square): DrawShape => ({ orig: makeSquare(square) as Key, brush: "threat" })),
   ];
-  const text = review.rating === "Book" ? `Known opening theory. ${ideaWords(before, played, viewer)}` : ideaWords(before, played, viewer);
+  const text = review.rating === "Book" ? `${ideaWords(before, played, viewer)} A known opening move.` : ideaWords(before, played, viewer);
   const card = startStory({ position: after, shapes }, text, moodForRating(review.rating), setsUp ? ["The move", "What it sets up"] : []);
   try {
     if (!setsUp || after.isEnd()) return;
@@ -912,7 +912,7 @@ export async function explainBrilliant(ply: number) {
       const story = talkLine(after, line, viewer);
       const best = await coachLine(after, 1);
       const trap = best?.pv[0] && makeUci(best.pv[0]) !== makeUci(line[0]);
-      const texts = story.texts.map((text, i) => i === 0 ? `If ${viewer === null ? colourName(opposite(mover)) : "they"} take${viewer === null ? "s" : ""} it: ${lowerFirst(text)}` : text);
+      const texts = story.texts.map((text, i) => i === 0 ? `Say ${viewer === null ? colourName(opposite(mover)) : "they"} take${viewer === null ? "s" : ""} it. ${text}` : text);
       endWith(texts, lineOutcome(after, line, taken.score, mover, viewer));
       if (trap) texts[texts.length - 1] += viewer === null ? ` So ${colourName(opposite(mover))} shouldn't take it.` : " So they shouldn't take it.";
       extendStepper(card, story.positions.slice(1), line, texts);
@@ -1131,7 +1131,7 @@ export async function openStrategy() {
   const position = base();
   const style = playStyle();
   const known = demoLineFrom(position);
-  setBusy(true, "Let me find the best plan...");
+  setBusy(true, "Let me find the best plan…");
   try {
     const lines = await coachAnalysis.analyse(position, 1.5, 5);
     const found = styleAlternative(position, lines, style);
@@ -1285,7 +1285,7 @@ export function drawStats() {
     fill.style.width = `${Math.round(fraction * 100)}%`;
     const track = element("div", "stats-progress-track");
     track.append(fill);
-    bar.append(element("span", "", "Stockfish is checking the game..."), track);
+    bar.append(element("span", "", "Checking every move…"), track);
     box.append(bar);
   }
 
@@ -1991,7 +1991,7 @@ export function drawCoach() {
   } else if (quiz?.answered) {
     const [correct, text] = quiz.result!;
     const parts: HTMLElement[] = [textBlock(text, correct ? "coach-right" : "coach-wrong")];
-    if (quiz.explaining) parts.push(textBlock("Stockfish is checking what your guess would do...", "coach-note"));
+    if (quiz.explaining) parts.push(textBlock("Let me see what your guess would do…", "coach-note"));
     if (quiz.explanation) {
       parts.push(textBlock(quiz.explanation.text));
       parts.push(textBlock("Blue arrow: your guess. Green arrow: your best answer. Use the ‹ › buttons below to play it out.", "coach-note"));

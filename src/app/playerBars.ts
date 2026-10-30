@@ -340,7 +340,7 @@ export function drawReview(reviews: (Review | undefined)[], info: OpeningInfo[])
     paragraph("Analysis - not part of the game", "review-opening");
     const review = ratingsOn() ? analysisReview() : undefined;
     if (!analysis.line.length) paragraph("Make a move to see what would have happened.");
-    else if (!review) paragraph(ratingsOn() ? "Stockfish is checking this move..." : "Move ratings are switched off.");
+    else if (!review) paragraph(ratingsOn() ? "Let me check that move…" : "Move ratings are switched off.");
     else showRating(review);
   } else {
     const ply = reviewPly();
@@ -359,7 +359,7 @@ export function drawReview(reviews: (Review | undefined)[], info: OpeningInfo[])
     }
     if (!ratingsOn()) paragraph("Move ratings are switched off.");
     else if (ply === 0) paragraph("Make a move, or tap a move in the list, to see what I think of it.");
-    else if (!reviews[ply - 1]) paragraph("Stockfish is checking this move...");
+    else if (!reviews[ply - 1]) paragraph("Let me check that move…");
     else {
       showRating(reviews[ply - 1]!);
       const missed = missedBrilliant(game.positionAt(ply - 1), game.moves[ply - 1].move, analyser.evals);
@@ -369,20 +369,20 @@ export function drawReview(reviews: (Review | undefined)[], info: OpeningInfo[])
 
   drawGameReport(reviews, info);
   const { done, total } = analyser.progress();
-  reviewProgress.textContent = reviewing && done < total ? `Stockfish is checking the game: ${done} of ${total} positions` : "";
+  reviewProgress.textContent = reviewing && done < total ? `Checking the game: ${done} of ${total} positions` : "";
   reviewProgress.hidden = !reviewProgress.textContent;
 
   // In a match the review stays on your move; this shows Stockfish's reply
   const current = currentPly();
   const live = match !== null && viewPly === null && !preview && !analysis;
   if (live && reviewPly() < current) {
-    replyButton.innerHTML = "See Stockfish's reply &rsaquo;";
+    replyButton.innerHTML = "See their reply &rsaquo;";
     replyButton.disabled = false;
   } else if (live && showReply && current && game.moverOf(current) !== match!.user) {
     replyButton.innerHTML = "&lsaquo; Back to your move";
     replyButton.disabled = false;
   } else {
-    replyButton.innerHTML = "See Stockfish's reply &rsaquo;";
+    replyButton.innerHTML = "See their reply &rsaquo;";
     replyButton.disabled = true;
   }
 }

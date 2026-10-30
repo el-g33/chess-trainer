@@ -238,7 +238,7 @@ export function demoShapes(): DrawShape[] {
 export async function showWhatYouGet() {
   if (!demo || busy) return;
   const position = game.position;
-  setBusy(true, "Let me look at the position you get...");
+  setBusy(true, "Let me look at the position you get…");
   try {
     const pages = await whatYouGet(coachAnalysis, position, orientation);
     setBusy(false);
@@ -551,7 +551,7 @@ export async function drillWrong(before: Chess, move: NormalMove, expected: Norm
   d.waiting = true;
   const played = game.play(move);
   moveSound(played.san, opposite(game.position.turn));
-  d.note = "Let me check that...";
+  d.note = "Let me check that move…";
   d.mood = "think";
   refresh();
   const [best] = await coachAnalysis.analyse(before, 0.5, 1);
@@ -586,7 +586,7 @@ export async function drillAnswer(move: NormalMove) {
   d.waiting = true;
   const played = game.play(move);
   moveSound(played.san, opposite(game.position.turn));
-  d.note = "Let me check that...";
+  d.note = "Let me check that move…";
   d.mood = "think";
   refresh();
   const score = await coachAnalysis.moveScore!(before, move, 0.8);
@@ -1021,7 +1021,7 @@ export async function practiceMove(move: NormalMove) {
   moveSound(played.san, before.turn);
   if (makeUci(move) === mistake.best) return practiceSolved(before, move);
   p.waiting = true;
-  p.note = "Let me check that...";
+  p.note = "Let me check that move…";
   p.mood = "think";
   refresh();
   const [best] = await coachAnalysis.analyse(before, 0.6, 1);
@@ -1074,7 +1074,7 @@ export function practiceShow() {
   moveSound(played.san, before.turn);
   recordAttempt(mistake.id, false);
   p.state = "shown";
-  p.note = `This was the move: ${lowerFirst(moveInWords(before, best, before.turn))} It comes back tomorrow.`;
+  p.note = `${moveInWords(before, best, before.turn)} That was the move: it comes back tomorrow.`;
   p.mood = "talk";
   refresh();
 }

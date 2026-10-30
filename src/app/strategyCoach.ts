@@ -48,16 +48,16 @@ export async function startTask(kind: Task) {
     refresh();
     return;
   }
-  setBusy(true, "Stockfish is thinking...");
+  setBusy(true, "Let me think…");
   try {
     const found: Insight = { ...insight };
     if (needBrilliant) {
-      set.statusMessage("Stockfish is looking for a sacrifice that works...");
+      set.statusMessage("Looking for a sacrifice that works…");
       found.brilliant = await findBrilliant(coachAnalysis, position);
       saveInsight(fen, found);
     }
     if (needThreat) {
-      set.statusMessage("Stockfish is looking for threats...");
+      set.statusMessage("Looking for threats…");
       found.threat = await threatCheck(coachAnalysis, position);
       saveInsight(fen, found);
       if (quiz && quiz.fen === fen) {
@@ -68,10 +68,10 @@ export async function startTask(kind: Task) {
     }
     if (needPlan) {
       if (planMode === "best") {
-        set.statusMessage("Stockfish is working out the next few moves...");
+        set.statusMessage("Working out the next few moves…");
         found.plan = await planAhead(coachAnalysis, position);
       } else {
-        set.statusMessage("Stockfish is checking your opening's moves...");
+        set.statusMessage("Checking your opening's moves…");
         const first = firstMoveOf(game.positionAt(0), gameMoves());
         found.plan = await openingPlanAhead(coachAnalysis, position, match!.myOpening!, book!, first, planMode);
       }
@@ -154,7 +154,7 @@ export async function explainWrongGuess(guess: NormalMove) {
   const asked = quiz;
   if (!asked?.threat) return;
   asked.explaining = true;
-  setBusy(true, "Stockfish is checking your guess...");
+  setBusy(true, "Let me check your guess…");
   try {
     asked.explanation = await explainGuess(coachAnalysis, asked.threat, guess);
   } catch (error) {

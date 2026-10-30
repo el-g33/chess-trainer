@@ -27,7 +27,7 @@ import { type CoachButton, type CoachSay, type StepFrame, TELL_MORE, closeSteppe
 import { $, levelBox, menu } from "./dom";
 import { arrowEnd, refresh } from "./draw";
 import { afterMove } from "./matches";
-import { drawMistakesCard, lowerFirst, practiseMistakes } from "./openingDemos";
+import { drawMistakesCard, practiseMistakes } from "./openingDemos";
 import { playerName } from "./playerBars";
 import { message } from "./popups";
 import { saveSettings } from "./settings";
@@ -638,7 +638,7 @@ export async function showIdeas() {
   if (!explore || busy) return;
   const { user, band } = explore;
   const position = base();
-  setBusy(true, "Let me look at the position...");
+  setBusy(true, "Let me look at the position…");
   try {
     const frames: StepFrame[] = [];
     const texts: string[] = [];
@@ -659,7 +659,7 @@ export async function showIdeas() {
       const plan = await planAhead(coachAnalysis, position);
       line = forcingStart(position, plan.steps.map((step) => step.move));
       score = plan.score;
-      if (line.length) moveFrame(position, line[0], `Best here: ${lowerFirst(moveInWords(position, line[0], user))}`, line.length === 1);
+      if (line.length) moveFrame(position, line[0], `Here's the strongest move. ${moveInWords(position, line[0], user)}`, line.length === 1);
     }
     // Their likely replies (to your best move, or now if it's their turn)
     const after = line.length ? positionAfter(position, line[0]) : position;
@@ -670,7 +670,7 @@ export async function showIdeas() {
         modifiers: { lineWidth: Math.round(4 + o.weight * 10) },
       }));
       const who = BANDS[band].who.replace(/^./, (c) => c.toUpperCase());
-      texts.push(line.length ? `${who} would most likely answer:` : `It's their move. ${who} would most likely play:`);
+      texts.push(line.length ? `${who} would most likely answer with one of these.` : `It's their move. ${who} would most likely play one of these.`);
       const others = 100 - odds.reduce((sum, o) => sum + o.chance, 0);
       frames.push({ position: after, shapes, odds, others: others >= 10 ? others : undefined });
     }
@@ -678,8 +678,8 @@ export async function showIdeas() {
     let walk = after;
     line.slice(1).forEach((move, i) => {
       const mine = walk.turn === user;
-      const text = i === 0 && !mine ? `Their best defence: ${lowerFirst(narrateMove(walk, move, user))}`
-        : mine ? `Then ${lowerFirst(moveInWords(walk, move, user))}` : narrateMove(walk, move, user);
+      // (the board shows the order: each move in one plain sentence)
+      const text = i === 0 && !mine ? `${narrateMove(walk, move, user)} That's their best defence.` : narrateMove(walk, move, user);
       moveFrame(walk, move, text, false);
       walk = positionAfter(walk, move);
     });
@@ -775,7 +775,7 @@ export function exploreSays(reviews: (Review | undefined)[]): CoachSay {
     return { mood: "talk", text, buttons };
   }
   const review = reviews[ply - 1];
-  if (!review) return { mood: "think", text: "Let me check that move...", buttons };
+  if (!review) return { mood: "think", text: "Let me check that move…", buttons };
   const said = verdict(review, game.positionAt(ply - 1), position, analyser.evals.get(fenOf(position)), user, ply);
   let text: string;
   if (over) text = said;
