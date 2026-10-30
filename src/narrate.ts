@@ -249,15 +249,17 @@ export function controlledSquares(position: Chess, square: number): number[] {
 }
 
 /** What a piece covers, for a picture - kept to what matters: the central
- *  squares it now controls (c3 to f6, not ones your own pieces stand on), as
- *  dots; a bishop instead shows its forward diagonals, as thin lines to
- *  their far ends (two squares or more), since its reach is what it's for. */
-export function pieceReach(position: Chess, square: number): { dots: number[]; lines: number[] } {
+ *  squares it now controls (c3 to f6, not ones its own side stands on), drawn
+ *  as small arrows (a knight's bent, the way it jumps); a bishop instead
+ *  shows its forward diagonals, as thin lines to their far ends (two squares
+ *  or more), since its reach is what it's for. A pawn: nothing here (its
+ *  chain and the pieces it attacks tell its story). */
+export function pieceReach(position: Chess, square: number): { centre: number[]; lines: number[] } {
   const piece = position.board.get(square);
-  if (!piece || piece.role === "king") return { dots: [], lines: [] };
+  if (!piece || piece.role === "king" || piece.role === "pawn") return { centre: [], lines: [] };
   if (piece.role !== "bishop") {
     const reach = attacks(piece, square, position.board.occupied).diff(position.board[piece.color]);
-    return { dots: [...reach].filter((s) => (s & 7) >= 2 && (s & 7) <= 5 && s >> 3 >= 2 && s >> 3 <= 5), lines: [] };
+    return { centre: [...reach].filter((s) => (s & 7) >= 2 && (s & 7) <= 5 && s >> 3 >= 2 && s >> 3 <= 5), lines: [] };
   }
   const lines: number[] = [];
   // (its forward diagonals: what it's eyeing, not the way back home)
@@ -274,7 +276,7 @@ export function pieceReach(position: Chess, square: number): { dots: number[]; l
     }
     if (steps >= 2) lines.push(end);
   }
-  return { dots: [], lines };
+  return { centre: [], lines };
 }
 
 /** Why a move is good, in a short clause: "it develops your knight and controls the centre". */

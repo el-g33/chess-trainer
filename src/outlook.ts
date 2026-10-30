@@ -72,22 +72,11 @@ function passTo(position: Chess, side: Color): Chess | null {
   return result.isOk ? result.value : null;
 }
 
-/** A plan in words: "castling", "a queen move", "a pawn push", "taking the pawn". */
-function planWords(position: Chess, move: NormalMove): string {
-  const piece = position.board.get(move.from);
-  if (!piece) return "a move";
-  const victim = position.board.get(move.to);
-  if (piece.role === "king" && (Math.abs(file(move.to) - file(move.from)) > 1 || victim?.color === piece.color)) return "castling";
-  if (victim && victim.color !== piece.color) return `taking the ${NAMES[victim.role]}`;
-  if (piece.role === "pawn") return "a pawn push";
-  return `a ${NAMES[piece.role]} move`;
-}
-
 interface Plan {
   move: NormalMove;
   san: string;
   step: string; // "bring your queen out", "castle, getting the king safe"
-  reach: { dots: number[]; lines: number[] }; // what the piece covers once there
+  reach: { centre: number[]; lines: number[] }; // what the piece covers once there
 }
 
 /** Stockfish's top moves for one side, with plain words for each. */
@@ -177,45 +166,6 @@ function outpost(position: Chess, you: Color): number | null {
   return candidates[0] ?? null;
 }
 
-/** A piece or pawn of yours that nothing defends, which one of their moves
- *  would attack (or already attacks). */
-function looseTarget(position: Chess, you: Color): { square: number; role: Role; by?: string } | null {
-  const them = opposite(you);
-  const theirs = passTo(position, them);
-  if (!theirs) return null;
-  const occupied = position.board.occupied;
-  const loose: number[] = [];
-  for (const square of position.board[you]) {
-    const piece = position.board.get(square)!;
-    if (piece.role === "king") continue;
-    if (position.kingAttackers(square, you, occupied).nonEmpty()) continue; // defended
-    loose.push(square);
-  }
-  loose.sort((a, b) => PIECE_VALUES[position.board.get(b)!.role] - PIECE_VALUES[position.board.get(a)!.role]);
-  for (const square of loose) {
-    const role = position.board.get(square)!.role;
-    if (position.kingAttackers(square, them, occupied).nonEmpty()) return { square, role };
-    for (const [from, dests] of theirs.allDests()) {
-      const piece = theirs.board.get(from)!;
-      if (piece.role === "king") continue;
-      for (const to of dests) {
-        if (to === square) continue;
-        // only moves that don't just lose the piece: to a square you don't
-        // cover, or a pawn backed up by their own pieces
-        const after = occupied.without(from).with(to);
-        const covered = position.kingAttackers(to, you, after).nonEmpty();
-        const backed = piece.role === "pawn" && position.kingAttackers(to, them, after).nonEmpty();
-        if (covered && !backed) continue;
-        if (attacks(piece, to, after).has(square)) {
-          const move: NormalMove = { from, to };
-          return { square, role, by: planWords(theirs, move) };
-        }
-      }
-    }
-  }
-  return null;
-}
-
 /** The position at the end of a line, one idea a page, each with its own
  *  picture and one sentence: the verdict, your pawns, your king, your next
  *  step (and the piece's range once it's there), an attack, a knight square,
@@ -246,19 +196,57 @@ export async function whatYouGet(engine: CoachEngine, position: Chess, you: Colo
   // Your plan: the next step (its arrow, then the piece's range from there), an attack, a knight square
   if (next) {
     page("Your plan", `A good next step is to ${next.step}.`,
-      [[next.move.from, next.move.to, "plan"], ...next.reach.lines.map((end): [number, number, Mark] => [next.move.to, end, "scope"])],
-      next.reach.dots.map((s): [number, Mark] => [s, "scope"]));
+      [[next.move.from, next.move.to, "plan"], ...[...next.reach.lines, ...next.reach.centre].map((end): [number, number, Mark] => [next.move.to, end, "scope"])]);
   }
   const aim = aimAtKing(position, you);
   if (aim) page("Your plan", `Your ${NAMES[aim.role]} is aimed at their king.`, [[aim.from, aim.to, "good"]]);
   const post = outpost(position, you);
   if (post !== null) page("Your plan", "There's a safe square for a knight, where no pawn can chase it away.", [], [[post, "good"]]);
 
-  // Watch out: their best idea, and anything left unguarded
-  const danger = theirs[0];
-  if (danger) page("Watch out", `Watch out: they want to ${danger.step}${watchReason(position, danger.move, you, aim)}.`, [[danger.move.from, danger.move.to, "bad"]]);
-  const target = looseTarget(position, you);
-  if (target) page("Watch out", `Nothing guards your ${NAMES[target.role]}${target.by ? ", and they could attack it" : ""}.`, [], [[target.square, "bad"]]);
-  if (!danger && !target) page("Watch out", "Nothing serious to watch out for yet.");
+  // Their answer: their best idea, said as what it does to your plan (a real
+  // threat only when it attacks something)
+  const answer = theirs[0];
+  if (answer) {
+    const reason = watchReason(position, answer.move, you, aim);
+    const text = reason.startsWith(", to block")
+      ? `To stop that, they'll likely ${answer.step}${reason.replace(", to block", ", blocking")}.`
+      : reason
+        ? `Watch out: they could ${answer.step}${reason}.`
+        : `Their plan is to ${answer.step}.`;
+    page("Their answer", text, [[answer.move.from, answer.move.to, "bad"]]);
+  }
+
+  // Weak spots, yours and theirs: pawns with no pawn beside them, doubled
+  // pawns, a piece nothing guards - the patterns to learn to see
+  const weak = (side: Color) => weakSpots(position, side);
+  const mine = weak(you);
+  const their = weak(them);
+  for (const spot of mine.slice(0, 2)) page("Weak spots", `Your weak spot: ${spot.text}.`, [], spot.squares.map((sq): [number, Mark] => [sq, "bad"]));
+  for (const spot of their.slice(0, 2)) page("Weak spots", `Their weak spot: ${spot.text}. A target for later.`, [], spot.squares.map((sq): [number, Mark] => [sq, "good"]));
+  if (!mine.length && !their.length) page("Weak spots", "No weak spots on either side yet: a healthy position for both.");
   return pages;
+}
+
+/** A side's weak spots, plainly: an isolated pawn, doubled pawns, a piece
+ *  nothing guards. (Their own words, from the owner's side: "your"/"their"
+ *  is added by the caller.) */
+function weakSpots(position: Chess, side: Color): { text: string; squares: number[] }[] {
+  const spots: { text: string; squares: number[] }[] = [];
+  const pawns = [...position.board.pieces(side, "pawn")];
+  const onFile = (f: number) => pawns.filter((sq) => file(sq) === f);
+  for (let f = 0; f < 8; f++) {
+    const here = onFile(f);
+    if (here.length >= 2) spots.push({ text: `two pawns on the ${"abcdefgh"[f]}-file, one in the other's way`, squares: here });
+    else if (here.length === 1 && !onFile(f - 1).length && !onFile(f + 1).length) {
+      spots.push({ text: `the ${"abcdefgh"[f]}-pawn has no pawn beside it, so only pieces can guard it`, squares: here });
+    }
+  }
+  const occupied = position.board.occupied;
+  for (const square of position.board[side]) {
+    const role = position.board.get(square)!.role;
+    if (role === "pawn" || role === "king") continue;
+    if (rank(square) === (side === "white" ? 0 : 7)) continue; // (still at home: not a weakness yet)
+    if (position.kingAttackers(square, side, occupied).isEmpty()) spots.push({ text: `nothing guards the ${NAMES[role]}`, squares: [square] });
+  }
+  return spots;
 }

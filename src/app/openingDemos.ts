@@ -5,6 +5,7 @@ import type { Key } from "@lichess-org/chessground/types";
 import { Chess, normalizeMove } from "chessops/chess";
 import { parseSan } from "chessops/san";
 import type { Color, NormalMove, Role } from "chessops/types";
+import { attacks } from "chessops/attacks";
 import { makeSquare, makeUci, opposite, parseUci } from "chessops/util";
 
 import { accuracyRating, divide, gameAccuracy, phaseAccuracy } from "../accuracy";
@@ -32,7 +33,7 @@ import { play } from "../sounds";
 
 import {
   type CoachButton, type CoachSay, type StepFrame, closeOverlay, closeStepper, element, listener, loadHistory, para,
-  reviews, showOverlay,
+  reviews, showLessonIntro, showOverlay,
 } from "./coach";
 import { $, colourBox, demoPick, menuCard, myOpeningBox, opponentBox } from "./dom";
 import { arrowEnd, refresh } from "./draw";
@@ -82,10 +83,11 @@ export function loadDemoLine(index: number, intro = true) {
   demo.interrupted = false;
   demo.intro = intro;
   if (intro) {
-    // the basic setup, while the coach introduces it; play starts the line
+    // the starting position, while the coach introduces the line in the middle of the screen
     set.viewPly(null);
     demo.playing = false;
     refresh();
+    showLessonIntro();
     return;
   }
   set.viewPly(0);
@@ -196,14 +198,21 @@ export function movePicture(before: Chess, after: Chess, move: NormalMove, yours
     marked.add(square);
     shapes.push({ orig: makeSquare(square) as Key, brush: yours ? "you" : "them" });
   };
+  const from = makeSquare(move.to) as Key;
   if (!isCastling(before, move)) {
-    // what it now covers: a pawn's or knight's squares as dots, a long-range piece's lines as thin arrows
+    // what it now covers: small arrows to the central squares (a knight's bent), a bishop's lines thin
     const reach = pieceReach(after, move.to);
-    for (const square of reach.dots) shapes.push(reachDot(square, yours));
-    for (const end of reach.lines) shapes.push({ orig: makeSquare(move.to) as Key, dest: makeSquare(end) as Key, brush: yours ? "scope" : "scopeThem" });
+    for (const square of reach.centre) shapes.push({ orig: from, dest: makeSquare(square) as Key, brush: yours ? "control" : "controlThem" });
+    for (const end of reach.lines) shapes.push({ orig: from, dest: makeSquare(end) as Key, brush: yours ? "scope" : "scopeThem" });
   }
-  // a pawn move: the chain it's part of (only the moving piece is pictured, nothing else's next move)
-  if (after.board.get(move.to)?.role === "pawn") for (const square of chainOf(after, move.to)) mark(square);
+  if (after.board.get(move.to)?.role === "pawn") {
+    // a pawn move: the chain it's part of, and a small arrow to any piece it now attacks
+    for (const square of chainOf(after, move.to)) mark(square);
+    const pawn = after.board.get(move.to)!;
+    for (const square of attacks(pawn, move.to, after.board.occupied).intersect(after.board[opposite(pawn.color)])) {
+      shapes.push({ orig: from, dest: makeSquare(square) as Key, brush: yours ? "control" : "controlThem" });
+    }
+  }
   return shapes;
 }
 

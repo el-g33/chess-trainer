@@ -139,7 +139,7 @@ export function moveButton(ply: number, review: Review): CoachButton | null {
 export const STRATEGY: CoachButton = { ico: "target", label: "Strategy", run: () => void openStrategy(), kind: "accent" };
 
 /** An opening lesson's first words: short, then play. */
-function lessonIntro(): string {
+export function lessonIntro(): string {
   if (!demo) return "";
   const lines = demo.demo.lines;
   if (demo.line > 0) return `Next, the ${lines[demo.line].title}. Whenever you're ready.`;
@@ -147,6 +147,16 @@ function lessonIntro(): string {
   return lines.length > 1
     ? `Let's go through the ${name}, its main lines and some variations. Whenever you're ready.`
     : `Let's go through the ${name} and its main line. Whenever you're ready.`;
+}
+
+/** A lesson's introduction in the middle of the screen (nothing is happening
+ *  on the board yet, so the coach has room to talk); Play sends the coach back
+ *  to the top and the line starts. */
+export function showLessonIntro() {
+  if (!demo) return;
+  const about = demo.line === 0 ? demo.demo.intro : demo.demo.lines[demo.line].about ?? "";
+  const play: CoachButton = { ico: "play", label: "Play the line", kind: "accent", run: () => { closeOverlay(false); startDemoLine(); } };
+  showOverlay("talk", [para(lessonIntro()), ...(about ? [para(about)] : [])], [play]);
 }
 
 /** The first sentence of a note (the bubble's line; the whole note is behind the dots). */
@@ -168,7 +178,8 @@ export function coachSays(reviews: (Review | undefined)[]): CoachSay {
   if (demo?.intro) {
     // short, on the starting position: the opening's own words wait behind the dots
     const play: CoachButton = { ico: "play", label: "Play the line", run: startDemoLine, kind: "accent" };
-    return { mood: "talk", text: lessonIntro(), buttons: [play, TELL_MORE], key: `demo:${demo.line}:intro` };
+    // (the introduction itself is in the middle of the screen; the dots bring it back)
+    return { mood: "talk", text: "Ready when you are.", buttons: [play, TELL_MORE], key: `demo:${demo.line}:intro` };
   }
   if (demo) {
     const ply = currentPly();
@@ -403,6 +414,7 @@ export function quizInWords(): string[] {
 
 /** Tell me more: the full review of the move (or the demo note, or the quiz result). */
 export function openMore() {
+  if (demo?.intro) return showLessonIntro();
   if (demo) {
     const ply = currentPly();
     const note = ply ? demo.steps[ply - 1].note : demo.demo.lines[demo.line].about ?? demo.demo.intro;
