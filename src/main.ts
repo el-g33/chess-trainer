@@ -395,6 +395,9 @@ wireButtons();
 refresh();
 showMenu();
 setupWhatsNew(); // after an update: what's new
+// Your games, mistakes and settings live in this browser's storage: ask it to
+// keep them, so it never clears them to save space (Chrome grants this quietly)
+void navigator.storage?.persist?.().catch(() => false);
 void loadPieces().then(refresh);
 // The built site keeps a copy of itself, so it works offline (see vite.config.ts).
 // A new version downloads in the background; when it's in, a notice offers to restart into it.
