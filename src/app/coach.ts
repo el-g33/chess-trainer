@@ -425,8 +425,8 @@ export async function explainGoodMove(ply: number, review: Review) {
   ];
   const text = review.rating === "Book" ? `Known opening theory. ${ideaWords(before, played, viewer)}` : ideaWords(before, played, viewer);
   const card = startStory({ position: after, shapes }, text, moodForRating(review.rating), setsUp ? ["The move", "What it sets up"] : []);
-  if (!setsUp || after.isEnd()) return;
   try {
+    if (!setsUp || after.isEnd()) return;
     // what it sets up: the line from here, a few moves
     const next = await coachLine(after, 1.5);
     const line = wholeLine(after, next?.pv ?? [], 3);
@@ -437,6 +437,9 @@ export async function explainGoodMove(ply: number, review: Review) {
   } catch (error) {
     set.errorText(`Something went wrong: ${error}`);
     refresh();
+  } finally {
+    if (!card.chapterOf!.includes(1)) card.chapters = []; // (nothing it sets up after all: no heading)
+    showStory(card);
   }
 }
 
@@ -465,22 +468,38 @@ export function linePages(start: Chess, line: NormalMove[], viewer: Color | null
   return { frames, texts: story.texts };
 }
 
-/** More pages for a card that is still open (a line Stockfish has just found). */
+/** More pages for a card that is still being put together, or still open. */
 export function extendPages(card: Stepper | null, frames: StepFrame[], texts: string[], chapter: number) {
-  if (!card || stepper !== card || !frames.length) return;
+  if (!card || (stepper !== card && pending?.card !== card) || !frames.length) return;
   card.frames!.push(...frames);
   card.texts.push(...texts);
   card.chapterOf!.push(...frames.map(() => chapter));
-  refresh();
+  if (stepper === card) refresh();
 }
 
-/** A card of pages in parts ("Why", "What it allows", ...), opening on its first page. */
+/** A card still being worked out, and the move it was asked about: it opens
+ *  only once every page is ready, and not at all if you've moved on. */
+let pending: { card: Stepper; ply: number } | null = null;
+
+/** A card of pages in parts ("Why", "What it allows", ...). It opens once
+ *  `showStory` says all its pages are in; meanwhile "Tell me more" pulses. */
 export function startStory(first: StepFrame, text: string, mood: Mood, chapters: string[]): Stepper {
-  closeOverlay(false);
   const card: Stepper = { positions: [], moves: [], texts: [text], step: 1, mood, frames: [first], chapters, chapterOf: [0] };
+  pending = { card, ply: currentPly() };
+  document.body.classList.add("story-loading");
+  return card;
+}
+
+/** Every page is in: open the card (if it's still the one asked for). */
+export function showStory(card: Stepper) {
+  if (pending?.card !== card) return;
+  const asked = pending.ply;
+  pending = null;
+  document.body.classList.remove("story-loading");
+  if (currentPly() !== asked) return;
+  closeOverlay(false);
   set.stepper(card);
   refresh();
-  return card;
 }
 
 /** A slip, in three parts: why it isn't the best, what it allows, better was. */
@@ -519,7 +538,7 @@ export async function explainSlip(ply: number, review: Review) {
       const promised = danger ? promisedGain(danger.text) : 0;
       const won = promised ? lineToGain(after, punish?.pv ?? [], opposite(mover), promised) : undefined;
       const line = won ?? wholeLine(after, punish?.pv ?? [], 3);
-      if (promised && !won && stepper === card) {
+      if (promised && !won) {
         // the line never wins it outright: say what it really costs
         dangerText = mine ? "This gives them the better game." : "This gives you the better game.";
         card.texts[0] = dangerText;
@@ -545,6 +564,8 @@ export async function explainSlip(ply: number, review: Review) {
   } catch (error) {
     set.errorText(`Something went wrong: ${error}`);
     refresh();
+  } finally {
+    showStory(card);
   }
 }
 
@@ -640,6 +661,8 @@ export async function showBestLine(ply: number) {
   } catch (error) {
     set.errorText(`Something went wrong: ${error}`);
     refresh();
+  } finally {
+    showStory(card);
   }
 }
 

@@ -2057,6 +2057,17 @@ body.demo-intro .move-strip {
   font-weight: 700;
 }
 
+/* Tell me more while its pages are worked out: the button pulses */
+body.story-loading #strip-actions button[aria-label="Tell me more"] {
+  animation: story-loading 0.9s ease-in-out infinite alternate;
+}
+@keyframes story-loading {
+  to {
+    opacity: 0.35;
+    transform: scale(0.9);
+  }
+}
+
 /* The coach's words still to appear: there, but unseen, so the bubble keeps its size */
 .typer-rest {
   visibility: hidden;
