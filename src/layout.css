@@ -600,6 +600,7 @@ html body .board-area .board-controls {
   grid-area: text;
   margin: 0 34px 0 0;
   line-height: 1.4;
+  white-space: pre-line; /* (a page in points keeps its lines) */
 }
 
 .step-count {

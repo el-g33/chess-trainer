@@ -3,7 +3,7 @@
 
 import type { DrawShape } from "@lichess-org/chessground/draw";
 import type { Key } from "@lichess-org/chessground/types";
-import { Chess } from "chessops/chess";
+import { Chess, normalizeMove } from "chessops/chess";
 import { makeSan, parseSan } from "chessops/san";
 import type { Color, NormalMove, Role as PieceRole } from "chessops/types";
 import { makeSquare, makeUci, opposite } from "chessops/util";
@@ -176,6 +176,10 @@ export function coachSays(reviews: (Review | undefined)[]): CoachSay {
     return { mood: moodForRating(review.rating), text: verdict(review, before, after, analyser.evals.get(fenOf(after)), before.turn, line.length), buttons: [] };
   }
   if (explore) return exploreSays(reviews);
+  if (findingAt !== null && reviewing && currentPly() === findingAt - 1 && !analysis) {
+    return { mood: "talk", text: "Your turn: find a better move than last time, and play it on the board.", buttons: [], key: `find:${findingAt}` };
+  }
+  findingAt = null;
   const ply = reviewPly();
   if (!ratingsOn()) return { mood: "talk", text: "Move ratings are off.", buttons: [STRATEGY] };
   if (ply === 0) return { mood: "talk", text: game.length ? "The starting position." : "Make a move and I'll tell you what I think.", buttons: [STRATEGY] };
@@ -468,7 +472,9 @@ export async function explainSlip(ply: number, review: Review) {
   }
   const theirSlip = !mine && viewer !== null;
   const card = startStory({ position: after, shapes }, why, moodForRating(review.rating),
-    theirSlip ? ["Why", "What you can do", "Better for them"] : ["Why", "What it allows", "Better was"]);
+    theirSlip ? ["Why", "What you can do", "Better for them", "How it goes on"] : ["Why", "What it allows", "Why it's better", "How it goes on"]);
+  // Yours: at the end, a go at finding the better move yourself
+  if (!theirSlip) card.extra = { ico: "target", label: "Find it yourself", kind: "accent", labelled: true, run: () => findItYourself(ply) };
   moveSound(makeSan(before, played), before.turn);
   try {
     // What it allows: Stockfish's best line after the move
@@ -481,20 +487,65 @@ export async function explainSlip(ply: number, review: Review) {
         extendPages(card, pages.frames, pages.texts, 1);
       }
     }
-    // Better was: the best move, and how it goes on
+    // Why it's better: the better move against the one played
     const best = parseSan(before, review.bestSan!) as NormalMove | undefined;
     if (!best) return;
+    const bestShapes = moveShapes(before, best, viewer).slice(0, 1);
+    extendPages(card, [{ position: before, shapes: bestShapes }], [whyBetter(before, after, best, reply, review, danger?.text, viewer, mine)], 2);
+    // How it goes on: the better move's line
     const better = await coachLine(before, 1.5, [best]);
     const line = wholeLine(before, better?.pv.length ? better.pv : [best], 3);
     const pages = linePages(before, line, viewer);
     pages.texts[0] = cap(moveInWords(before, best, viewer));
     if (better && line.length > 1) pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(before, line, better.score, mover, viewer)}`;
-    extendPages(card, pages.frames, pages.texts, 2);
+    extendPages(card, pages.frames, pages.texts, 3);
   } catch (error) {
     set.errorText(`Something went wrong: ${error}`);
     refresh();
   }
 }
+
+/** Why the better move beats the one played, in up to three short points:
+ *  what it does, the reply it doesn't allow, and what the played move cost. */
+export function whyBetter(before: Chess, after: Chess, best: NormalMove, reply: NormalMove | undefined, review: Review,
+  danger: string | undefined, viewer: Color | null, mine: boolean): string {
+  const points = [`What it does: ${whyMove(before, best, viewer).replace(/^it /, "")}.`];
+  if (reply) {
+    // their reply to the move played: after the better one, is it gone, or would it now cost them?
+    const instead = positionAfter(before, best);
+    const same = normalizeMove(instead, reply) as NormalMove;
+    const gone = !instead.isLegal(same) || instead.board.get(same.to)?.role !== after.board.get(reply.to)?.role;
+    let costly = false;
+    if (!gone) {
+      const then = positionAfter(instead, same);
+      const piece = instead.board.get(same.from);
+      const taken = instead.board.get(same.to);
+      const us = opposite(instead.turn);
+      costly = !!piece && then.kingAttackers(same.to, us, then.board.occupied).nonEmpty() && VALUE[piece.role] > (taken ? VALUE[taken.role] : 0);
+    }
+    if (gone || costly) points.push(`It takes away their best reply: ${lowerFirst(narrateMove(after, reply, viewer))}`);
+  }
+  if (mine) {
+    const cost = review.chanceBefore - review.chanceAfter;
+    const size = cost >= 20 ? "a lot" : cost >= 8 ? "quite a bit" : "a little";
+    points.push(danger
+      ? `Compared with your move: with yours, ${lowerFirst(danger)}`
+      : `Compared with your move: yours gave away ${size} of your chances.`);
+  }
+  return points.map((point) => `• ${point}`).join("\n");
+}
+
+const VALUE: Record<string, number> = { pawn: 1, knight: 3, bishop: 3, rook: 5, queen: 9, king: 100 };
+
+/** Find it yourself: back to just before the move, to play the better one
+ *  (a what-if move on the board, rated like any other). */
+export function findItYourself(ply: number) {
+  closeStepper();
+  findingAt = ply;
+  goTo(ply - 1);
+}
+
+let findingAt: number | null = null; // the move being found again, while you look for it
 
 /** See the best move: for a good move that wasn't the top one, a card that
  *  says why the move is good, then (one tap on) the best move and how the
