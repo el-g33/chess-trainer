@@ -525,41 +525,46 @@ export async function explainSlip(ply: number, review: Review) {
   }
   const theirSlip = !mine && viewer !== null;
   const card = startStory({ position: after, shapes }, why, moodForRating(review.rating),
-    theirSlip ? ["Why", "Their better option", "How it goes on"] : ["Why", "Why it's better", "How it goes on"]);
+    theirSlip ? ["Why", "Their better option", "How it goes on"] : ["Why", "Your better option", "How it goes on"]);
   // Yours: at the end, a go at finding the better move yourself
   if (!theirSlip) card.extra = { ico: "target", label: "Find it yourself", kind: "accent", labelled: true, run: () => findItYourself(ply) };
   moveSound(makeSan(before, played), before.turn);
   try {
     // What it allows: the best line after the move, played on until the
     // material the first page promised is actually won
-    let dangerText = danger?.text;
     if (reply) {
       const punish = await coachLine(after, 1.5);
       const promised = danger ? promisedGain(danger.text) : 0;
       const won = promised ? lineToGain(after, punish?.pv ?? [], opposite(mover), promised) : undefined;
-      const line = won ?? wholeLine(after, punish?.pv ?? [], 3);
-      if (promised && !won) {
-        // the line never wins it outright: say what it really costs
-        dangerText = mine ? "This gives them the better game." : "This gives you the better game.";
-        card.texts[0] = dangerText;
-      }
+      // (the longer of the two: the pawn may only be the start of it)
+      const plain = wholeLine(after, punish?.pv ?? [], 3);
+      const line = won && won.length > plain.length ? won : plain;
+      // the first page says what the line really wins: no more, no less
+      let end = after;
+      for (const move of line) end = positionAfter(end, move);
+      const gain = materialFor(end, opposite(mover)) - materialFor(after, opposite(mover));
+      const queenGone = end.board.pieces(mover, "queen").size() < after.board.pieces(mover, "queen").size();
+      if (promised && gain >= 3 && queenGone && promised < 9) card.texts[0] = mine ? "You can lose your queen here." : "You can win their queen here.";
+      else if (promised && gain >= 3 && promised < 3) card.texts[0] = mine ? "You can lose a piece here." : "You can win a piece here.";
+      else if (promised && gain < promised) card.texts[0] = mine ? "This gives them the better game." : "This gives you the better game.";
       if (punish && line.length) {
         const pages = linePages(after, line, viewer);
         pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(after, line, punish.score, opposite(mover), viewer)}`;
         extendPages(card, pages.frames, pages.texts, 0); // (what it allows is part of why)
       }
     }
-    // Why it's better: the better move against the one played
+    // Your better option: what the better move does
     const best = parseSan(before, review.bestSan!) as NormalMove | undefined;
     if (!best) return;
-    const bestShapes = moveShapes(before, best, viewer).slice(0, 1);
-    extendPages(card, [{ position: before, shapes: bestShapes }], [whyBetter(before, after, best, reply, review, dangerText, viewer, mine)], 1);
-    // How it goes on: the better move's line
+    // (played on the board, with its picture: so How it goes on starts from the reply)
+    const afterBest = positionAfter(before, best);
+    extendPages(card, [{ position: afterBest, shapes: movePicture(before, afterBest, best, mine, viewer) }], [whyBetter(before, after, best, reply, viewer)], 1);
+    // How it goes on: the better move's line, from their reply
     const better = await coachLine(before, 1.5, [best]);
     const line = wholeLine(before, better?.pv.length ? better.pv : [best], 3);
-    const pages = linePages(before, line, viewer);
-    pages.texts[0] = cap(moveInWords(before, best, viewer));
-    if (better && line.length > 1) pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(before, line, better.score, mover, viewer)}`;
+    if (line.length < 2) return;
+    const pages = linePages(afterBest, line.slice(1), viewer);
+    if (better) pages.texts[pages.texts.length - 1] += ` In the end, ${lineOutcome(before, line, better.score, mover, viewer)}`;
     extendPages(card, pages.frames, pages.texts, 2);
   } catch (error) {
     set.errorText(`Something went wrong: ${error}`);
@@ -593,11 +598,11 @@ export function lineToGain(start: Chess, pv: NormalMove[], side: Color, amount: 
   return undefined;
 }
 
-/** Why the better move beats the one played, in up to three short points:
- *  what it does, the reply it doesn't allow, and what the played move cost. */
-export function whyBetter(before: Chess, after: Chess, best: NormalMove, reply: NormalMove | undefined, review: Review,
-  danger: string | undefined, viewer: Color | null, mine: boolean): string {
-  const points = [`What it does: ${whyMove(before, best, viewer).replace(/^it /, "")}.`];
+/** The better move in a sentence or two, straight in: what it does, and
+ *  whether it takes away the reply your move allowed. (Not what your move
+ *  cost: the Why pages have just shown that.) */
+export function whyBetter(before: Chess, after: Chess, best: NormalMove, reply: NormalMove | undefined, viewer: Color | null): string {
+  let text = ideaWords(before, best, viewer);
   if (reply) {
     // their reply to the move played: after the better one, is it gone, or would it now cost them?
     const instead = positionAfter(before, best);
@@ -611,16 +616,9 @@ export function whyBetter(before: Chess, after: Chess, best: NormalMove, reply: 
       const us = opposite(instead.turn);
       costly = !!piece && then.kingAttackers(same.to, us, then.board.occupied).nonEmpty() && VALUE[piece.role] > (taken ? VALUE[taken.role] : 0);
     }
-    if (gone || costly) points.push(`It takes away their best reply: ${lowerFirst(narrateMove(after, reply, viewer))}`);
+    if (gone || costly) text += " And it stops the reply you just saw.";
   }
-  if (mine) {
-    const cost = review.chanceBefore - review.chanceAfter;
-    const size = cost >= 20 ? "a lot" : cost >= 8 ? "quite a bit" : "a little";
-    points.push(danger
-      ? `Compared with your move: with yours, ${lowerFirst(danger)}`
-      : `Compared with your move: yours gave away ${size} of your chances.`);
-  }
-  return points.map((point) => `• ${point}`).join("\n");
+  return text;
 }
 
 const VALUE: Record<string, number> = { pawn: 1, knight: 3, bishop: 3, rook: 5, queen: 9, king: 100 };
