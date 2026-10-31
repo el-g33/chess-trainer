@@ -426,6 +426,15 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
         if (ok && !checkingUpdates) $("update-toast").hidden = false;
       });
     });
+    // An installed app on a phone mostly comes back from the background rather
+    // than starting afresh, so look for a new version each time it's shown again
+    // (at most every 10 minutes)
+    let lastCheck = Date.now();
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible" || Date.now() - lastCheck < 10 * 60_000) return;
+      lastCheck = Date.now();
+      void registration.update().catch(() => {}); // (offline: try again next time)
+    });
   }).catch(() => {
     // not possible here (e.g. not https): the site still works online
   });

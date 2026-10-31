@@ -11,6 +11,12 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.20",
+    items: [
+      { icon: "download", title: "Updates find you", text: "The installed app now looks for a new version whenever you come back to it, not only when it starts afresh." },
+    ],
+  },
+  {
     version: "3.19",
     items: [
       { icon: "back", title: "Back works in Training", text: "The back button now takes you from a list of lessons to its tab, then home." },
