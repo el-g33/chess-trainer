@@ -71,7 +71,7 @@
           <div class="mode-choices" role="radiogroup" aria-label="What would you like to do?">
             <button type="button" class="mode-choice" data-choice="play" role="radio" aria-checked="false"><span class="mc-icon" data-ico="knight" data-ico-size="22"></span>Play against the coach</button>
             <button type="button" class="mode-choice" data-choice="practice" role="radio" aria-checked="false"><span class="mc-icon" data-ico="school" data-ico-size="22"></span>Practice match</button>
-            <button type="button" class="mode-choice" data-choice="analysis" role="radio" aria-checked="false"><span class="mc-icon" data-ico="search" data-ico-size="22"></span>Game review</button>
+            <button type="button" class="mode-choice" data-choice="analysis" role="radio" aria-checked="false"><span class="mc-icon" data-ico="search" data-ico-size="22"></span>Analyse a game</button>
             <button type="button" class="mode-choice" data-choice="train" role="radio" aria-checked="false"><span class="mc-icon" data-ico="puzzle" data-ico-size="22"></span>Training</button>
           </div>
           <button type="button" id="home-next" class="home-next accent" disabled>Next</button>
@@ -137,11 +137,11 @@
           </div>
         </section>
 
-        <!-- 2c. Game review: a game from a PGN -->
+        <!-- 2c. Analyse a game: a game from a PGN -->
         <section class="screen" data-screen="analysis" hidden>
           <div class="setup-head">
             <button type="button" class="back-round setup-back" aria-label="Back" title="Back"><span data-ico="back"></span></button>
-            <h2>Game review</h2>
+            <h2>Analyse a game</h2>
             <button type="button" class="setup-start accent" data-start="analysis" disabled>Start</button>
           </div>
           <!-- Your latest games (from here, Lichess and chess.com): tap one to review it -->
@@ -256,7 +256,7 @@
         </div>
         <!-- Your opponent's bar above the board, yours below (they swap when the board flips) -->
         <div class="board-col">
-        <!-- Reviewing: back to the summary, and key moments only or every move -->
+        <!-- Reviewing: back to the summary, and turning points only or every move -->
         <div id="review-bar" class="whatif-bar review-bar" hidden>
           <span class="review-label">Reviewing</span>
           <div id="review-mode" class="review-mode" role="group" aria-label="Which moves">
@@ -385,7 +385,7 @@
         <p id="turn" class="turn"></p>
         <span id="game-info"></span>
         <button type="button" id="review-game">Review this game</button>
-        <button type="button" id="exit-analysis">Back to game review</button>
+        <button type="button" id="exit-analysis">Back to the analysis</button>
         <div id="review-area">
           <p id="review-progress"></p>
           <details id="game-report"><summary>Game report</summary><div id="game-report-body"></div></details>
@@ -621,7 +621,7 @@
       </form>
     </dialog>
 
-    <!-- Game review with both a game and a position filled in: which one? -->
+    <!-- Analyse a game with both a game and a position filled in: which one? -->
     <dialog id="load-choice" class="settings-dialog">
       <form method="dialog">
         <h3>What shall we load?</h3>

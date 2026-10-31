@@ -6,6 +6,9 @@ included - so the site is just static files with no server behind it.
 
 **Play it:** https://el-g33.github.io/chess-trainer/ (installable, works offline)
 
+Chess Trainer is an independent project, not affiliated with, endorsed by or
+connected to Chess.com or Lichess.
+
 The site is unlisted: `index.html` asks search engines not to list it
 (`<meta name="robots" content="noindex, nofollow">`). To make it findable,
 remove that line (and the one in `public/about.html`) and register the address

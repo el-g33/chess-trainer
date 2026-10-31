@@ -18,7 +18,7 @@ export const pgnText = $<HTMLTextAreaElement>("pgn-text");
 export const pgnPick = $<HTMLSelectElement>("pgn-pick");
 export const pgnStatus = $("pgn-status");
 
-/** "Open PGN": the Game review screen. */
+/** "Open PGN": the Analyse a game screen. */
 export function openPgnDialog() {
   showMenu();
   set.homeChoice("analysis");

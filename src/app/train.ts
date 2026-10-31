@@ -90,7 +90,7 @@ export function drawTrainScreen() {
   }
   drawMistakesCard();
   // Every tab: its principles first. Openings: then the lessons by colour and the
-  // opening traps; the phases: then puzzles. (Your position is on the Game review screen.)
+  // opening traps; the phases: then puzzles. (Your position is on the Analyse a game screen.)
   const openings = trainTab === "openings";
   $("train-openings").hidden = !openings;
   $("puzzles-title").textContent = openings ? "Opening traps" : "Puzzles";

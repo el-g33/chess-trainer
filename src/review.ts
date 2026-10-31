@@ -1,4 +1,4 @@
-// Rates each move in a game on the scale chess.com uses, and says why in
+// Rates each move in a game on the app's own scale, and says why in
 // plain words - a port of the desktop app's move_review.py (same limits,
 // same wording).
 //
@@ -46,7 +46,7 @@ const GREAT_GAP = 12; // "only good move": the next best is at least this much w
 const AS_GOOD = 0.5; // a move this close to the top one (in winning chance) is as good: Best
 // A sacrifice is brilliant when it's this close to the best move (in winning
 // chance)... and leaves the mover at least roughly level - a little more
-// generous than "Excellent and never worse", nearer to how chess.com judges it
+// generous than "Excellent and never worse"
 export const BRILLIANT_LOSS = 3.5;
 export const BRILLIANT_FLOOR = 45;
 // A "poisoned" offer - a piece the opponent can't take without losing badly -

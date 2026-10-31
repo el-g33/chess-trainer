@@ -11,9 +11,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.16",
+    items: [
+      { icon: "search", title: "New names", text: "Looking back at a game is now called Analyse a game, and the moments that decided it are its Turning points." },
+    ],
+  },
+  {
     version: "3.15",
     items: [
-      { icon: "search", title: "A guide to Game review", text: "The first time you open Game review, a short tour shows how to bring in your games: from this app, by username, or pasted as a PGN." },
+      { icon: "search", title: "A guide to analysing a game", text: "The first time you open Analyse a game, a short tour shows how to bring in your games: from this app, by username, or pasted as a PGN." },
       { icon: "eye", title: "A streamlined look", text: "Shorter lines from the coach on the main menu, which now stays the same size, for a better experience." },
     ],
   },
@@ -62,7 +68,7 @@ export const RELEASES: Release[] = [
   {
     version: "3.8",
     items: [
-      { icon: "flag", title: "Key moments", text: "A review picks out your game's turning points. Go through just those or every move, and switch whenever you like." },
+      { icon: "flag", title: "Turning points", text: "A review picks out the moments that decided your game. Go through just those or every move, and switch whenever you like." },
       { icon: "bulb", title: "Explanations that fit the move", text: "Tap a move's sign to see why. A simple take is one picture; the moves play out only when there's a real tactic." },
       { icon: "user", title: "From your side", text: "When your opponent slips, the coach says so from your point of view, and how bad it was." },
       { icon: "book", title: "Clearer opening lessons", text: "Each move is pictured with one short line, and the end of a line shows your plan, their answer and the weak spots on both sides." },
@@ -89,7 +95,7 @@ export const RELEASES: Release[] = [
     version: "3.5",
     items: [
       { icon: "chart", title: "Move ratings, renamed", text: "Masterstroke, Key move, Top move, Strong, Solid, Theory, Imprecise and Missed chance, with new badges. The ratings themselves are the same." },
-      { icon: "download", title: "Games from chess.com", text: "Copy or download a game's PGN on chess.com and paste it into Game review. Lichess games still come in with Get my games." },
+      { icon: "download", title: "Games from chess.com", text: "Copy or download a game's PGN on chess.com and paste it into Analyse a game. Lichess games still come in with Get my games." },
     ],
   },
   {

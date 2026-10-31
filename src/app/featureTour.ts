@@ -79,7 +79,7 @@ export const PLAY_TOUR: TourStep[] = [
     text: "Back to the start. After a game I'll offer to go through it with you." },
 ];
 
-// The Game review screen (a menu screen): how a game gets in
+// The Analyse a game screen (a menu screen): how a game gets in
 export const REVIEW_SETUP_TOUR: TourStep[] = [
   { target: "#your-games", title: "Your games",
     text: "Games you play here land in this list. Tap one and we'll go through it together." },
@@ -90,7 +90,7 @@ export const REVIEW_SETUP_TOUR: TourStep[] = [
   { target: "#fen", title: "Or one position",
     text: "To look at a single position instead, paste its FEN here." },
   { target: '[data-start="analysis"]', title: "Start",
-    text: "Once a game is in, press Start. I'll check every move and pick out the key moments." },
+    text: "Once a game is in, press Start. I'll check every move and pick out the turning points." },
 ];
 
 export function tourSeen(): Record<string, string> {
@@ -127,10 +127,10 @@ function markSeen(which: string, never: boolean) {
 
 const reviewSetupOpen = () => menuOpen && !menu.querySelector<HTMLElement>('.screen[data-screen="analysis"]')!.hidden;
 
-/** The Game review screen's tour: by itself the first time it's opened, or from the ? menu. */
+/** The Analyse a game screen's tour: by itself the first time it's opened, or from the ? menu. */
 export async function showReviewSetupTour(asked: boolean) {
   if (tourOpen() || !reviewSetupOpen() || (!asked && tourSeen().reviewSetup)) return;
-  const end = await runTour(REVIEW_SETUP_TOUR, "Game review");
+  const end = await runTour(REVIEW_SETUP_TOUR, "Analyse a game");
   if (end.finished || end.neverAgain || asked) markSeen("reviewSetup", end.neverAgain);
 }
 

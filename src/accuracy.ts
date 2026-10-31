@@ -207,17 +207,17 @@ export function accuracyRating(accuracy: number): string {
 const LOSS_CAP = 1000; // one blunder shouldn't count for more than this (centipawns)
 
 /** How well someone played, as a rating, when their own rating is known:
- *  their rating, adjusted by how accurate they were - fitted to chess.com's
- *  Game Rating, where about 58.5% accuracy is playing to your rating and each
- *  point above or below it is worth about 24 rating points. */
+ *  their rating, adjusted by how accurate they were: about 58.5% accuracy is
+ *  playing to your rating, and each point above or below it is worth about
+ *  24 rating points. */
 export function ratingFromAccuracy(rating: number, accuracy: number): number {
   const played = rating + 24 * (accuracy - 58.5);
   return Math.round(Math.max(100, Math.min(3000, played)) / 25) * 25;
 }
 
 /** Roughly how strong each side played: from the average centipawn loss per
- *  move, fitted to chess.com's Game Rating (about 2100 at 10, 1650 at 25,
- *  1350 at 50, 1000 at 100, 650 at 250):
+ *  move, on a simple curve (about 2100 at 10, 1650 at 25, 1350 at 50,
+ *  1000 at 100, 650 at 250):
  *  rating = 3000 x e^(-0.11 x the square root of the average loss).
  *  Needs a few moves each. */
 export function estimateRating(startColor: Color, scores: (Score | undefined)[]): Partial<Record<Color, number>> {

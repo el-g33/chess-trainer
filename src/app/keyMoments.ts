@@ -1,4 +1,4 @@
-// Key moments: the few turning points of a reviewed game (the slips that cost
+// Turning points: the few moments that decided a reviewed game (the slips that cost
 // most, the chances missed, the masterstrokes), listed on the summary, and a
 // way through the review that stops only at those.
 
@@ -46,7 +46,7 @@ function momentWords(review: Review, viewer: Color | null, mover: Color): { text
   return { text: `${whose} mistake`, sign: "orange", ico: "hazard" };
 }
 
-let moments: number[] | null = null; // going through the key moments only
+let moments: number[] | null = null; // going through the turning points only
 
 export const keyMomentsOn = () => moments !== null && reviewing;
 
@@ -59,7 +59,7 @@ export function keyMomentsCard(list: (Review | undefined)[], startReview: () => 
   if (plies.length) {
     const title = document.createElement("p");
     title.className = "key-moments-title";
-    title.textContent = "Key moments";
+    title.textContent = "Turning points";
     box.append(title);
     for (const ply of plies) {
       const words = momentWords(list[ply - 1]!, viewer, game.moverOf(ply));
@@ -75,7 +75,7 @@ export function keyMomentsCard(list: (Review | undefined)[], startReview: () => 
   }
   const start = document.createElement("div");
   start.className = "stats-start";
-  if (plies.length) start.append(startButton(`Key moments (${plies.length})`, "accent", () => showMoment(plies[0], plies)));
+  if (plies.length) start.append(startButton(`Turning points (${plies.length})`, "accent", () => showMoment(plies[0], plies)));
   start.append(startButton(plies.length ? "Every move" : "Start the review", plies.length ? "soft" : "accent", () => {
     moments = null;
     startReview();
@@ -108,7 +108,7 @@ export function showMoment(ply: number, plies: number[] = moments ?? []) {
   }, GRADE_JUMP_PAUSE);
 }
 
-/** Forward or back while going through the key moments: the next or the
+/** Forward or back while going through the turning points: the next or the
  *  previous one (past the last: back to the summary). False if not in that mode. */
 export function momentStep(where: "back" | "forward"): boolean {
   if (!keyMomentsOn()) return false;
@@ -129,7 +129,7 @@ export function momentStep(where: "back" | "forward"): boolean {
 }
 
 /** The review bar above the board: back to the summary, and the switch
- *  between key moments only and every move (none for a game without any). */
+ *  between turning points only and every move (none for a game without any). */
 export function drawMomentsBar() {
   if (!reviewing) moments = null;
   const show = reviewing && currentView === "board" && !analysis && !demo;
@@ -139,7 +139,7 @@ export function drawMomentsBar() {
   $("review-mode").hidden = !plies.length;
   const on = keyMomentsOn();
   const at = on ? moments!.findIndex((ply) => ply >= currentPly()) : -1;
-  $("mode-moments").textContent = on ? `Key moments ${at < 0 ? moments!.length : at + 1}/${moments!.length}` : "Key moments";
+  $("mode-moments").textContent = on ? `Turning points ${at < 0 ? moments!.length : at + 1}/${moments!.length}` : "Turning points";
   $("mode-moments").classList.toggle("on", on);
   $("mode-every").classList.toggle("on", !on);
 }
@@ -150,7 +150,7 @@ export function everyMove() {
   refresh();
 }
 
-/** Key moments only: from the move on screen if it's one, else the next one ahead. */
+/** Turning points only: from the move on screen if it's one, else the next one ahead. */
 export function momentsOnly() {
   if (keyMomentsOn()) return;
   const plies = keyMoments(withBook(reviews()));

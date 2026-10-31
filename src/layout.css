@@ -1077,7 +1077,7 @@ html body .board-area .board-controls {
   white-space: nowrap;
 }
 
-/* Game review: your latest games, above the paste box */
+/* Analyse a game: your latest games, above the paste box */
 .your-games {
   display: flex;
   flex-direction: column;
@@ -1235,7 +1235,7 @@ button.round.hazard.red { background: #d93025; color: #fff; }
 }
 
 /* Reviewing: a quiet bar above the board - back to the summary, and the
-   switch between key moments and every move (the theme's selection colour) */
+   switch between turning points and every move (the theme's selection colour) */
 .review-bar {
   margin-bottom: 4px;
   padding: 0 3px 0 4px;
@@ -1270,7 +1270,7 @@ button.round.hazard.red { background: #d93025; color: #fff; }
   color: var(--sel-fg);
 }
 
-/* Key moments: the game's turning points, on the summary */
+/* Turning points: the moments that decided the game, on the summary */
 .key-moments {
   margin-bottom: 12px;
 }

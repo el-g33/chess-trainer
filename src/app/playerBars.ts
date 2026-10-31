@@ -250,7 +250,7 @@ export function drawGameReport(reviews: (Review | undefined)[], info: OpeningInf
     if (accuracy === undefined || Number.isNaN(accuracy)) {
       td.textContent = "-";
     } else {
-      td.textContent = accuracy.toFixed(1); // (like chess.com: 96.3)
+      td.textContent = accuracy.toFixed(1); // (one decimal: 96.3)
       td.className = `acc ${ratingClass(accuracyRating(accuracy))}`;
     }
     return td;

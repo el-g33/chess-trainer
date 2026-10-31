@@ -1284,7 +1284,7 @@ export function drawStats() {
   const overall = gameAccuracy(start, scores);
   const phases = phaseAccuracy(start, positions, scores);
   const ratings = estimateRating(start, scores);
-  // With the players' ratings in the game's details: from those and the accuracy (as chess.com does)
+  // With the players' ratings in the game's details: from those and the accuracy
   for (const colour of ["white", "black"] as const) {
     const elo = Number(gameHeaders[colour === "white" ? "WhiteElo" : "BlackElo"]);
     const accuracy = overall[colour];
@@ -1322,7 +1322,7 @@ export function drawStats() {
     if (pending) cell.textContent = "??";
     else if (value === undefined || Number.isNaN(value)) cell.textContent = "-";
     else {
-      cell.textContent = value.toFixed(1); // (like chess.com: 96.3)
+      cell.textContent = value.toFixed(1); // (one decimal: 96.3)
       cell.classList.add(ratingClass(accuracyRating(value)));
     }
     return cell;
@@ -1539,12 +1539,12 @@ export function drawHistory() {
     box.append(note);
   }
   const games = loadHistory();
-  // Back to Game review (when you came from there), and the import button
+  // Back to Analyse a game (when you came from there), and the import button
   const top = element("div", "history-top");
   if (historyFromReview) {
     const back = element("button", "soft history-back", "");
     back.type = "button";
-    back.innerHTML = `${icon("back", 16)} Game review`;
+    back.innerHTML = `${icon("back", 16)} Analyse a game`;
     back.addEventListener("click", () => {
       setHistoryFromReview(false);
       openPgnDialog();
@@ -1629,10 +1629,10 @@ export function drawHistory() {
 }
 
 let historySource: "all" | "app" | Source = "all";
-export let historyFromReview = false; // opened with See all games: the way back is to Game review
+export let historyFromReview = false; // opened with See all games: the way back is to Analyse a game
 export const setHistoryFromReview = (on: boolean) => (historyFromReview = on);
 
-/** One game in the history (and on the Game review screen): tap to replay or review it. */
+/** One game in the history (and on the Analyse a game screen): tap to replay or review it. */
 export function historyRow(saved: SavedGame): HTMLButtonElement {
   const item = element("button", "history-game");
   item.type = "button";

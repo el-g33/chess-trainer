@@ -1,5 +1,5 @@
 // Your games from Lichess and chess.com: brought into Game history with the
-// Get my games button, and reviewed from there (or from the Game review screen)
+// Get my games button, and reviewed from there (or from the Analyse a game screen)
 
 import { OnlineError, SOURCE_NAMES, type OnlineGame, type Source, type Wanted, fetchChesscom, fetchLichess } from "../online";
 import { readPgn } from "../pgn";
@@ -113,7 +113,7 @@ export function reviewImported(saved: SavedGame) {
   refresh();
 }
 
-/** See all games: the history, with the way back to Game review. */
+/** See all games: the history, with the way back to Analyse a game. */
 export function showAllGames() {
   setHistoryFromReview(true);
   if (menuOpen) hideMenu();
@@ -128,13 +128,14 @@ export function setupOnlineGames() {
   for (const element of [chesscomUserBox, document.querySelector<HTMLElement>('label[for="chesscom-user"]')]) {
     if (element) element.hidden = !CHESSCOM_IMPORT;
   }
-  $("online-note").textContent = CHESSCOM_IMPORT
+  const independent = " Chess Trainer is not affiliated with Chess.com or Lichess.";
+  $("online-note").textContent = (CHESSCOM_IMPORT
     ? "Your usernames, to bring your games into Game history. Only your public games are read; nothing is posted."
     : "Your Lichess username, to bring your games into Game history. Only your public games are read; nothing is posted. " +
-      "Games from chess.com: copy or download the PGN there, and paste it into Game review.";
+      "Games from Chess.com: copy or download the PGN there, and paste it into Analyse a game.") + independent;
 }
 
-/** The Game review screen: your three latest games, to review with a tap. */
+/** The Analyse a game screen: your three latest games, to review with a tap. */
 export function drawYourGames() {
   const box = $("your-games");
   const games = loadHistory().slice(0, 3);
