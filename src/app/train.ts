@@ -94,6 +94,7 @@ export function drawTrainScreen() {
   const openings = trainTab === "openings";
   $("train-openings").hidden = !openings;
   $("puzzles-title").textContent = openings ? "Opening traps" : "Puzzles";
+  if (!openings) showPuzzleLevels(true);
   const lessons = LESSONS[lessonPhase()];
   $("principles-note").textContent = lessons.length ? `${lessons.length} short lessons` : "Being written";
   // The puzzles row opens the levels; choosing one starts them
@@ -127,7 +128,8 @@ export function setupTrain() {
       if (trainTab !== "openings") set.trainPhase(trainTab);
       $("lesson-list").hidden = true;
       $("train-cards").hidden = false;
-      showPuzzleLevels(false);
+      // Middlegame and Endgame: the puzzle levels open straight away (Openings' traps stay folded)
+      showPuzzleLevels(trainTab !== "openings");
       drawTrainScreen();
     });
   }
@@ -799,20 +801,19 @@ export interface LessonState {
 const lessonPhase = (): LessonPhase => (trainTab === "openings" ? "opening" : trainPhase);
 
 
+/** Back from the lessons to the tab's cards; false if they weren't open. */
+export function closeLessonList(): boolean {
+  if ($("lesson-list").hidden) return false;
+  $("lesson-list").hidden = true;
+  $("train-cards").hidden = false;
+  return true;
+}
+
 export function showLessonList() {
   const list = $("lesson-list");
   const phase = lessonPhase();
   const lessons = LESSONS[phase];
-  list.replaceChildren();
-  const back = document.createElement("button");
-  back.type = "button";
-  back.className = "home-link";
-  back.innerHTML = `${icon("back", 16)} ${{ opening: "Openings", middlegame: "Middlegame", endgame: "Endgame" }[phase]}`;
-  back.addEventListener("click", () => {
-    list.hidden = true;
-    $("train-cards").hidden = false;
-  });
-  list.append(back);
+  list.replaceChildren(); // (the screen's own back button closes it: closeLessonList)
   if (!lessons.length) {
     const note = document.createElement("p");
     note.className = "setup-note";

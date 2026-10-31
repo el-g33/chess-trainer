@@ -1712,6 +1712,27 @@ body {
 /* -- Train ------------------------------------------------------------------------ */
 
 .train-cards,
+/* Training: the card starts at the top of the screen whichever tab is open
+   (centred, a shorter tab would move the tabs down the screen) */
+.cover:has(.screen[data-screen="train"]:not([hidden])) {
+  align-items: start;
+}
+
+/* Training: the heading and tabs stay at the top of the card while a long
+   list of lessons scrolls under them */
+.train-top {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
+  margin: -8px -8px 0;
+  padding: 8px 8px 10px;
+  background: var(--card);
+  border-radius: var(--card-radius, 12px) var(--card-radius, 12px) 0 0;
+}
+
 .lesson-list {
   display: flex;
   flex-direction: column;
@@ -2886,4 +2907,51 @@ body.cb-arrows cg-container svg.cg-shapes line[stroke="#B26B00" i] {
 }
 .lp-pieces .lp-piece {
   margin: 6px;
+}
+
+/* -- Transitions: screens ease into place instead of just appearing --------------
+   (an animation runs each time an element goes from hidden to shown). The board
+   only fades, so a piece you drag is never under a moving board. */
+@keyframes screen-in {
+  from { opacity: 0; transform: translateY(12px); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+}
+.cover:not([hidden]) {
+  animation: fade-in 0.22s ease-out;
+}
+.cover .screen:not([hidden]),
+.lesson-list:not([hidden]),
+.train-cards:not([hidden]),
+.stats-view:not([hidden]),
+.history-view:not([hidden]) {
+  animation: screen-in 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.board-area:not([hidden]),
+.moves-area:not([hidden]) {
+  animation: fade-in 0.22s ease-out;
+}
+dialog[open] {
+  animation: pop-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+dialog[open]::backdrop {
+  animation: fade-in 0.2s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cover:not([hidden]),
+  .cover .screen:not([hidden]),
+  .lesson-list:not([hidden]),
+  .train-cards:not([hidden]),
+  .stats-view:not([hidden]),
+  .history-view:not([hidden]),
+  .board-area:not([hidden]),
+  .moves-area:not([hidden]),
+  dialog[open],
+  dialog[open]::backdrop {
+    animation: none;
+  }
 }

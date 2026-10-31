@@ -183,15 +183,18 @@
         </section>
 
         <section class="screen" data-screen="train" hidden>
-          <div class="setup-head">
-            <button type="button" class="back-round setup-back" aria-label="Back" title="Back"><span data-ico="back"></span></button>
-            <h2>Training</h2>
-            <span></span>
-          </div>
-          <div class="tabs" role="tablist">
-            <button type="button" role="tab" data-train-tab="openings">Openings</button>
-            <button type="button" role="tab" data-train-tab="middlegame">Middlegame</button>
-            <button type="button" role="tab" data-train-tab="endgame">Endgame</button>
+          <!-- The heading and tabs stay at the top while a long list scrolls under them -->
+          <div class="train-top">
+            <div class="setup-head">
+              <button type="button" class="back-round setup-back" aria-label="Back" title="Back"><span data-ico="back"></span></button>
+              <h2>Training</h2>
+              <span></span>
+            </div>
+            <div class="tabs" role="tablist">
+              <button type="button" role="tab" data-train-tab="openings">Openings</button>
+              <button type="button" role="tab" data-train-tab="middlegame">Middlegame</button>
+              <button type="button" role="tab" data-train-tab="endgame">Endgame</button>
+            </div>
           </div>
           <div id="train-cards" class="train-cards">
             <!-- Only there while some of your mistakes are waiting -->
@@ -477,7 +480,7 @@
           <h4 class="settings-group wide">While you play</h4>
           <label class="check wide"><input type="checkbox" id="eval-check" checked /> Eval bar (practice)</label>
           <label class="check wide"><input type="checkbox" id="rate-moves" checked /> Rate moves (practice)</label>
-          <label for="plan-mode">Playing style (for Strategy)</label>
+          <label for="plan-mode">Playing style</label>
           <select id="plan-mode">
             <option value="positional">Positional</option>
             <option value="attacking">Attacking</option>
@@ -491,9 +494,9 @@
           <h4 class="settings-group wide">The coach</h4>
           <label for="coach-focus">Coach me on</label>
           <select id="coach-focus">
-            <option value="auto">Automatic (by your level)</option>
-            <option value="fundamentals">The fundamentals</option>
-            <option value="everything">Everything</option>
+            <option value="fundamentals">Fundamentals</option>
+            <option value="auto">Auto (your level)</option>
+            <option value="everything">Top move</option>
           </select>
           <label for="coach-speed">Coach speed</label>
           <select id="coach-speed">

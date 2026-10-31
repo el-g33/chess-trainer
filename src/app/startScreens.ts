@@ -28,7 +28,7 @@ import { menuMode } from "./startMenu";
 import {
   demo, fenPosition, freshViewTrail, greeting, homeChoice, learnColour, learnOpening, matchColour, mode, pgnGames, set,
 } from "./state";
-import { drawTrainScreen, levelCheckDone, setupTrain } from "./train";
+import { closeLessonList, drawTrainScreen, levelCheckDone, setupTrain } from "./train";
 
 export type HomeScreen = "welcome" | "play" | "practice" | "analysis" | "train" | "progress";
 export type HomeChoice = "play" | "practice" | "analysis" | "train";
@@ -214,7 +214,8 @@ export function setupHome() {
   });
   setupTrain();
   for (const button of menu.querySelectorAll<HTMLButtonElement>(".setup-back")) {
-    button.addEventListener("click", () => showScreen("welcome"));
+    // (on Training with a tab's lessons open: back to that tab first)
+    button.addEventListener("click", () => closeLessonList() || showScreen("welcome"));
   }
   for (const button of menu.querySelectorAll<HTMLButtonElement>("#colour-seg button")) {
     button.addEventListener("click", () => {

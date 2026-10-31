@@ -11,6 +11,13 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.19",
+    items: [
+      { icon: "back", title: "Back works in Training", text: "The back button now takes you from a list of lessons to its tab, then home." },
+      { icon: "eye", title: "A streamlined look", text: "Gentle transitions between screens, calmer pop-ups, and Training that stays in place as you switch tabs, for a better experience." },
+    ],
+  },
+  {
     version: "3.18",
     items: [
       { icon: "target", title: "Coaching for your level", text: "At beginner level the coach focuses on what decides those games: pieces left loose, free pieces taken or missed, and checkmates, with the habit that would have saved each slip. Choose it in Settings, under Coach me on." },
