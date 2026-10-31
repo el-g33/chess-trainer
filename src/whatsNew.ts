@@ -11,6 +11,12 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.11",
+    items: [
+      { icon: "book", title: "Opening principles", text: "Six short lessons at the top of Training's Openings tab: take the centre, develop, castle early, don't waste moves, watch f7, and connect your rooks." },
+    ],
+  },
+  {
     version: "3.10",
     items: [
       { icon: "back", title: "Back goes where you came from", text: "Leaving a lesson, puzzles or a game takes you back to the screen you started it from, not all the way Home." },

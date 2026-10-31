@@ -14,7 +14,7 @@ import { type Score, colourName, isCastling, afterMove as positionAfter } from "
 import { BANDS, type Band, likelyMoves, pickLikely } from "../explore";
 import { Game } from "../game";
 import { icon } from "../icons";
-import { LESSONS, type Lesson, type TrainPhase } from "../lessons";
+import { LESSONS, type Lesson, type LessonPhase, type TrainPhase } from "../lessons";
 import { LEVELS, shortName } from "../levels";
 import { analyser, base, coachAnalysis, currentPly, ground } from "../main";
 import { controlledSquares, moveInWords, narrateMove, quietIdea, ratingWords, verdict } from "../narrate";
@@ -89,13 +89,12 @@ export function drawTrainScreen() {
     tab.setAttribute("aria-selected", String(on));
   }
   drawMistakesCard();
-  // Openings: the lessons by colour and the opening traps; the phases: principles
-  // and puzzles. (Your position is on the Game review screen.)
+  // Every tab: its principles first. Openings: then the lessons by colour and the
+  // opening traps; the phases: then puzzles. (Your position is on the Game review screen.)
   const openings = trainTab === "openings";
   $("train-openings").hidden = !openings;
-  $("train-principles").hidden = openings;
   $("puzzles-title").textContent = openings ? "Opening traps" : "Puzzles";
-  const lessons = LESSONS[trainPhase];
+  const lessons = LESSONS[lessonPhase()];
   $("principles-note").textContent = lessons.length ? `${lessons.length} short lessons` : "Being written";
   // The puzzles row opens the levels; choosing one starts them
   const chips = $("puzzle-levels");
@@ -792,19 +791,23 @@ export function exploreSays(reviews: (Review | undefined)[]): CoachSay {
 // -- Lessons ----------------------------------------------------------------------
 
 export interface LessonState {
-  phase: TrainPhase;
+  phase: LessonPhase;
   index: number;
 }
+
+/** The principles on the tab on screen: the opening ones on the Openings tab. */
+const lessonPhase = (): LessonPhase => (trainTab === "openings" ? "opening" : trainPhase);
 
 
 export function showLessonList() {
   const list = $("lesson-list");
-  const lessons = LESSONS[trainPhase];
+  const phase = lessonPhase();
+  const lessons = LESSONS[phase];
   list.replaceChildren();
   const back = document.createElement("button");
   back.type = "button";
   back.className = "home-link";
-  back.innerHTML = `${icon("back", 16)} ${trainPhase === "middlegame" ? "Middlegame" : "Endgame"}`;
+  back.innerHTML = `${icon("back", 16)} ${{ opening: "Openings", middlegame: "Middlegame", endgame: "Endgame" }[phase]}`;
   back.addEventListener("click", () => {
     list.hidden = true;
     $("train-cards").hidden = false;
@@ -823,14 +826,14 @@ export function showLessonList() {
     card.innerHTML = `<span class="lesson-number">${i + 1}</span><span><b></b><small></small></span>`;
     card.querySelector("b")!.textContent = item.title;
     card.querySelector("small")!.textContent = item.summary;
-    card.addEventListener("click", () => startLesson(trainPhase, i));
+    card.addEventListener("click", () => startLesson(phase, i));
     list.append(card);
   });
   $("train-cards").hidden = true;
   list.hidden = false;
 }
 
-export function startLesson(phase: TrainPhase, index: number) {
+export function startLesson(phase: LessonPhase, index: number) {
   const item: Lesson | undefined = LESSONS[phase][index];
   if (!item) return;
   set.mode("play");
@@ -851,11 +854,11 @@ export function startLesson(phase: TrainPhase, index: number) {
   });
   const tryIt: CoachButton = {
     ico: "puzzle", label: "Try it: puzzles on this idea", kind: "accent",
-    run: () => { closeStepper(); set.lesson(null); void startPuzzles(phase, puzzleLevel, item.themes); },
+    run: () => { closeStepper(); set.lesson(null); void startPuzzles(phase === "opening" ? "openings" : phase, puzzleLevel, item.themes); },
   };
   set.stepper({
     positions: frames.map((f) => f.position), moves: [], texts: item.steps.map((s) => s.text),
-    step: 1, mood: "talk", extra: tryIt, frames,
+    step: 1, mood: "talk", extra: item.themes.length ? tryIt : undefined, frames,
   });
   set.orientation(frames[0].position.turn);
   refresh();

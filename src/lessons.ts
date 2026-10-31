@@ -1,4 +1,4 @@
-// Lessons on middlegame and endgame principles: each is a few short steps,
+// Lessons on opening, middlegame and endgame principles: each is a few short steps,
 // a position with arrows and highlighted squares, and a sentence or two.
 // Every position is checked with Stockfish before it goes in (see
 // tests/lessons in the scratchpad notes). "themes" picks the "Try it"
@@ -19,8 +19,454 @@ export interface Lesson {
 }
 
 export type TrainPhase = "middlegame" | "endgame";
+export type LessonPhase = "opening" | TrainPhase; // opening lessons sit on the Openings tab
 
-export const LESSONS: Record<TrainPhase, Lesson[]> = {
+export const LESSONS: Record<LessonPhase, Lesson[]> = {
+  opening: [
+    {
+      "title": "Take the centre",
+      "summary": "Why the four middle squares matter most.",
+      "themes": [],
+      "steps": [
+        {
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "text": "The opening has three jobs: take the centre, bring your pieces out, and get your king safe. The centre comes first: the four squares in the middle.",
+          "squares": [
+            [
+              "d4",
+              "plan"
+            ],
+            [
+              "e4",
+              "plan"
+            ],
+            [
+              "d5",
+              "plan"
+            ],
+            [
+              "e5",
+              "plan"
+            ]
+          ]
+        },
+        {
+          "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+          "text": "A pawn in the centre controls the squares in front of it. This one covers d5 and f5, and it opens lines for the queen and a bishop.",
+          "arrows": [
+            [
+              "e4",
+              "d5",
+              "good"
+            ],
+            [
+              "e4",
+              "f5",
+              "good"
+            ],
+            [
+              "d1",
+              "h5",
+              "plan"
+            ],
+            [
+              "f1",
+              "a6",
+              "plan"
+            ]
+          ]
+        },
+        {
+          "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
+          "text": "Pieces control the centre too. The knight attacks the pawn on e5 and guards d4, ready for the other centre pawn.",
+          "arrows": [
+            [
+              "f3",
+              "e5",
+              "good"
+            ],
+            [
+              "f3",
+              "d4",
+              "good"
+            ]
+          ]
+        },
+        {
+          "fen": "rnbqkbnr/ppppppp1/7p/8/3PP3/8/PPP2PPP/RNBQKBNR b KQkq - 0 2",
+          "text": "If you ignore the centre, your opponent takes it all. Here Black played a pawn on the edge, and White has two pawns side by side in the middle.",
+          "squares": [
+            [
+              "e4",
+              "good"
+            ],
+            [
+              "d4",
+              "good"
+            ],
+            [
+              "h6",
+              "bad"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Develop your pieces",
+      "summary": "A new piece out with almost every move.",
+      "themes": [],
+      "steps": [
+        {
+          "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+          "text": "Developing means bringing your pieces off the back rank, where they can do something. Knights first: each has one or two good squares.",
+          "arrows": [
+            [
+              "g1",
+              "f3",
+              "good"
+            ],
+            [
+              "b1",
+              "c3",
+              "good"
+            ]
+          ]
+        },
+        {
+          "fen": "r1bqk1nr/pppp1ppp/2n5/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4",
+          "text": "Bring out a new piece with almost every move. Both sides have two pieces out here, and both are ready to castle.",
+          "squares": [
+            [
+              "f3",
+              "good"
+            ],
+            [
+              "c4",
+              "good"
+            ],
+            [
+              "c6",
+              "plan"
+            ],
+            [
+              "c5",
+              "plan"
+            ]
+          ]
+        },
+        {
+          "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/3B4/PPPP1PPP/RNBQK1NR b KQkq - 1 2",
+          "text": "Don't block your centre pawns. This bishop stands in front of the d-pawn, and that pawn now shuts in the other bishop.",
+          "squares": [
+            [
+              "d3",
+              "bad"
+            ],
+            [
+              "d2",
+              "bad"
+            ],
+            [
+              "c1",
+              "bad"
+            ]
+          ]
+        },
+        {
+          "fen": "r1bqkbnr/1ppp1pp1/p1n4p/4p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R b KQkq - 0 5",
+          "text": "Count the pieces each side has out. White has three, Black only one. Material is level, but White is well ahead in the race.",
+          "squares": [
+            [
+              "f3",
+              "good"
+            ],
+            [
+              "c4",
+              "good"
+            ],
+            [
+              "c3",
+              "good"
+            ],
+            [
+              "h6",
+              "bad"
+            ],
+            [
+              "a6",
+              "bad"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Castle early",
+      "summary": "King safe, rook in the game: two jobs in one move.",
+      "themes": [
+        "exposedKing",
+        "castling"
+      ],
+      "steps": [
+        {
+          "fen": "r1bqk1nr/pppp1ppp/2n5/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4",
+          "text": "To castle, the squares between your king and rook must be empty. Your king can't be in check, or pass through a square that's attacked.",
+          "arrows": [
+            [
+              "e1",
+              "g1",
+              "plan"
+            ]
+          ],
+          "squares": [
+            [
+              "f1",
+              "plan"
+            ],
+            [
+              "g1",
+              "plan"
+            ]
+          ]
+        },
+        {
+          "fen": "r1bqk1nr/pppp1ppp/2n5/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQ1RK1 b kq - 5 4",
+          "text": "Castling does two jobs in one move: the king tucks away behind its pawns, and the rook comes towards the centre.",
+          "squares": [
+            [
+              "g1",
+              "good"
+            ],
+            [
+              "f1",
+              "good"
+            ]
+          ]
+        },
+        {
+          "fen": "r1bq1b1r/ppp2kpp/2n5/3np3/2B5/8/PPPP1PPP/RNBQK2R w KQ - 0 7",
+          "text": "Once your king has moved, castling is gone for good. Black's king had to take on f7, so it's stuck in the middle, where it's easy to attack.",
+          "arrows": [
+            [
+              "d1",
+              "f3",
+              "plan"
+            ]
+          ],
+          "squares": [
+            [
+              "f7",
+              "bad"
+            ]
+          ]
+        },
+        {
+          "fen": "r1bq1b1r/ppp3pp/2n1k3/3np3/2B5/5Q2/PPPP1PPP/RNB1K2R w KQ - 2 8",
+          "text": "Here it's already being chased. Even if it walks to safety later, its rook stays shut in the corner.",
+          "squares": [
+            [
+              "e6",
+              "bad"
+            ],
+            [
+              "h8",
+              "bad"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Don't waste moves",
+      "summary": "Early queen trips and moving a piece twice.",
+      "themes": [
+        "trappedPiece"
+      ],
+      "steps": [
+        {
+          "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+          "text": "Every move in the opening counts. A move that doesn't bring out a new piece, or fight for the centre, is a move your opponent gets for free."
+        },
+        {
+          "fen": "rnbqkbnr/pppp1ppp/8/4p2Q/4P3/8/PPPP1PPP/RNB1KBNR b KQkq - 1 2",
+          "text": "Bringing the queen out early is tempting: here it already attacks e5 and f7.",
+          "arrows": [
+            [
+              "h5",
+              "e5",
+              "good"
+            ],
+            [
+              "h5",
+              "f7",
+              "good"
+            ]
+          ]
+        },
+        {
+          "fen": "r1bqkb1r/pppp1p1p/2n2np1/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 2 5",
+          "text": "But the queen is easy to chase. Each time it moves away, Black brings out a new piece with tempo.",
+          "squares": [
+            [
+              "f3",
+              "bad"
+            ],
+            [
+              "c6",
+              "plan"
+            ],
+            [
+              "f6",
+              "plan"
+            ],
+            [
+              "g6",
+              "plan"
+            ]
+          ]
+        },
+        {
+          "fen": "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4",
+          "text": "Moving a piece again is fine when it wins something or stops a threat. Otherwise, bring out a new one. Here White can castle, or bring out the other knight.",
+          "arrows": [
+            [
+              "e1",
+              "g1",
+              "good"
+            ],
+            [
+              "b1",
+              "c3",
+              "good"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Watch f7 and f2",
+      "summary": "The weakest square at the start, and how to guard it.",
+      "themes": [
+        "attackingF2F7"
+      ],
+      "steps": [
+        {
+          "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+          "text": "At the start, f7 is Black's weakest square, and f2 is White's: only the king guards them.",
+          "squares": [
+            [
+              "f7",
+              "bad"
+            ],
+            [
+              "f2",
+              "bad"
+            ]
+          ]
+        },
+        {
+          "fen": "r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 3 3",
+          "text": "Bishop and queen both aim at f7. The threat is to take on f7 with the queen: checkmate.",
+          "arrows": [
+            [
+              "c4",
+              "f7",
+              "good"
+            ],
+            [
+              "h5",
+              "f7",
+              "good"
+            ]
+          ],
+          "squares": [
+            [
+              "f7",
+              "bad"
+            ]
+          ]
+        },
+        {
+          "fen": "r1bqkbnr/pppp1p1p/2n3p1/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 0 4",
+          "text": "Black blocks the queen with a pawn, and now the queen is attacked and has to move again.",
+          "arrows": [
+            [
+              "g6",
+              "h5",
+              "plan"
+            ]
+          ]
+        },
+        {
+          "fen": "r1bqkb1r/pppp1Qpp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 0 4",
+          "text": "If Black misses it and brings out a knight instead, the queen takes on f7 and it's checkmate. Glance at f7 (or f2) on every move of the opening.",
+          "squares": [
+            [
+              "f7",
+              "bad"
+            ],
+            [
+              "e8",
+              "bad"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Connect your rooks",
+      "summary": "How you know the opening is over.",
+      "themes": [],
+      "steps": [
+        {
+          "fen": "r1b2rk1/p1q2ppp/1pnbpn2/2pp4/3P1B2/2PBPN2/PP1NQPPP/R4RK1 w - - 0 10",
+          "text": "The opening is over when your pieces are out and your king is safe. A simple test: can your two rooks see each other?",
+          "arrows": [
+            [
+              "a1",
+              "f1",
+              "good"
+            ]
+          ]
+        },
+        {
+          "fen": "r1b2rk1/p1q2ppp/1pnbpn2/2pp4/3P1B2/2PBPN2/PP1NQPPP/R4RK1 w - - 0 10",
+          "text": "White's rooks are connected. Black still has a piece at home: the bishop on c8 sits between its rooks.",
+          "squares": [
+            [
+              "c8",
+              "bad"
+            ],
+            [
+              "a8",
+              "plan"
+            ],
+            [
+              "f8",
+              "plan"
+            ]
+          ]
+        },
+        {
+          "fen": "r1b2rk1/p1q2ppp/1pnbpn2/2pp4/3P1B2/2PBPN2/PP1NQPPP/R4RK1 w - - 0 10",
+          "text": "Now the middlegame starts: the rooks head for the open and central files. In short, take the centre, develop, castle, don't waste moves, watch f7, and connect your rooks.",
+          "arrows": [
+            [
+              "f1",
+              "d1",
+              "plan"
+            ],
+            [
+              "a1",
+              "c1",
+              "plan"
+            ]
+          ]
+        }
+      ]
+    }
+  ],
   middlegame: [
     {
       "title": "Reading a position",
