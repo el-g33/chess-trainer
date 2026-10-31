@@ -30,7 +30,7 @@ export const PRACTICE_TOUR: TourStep[] = [
   { target: ".moves-area", title: "The moves",
     text: "Every move of the game, coloured by its rating. Click one to go to it." },
   { target: ".view-tabs", title: "Statistics and history",
-    text: "See each player's accuracy and an estimated rating for this game, and your record against the coach." },
+    text: "See how accurately each side played and the level they played at, and your record against the coach." },
   { target: ".game-top .gear-button", title: "Settings",
     text: "Theme, board, pieces, sounds, your name, and more." },
   { target: "#new-game", title: "New game",
@@ -54,8 +54,8 @@ export const DEMO_TOUR: TourStep[] = [
 export const STATS_TOUR: TourStep[] = [
   { target: ".stats-card", title: "Accuracy",
     text: "How accurately each player played: over the whole game, then the opening, middlegame and endgame. Tap More for a count of every grade." },
-  { target: ".rating-row", title: "Rating",
-    text: "Roughly how strongly each side played in this game, judged by how much they gave away move by move." },
+  { target: ".rating-row", title: "Played like",
+    text: "The level each side played at in this game, from Beginner to Expert, judged by how much they gave away move by move." },
   { target: ".stats-start", title: "The review", text: "Go through the game move by move, from the start." },
   { target: ".view-tabs", title: "Tabs", text: "Back to the board, or on to your game history." },
 ];
@@ -72,7 +72,7 @@ export const PLAY_TOUR: TourStep[] = [
   { target: ".board-controls", title: "Moving through the game",
     text: "Step back to look at earlier moves, flip the board, or resign with the white flag." },
   { target: ".view-tabs", title: "Statistics and history",
-    text: "After the game: accuracy and an estimated rating, and your record against the coach." },
+    text: "After the game: accuracy and the level each side played at, and your record against the coach." },
   { target: ".game-top .gear-button", title: "Settings",
     text: "Theme, board, pieces, sounds, your name, and more." },
   { target: "#new-game", title: "New game",

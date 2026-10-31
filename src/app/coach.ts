@@ -8,7 +8,7 @@ import { makeSan, parseSan } from "chessops/san";
 import type { Color, NormalMove, Role as PieceRole } from "chessops/types";
 import { makeSquare, makeUci, opposite } from "chessops/util";
 
-import { accuracyRating, divide, estimateRating, gameAccuracy, phaseAccuracy, ratingFromAccuracy } from "../accuracy";
+import { accuracyRating, divide, gameAccuracy, phaseAccuracy, playedLike } from "../accuracy";
 import { type Mood, avatarSvg, moodForRating } from "../avatar";
 import {
   type BackupContents, backupDue, backupNote, dataCounts, makeBackup, noteBackup, readBackup, restoreBackup,
@@ -1283,13 +1283,7 @@ export function drawStats() {
   const start = positions[0].turn;
   const overall = gameAccuracy(start, scores);
   const phases = phaseAccuracy(start, positions, scores);
-  const ratings = estimateRating(start, scores);
-  // With the players' ratings in the game's details: from those and the accuracy
-  for (const colour of ["white", "black"] as const) {
-    const elo = Number(gameHeaders[colour === "white" ? "WhiteElo" : "BlackElo"]);
-    const accuracy = overall[colour];
-    if (elo > 0 && accuracy !== undefined && !Number.isNaN(accuracy)) ratings[colour] = ratingFromAccuracy(elo, accuracy);
-  }
+  const levels = playedLike(start, scores);
   const { done, total } = analyser.progress();
   // Until Stockfish has checked every move, show ?? rather than numbers that keep changing
   const pending = done < total || scores.some((score) => !score) || list.some((review) => !review);
@@ -1332,9 +1326,9 @@ export function drawStats() {
   row("Opening", sides.map((c) => percent(phases.opening[c])));
   row("Middlegame", sides.map((c) => percent(phases.middlegame[c])));
   row("Endgame", sides.map((c) => percent(phases.endgame[c])));
-  const fromRatings = ["WhiteElo", "BlackElo"].some((tag) => Number(gameHeaders[tag]) > 0);
-  const ratingLabel = element("span", "stats-label", "Rating");
-  const info = element("button", "stats-tag stats-info", "estimate ⓘ");
+  const ratingLabel = element("span", "stats-label", "Played like");
+  const info = element("button", "stats-tag stats-info", "ⓘ");
+  info.setAttribute("aria-label", "About this");
   info.type = "button";
   info.setAttribute("aria-expanded", String(ratingInfo));
   info.addEventListener("click", () => {
@@ -1344,13 +1338,13 @@ export function drawStats() {
   ratingLabel.append(info);
   row(ratingLabel, sides.map((c) => {
     const cell = element("span", "stats-cell");
-    cell.append(element("span", "rating-block", pending ? "??" : ratings[c] ? String(ratings[c]) : "-"));
+    cell.append(element("span", "rating-block", pending ? "??" : levels[c] ?? "-"));
     return cell;
   }), "rating-row");
   if (ratingInfo) {
     const note = element("p", "stats-note stats-info-note",
-      `An estimate from how accurately each side played${fromRatings ? ", starting from their ratings" : ""}. ` +
-      "One game is a small sample: expect it to vary a few hundred points.");
+      "From how much each side gave away, move by move: Beginner, Improver, Club player, Strong club or Expert. " +
+      "One game is a small sample, so expect it to vary.");
     table.append(note);
   }
 

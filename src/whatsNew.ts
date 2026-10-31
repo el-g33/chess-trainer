@@ -11,6 +11,13 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.17",
+    items: [
+      { icon: "chart", title: "Played like", text: "Statistics now say the level each side played at, from Beginner to Expert, instead of a rating number." },
+      { icon: "eye", title: "A streamlined look", text: "The Forest theme's board is now a deep teal, for a better experience." },
+    ],
+  },
+  {
     version: "3.16",
     items: [
       { icon: "search", title: "New names", text: "Looking back at a game is now called Analyse a game, and the moments that decided it are its Turning points." },

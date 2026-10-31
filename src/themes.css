@@ -296,12 +296,12 @@
 #board.green {
   --last-move: rgba(212, 168, 58, 0.5);
   --selected: rgba(212, 168, 58, 0.65);
-  --coord-on-light: #546d41;
-  --coord-on-dark: #e9e4c8;
+  --coord-on-light: #416a5e;
+  --coord-on-dark: #d6e4dc;
 }
 
 .green cg-board {
-  background: repeating-conic-gradient(#6f8f55 0 25%, #e9e4c8 0 50%) 0 0 / 25% 25%;
+  background: repeating-conic-gradient(#4c7d6e 0 25%, #d6e4dc 0 50%) 0 0 / 25% 25%;
 }
 
 #board.rose {

@@ -917,11 +917,12 @@ html body .board-area .board-controls {
 .rating-block {
   display: inline-block;
   min-width: 70px;
-  padding: 6px 0;
+  padding: 6px 8px;
   border-radius: 10px;
   background: var(--chip);
   color: #fff;
-  font-size: 1.15rem;
+  font-size: 0.85rem; /* a level in words: "Club player", on one line */
+  white-space: nowrap;
   font-weight: 700;
 }
 

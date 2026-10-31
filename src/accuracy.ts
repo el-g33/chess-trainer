@@ -202,25 +202,23 @@ export function accuracyRating(accuracy: number): string {
   return "Blunder";
 }
 
-// --- An estimated rating from how much each side gave away ---
+// --- How well each side played, in words, from how much they gave away ---
 
 const LOSS_CAP = 1000; // one blunder shouldn't count for more than this (centipawns)
 
-/** How well someone played, as a rating, when their own rating is known:
- *  their rating, adjusted by how accurate they were: about 58.5% accuracy is
- *  playing to your rating, and each point above or below it is worth about
- *  24 rating points. */
-export function ratingFromAccuracy(rating: number, accuracy: number): number {
-  const played = rating + 24 * (accuracy - 58.5);
-  return Math.round(Math.max(100, Math.min(3000, played)) / 25) * 25;
-}
+// The app's own scale: the most a side may give away on average per move
+// (centipawns) and still be called this
+export const PLAYED_LIKE: [maxLoss: number, level: string][] = [
+  [15, "Expert"],
+  [30, "Strong club"],
+  [55, "Club player"],
+  [100, "Improver"],
+  [Infinity, "Beginner"],
+];
 
-/** Roughly how strong each side played: from the average centipawn loss per
- *  move, on a simple curve (about 2100 at 10, 1650 at 25, 1350 at 50,
- *  1000 at 100, 650 at 250):
- *  rating = 3000 x e^(-0.11 x the square root of the average loss).
- *  Needs a few moves each. */
-export function estimateRating(startColor: Color, scores: (Score | undefined)[]): Partial<Record<Color, number>> {
+/** How well each side played, as a level in words, from the average amount
+ *  each move gave away. Needs a few moves each. */
+export function playedLike(startColor: Color, scores: (Score | undefined)[]): Partial<Record<Color, string>> {
   const cp = (score: Score) =>
     score.mate !== undefined ? (score.mate > 0 ? LOSS_CAP : -LOSS_CAP) : Math.max(-LOSS_CAP, Math.min(LOSS_CAP, score.cp));
   const losses: Record<Color, number[]> = { white: [], black: [] };
@@ -232,12 +230,11 @@ export function estimateRating(startColor: Color, scores: (Score | undefined)[])
     const sign = colour === "white" ? 1 : -1;
     losses[colour].push(Math.max(0, Math.min(LOSS_CAP, sign * (cp(before) - cp(after)))));
   }
-  const result: Partial<Record<Color, number>> = {};
+  const result: Partial<Record<Color, string>> = {};
   for (const colour of ["white", "black"] as const) {
     if (losses[colour].length < 5) continue;
     const average = mean(losses[colour]);
-    const rating = 3000 * Math.exp(-0.11 * Math.sqrt(average));
-    result[colour] = Math.round(Math.max(400, Math.min(2900, rating)) / 25) * 25;
+    result[colour] = PLAYED_LIKE.find(([most]) => average <= most)![1];
   }
   return result;
 }

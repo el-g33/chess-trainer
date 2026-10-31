@@ -23,7 +23,7 @@ const BOARD_LOOKS: Record<string, [string, string]> = {
   slate: ["#5f687b", "#9aa3b5"],
   walnut: ["#a9805e", "#ede3d3"],
   lavender: ["#8f89cf", "#cfcbf0"],
-  green: ["#6f8f55", "#e9e4c8"],
+  green: ["#4c7d6e", "#d6e4dc"],
   rose: ["#c98f93", "#f7e6e2"],
 };
 
