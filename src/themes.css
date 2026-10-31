@@ -305,8 +305,8 @@
 }
 
 #board.rose {
-  --last-move: rgba(176, 40, 95, 0.3);
-  --selected: rgba(176, 40, 95, 0.45);
+  --last-move: rgba(98, 160, 110, 0.55); /* sage green: stands out on pink squares */
+  --selected: rgba(98, 160, 110, 0.7);
   --coord-on-light: #855e61;
   --coord-on-dark: #f7e6e2;
 }

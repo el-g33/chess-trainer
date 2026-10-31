@@ -11,6 +11,7 @@
   --button-hover: #f3f3f3;
   --accent: #005fb8;
   --accent-hover: #1a6fc0;
+  --avatar-bg: var(--accent); /* the coach's circle, in each theme's own colour */
   --current-move: #dbe8f6;
   --last-move: rgba(246, 226, 122, 0.55);
   --selected: rgba(246, 226, 122, 0.75);

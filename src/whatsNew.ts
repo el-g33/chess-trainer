@@ -11,6 +11,12 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.12",
+    items: [
+      { icon: "eye", title: "A streamlined look", text: "The coach now wears your theme's colour, and Rose quartz shows the last move in sage green, for a better experience." },
+    ],
+  },
+  {
     version: "3.11",
     items: [
       { icon: "book", title: "Opening principles", text: "Six short lessons at the top of Training's Openings tab: take the centre, develop, castle early, don't waste moves, watch f7, and connect your rooks." },
