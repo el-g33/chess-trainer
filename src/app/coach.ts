@@ -48,7 +48,7 @@ import {
 import { keyMomentsCard } from "./keyMoments";
 import { analysisLineText, goTo } from "./moves";
 import {
-  cap, depthCard, drillSays, openingShortName, practiceSays, scheduleDemo, showWhatYouGet, startDemoLine,
+  cap, depthCard, drillSays, lessonNotePages, openingShortName, practiceSays, scheduleDemo, showWhatYouGet, startDemoLine,
   movePicture, practiseGameSlips,
 } from "./openingDemos";
 import { importGames, importing, importNote, reviewImported } from "./onlineGames";
@@ -161,7 +161,7 @@ export function showLessonIntro() {
 
 /** The first sentence of a note (the bubble's line; the whole note is behind the dots). */
 export function firstSentence(note: string): string {
-  return note.trim().match(/^.+?[.!?](?=\s|$)/)?.[0] ?? note.trim();
+  return note.trim().split(/(?<=[.!?])\s+(?=[A-Z])/)[0];
 }
 
 /** What the coach says about the position on screen. */
@@ -419,6 +419,15 @@ export function quizInWords(): string[] {
 export function openMore() {
   if (demo?.intro) return showLessonIntro();
   if (demo) {
+    // a move's note: a page per sentence, each with its own picture
+    const pages = lessonNotePages();
+    if (pages && pages.texts.length > 1) {
+      demo.playing = false;
+      const card = startStory(pages.frames[0], pages.texts[0], "talk", []);
+      extendPages(card, pages.frames.slice(1), pages.texts.slice(1), 0);
+      showStory(card);
+      return;
+    }
     const ply = currentPly();
     const note = ply ? demo.steps[ply - 1].note : demo.demo.lines[demo.line].about ?? demo.demo.intro;
     showOverlay("talk", [para(note ?? "Watch how the line goes.")], [CLOSE]);

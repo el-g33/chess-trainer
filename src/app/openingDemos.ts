@@ -233,6 +233,30 @@ export function demoShapes(): DrawShape[] {
   return movePicture(before, after, move, yours, orientation);
 }
 
+/** A lesson move's note, a page per sentence: the first with the move's own
+ *  picture, the rest with the lesson's arrows (one each when there are just
+ *  enough to go round, else all of them), so each idea has its picture. */
+export function lessonNotePages(): { frames: StepFrame[]; texts: string[] } | null {
+  if (!demo || demo.intro) return null;
+  const ply = currentPly();
+  const step = ply ? demo.steps[ply - 1] : undefined;
+  if (!step?.note) return null;
+  // (split only where a sentence ends and a new one starts with a capital: not at "3...e6")
+  const sentences = step.note.trim().split(/(?<=[.!?])\s+(?=[A-Z])/);
+  const after = game.positionAt(ply);
+  const arrows = (demo.demo.lines[demo.line].arrows?.[step.label] ?? []).map((item): DrawShape => {
+    const brush = item.endsWith("!") ? "them" : "guess";
+    const squares = item.replace(/[@!]/g, "");
+    return item.startsWith("@") ? { orig: squares as Key, brush } : { orig: squares.slice(0, 2) as Key, dest: squares.slice(2, 4) as Key, brush };
+  });
+  const rest = sentences.length - 1;
+  const frames = sentences.map((_, i): StepFrame => ({
+    position: after,
+    shapes: i === 0 ? demoShapes() : arrows.length === rest ? [arrows[i - 1]] : arrows,
+  }));
+  return { frames, texts: sentences };
+}
+
 /** The end of a line: the position you get, explained with Stockfish - its
  *  shape, its strengths and ideas, and what to watch out for. */
 export async function showWhatYouGet() {
