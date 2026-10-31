@@ -11,6 +11,13 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.15",
+    items: [
+      { icon: "search", title: "A guide to Game review", text: "The first time you open Game review, a short tour shows how to bring in your games: from this app, by username, or pasted as a PGN." },
+      { icon: "eye", title: "A streamlined look", text: "Shorter lines from the coach on the main menu, which now stays the same size, for a better experience." },
+    ],
+  },
+  {
     version: "3.14",
     items: [
       { icon: "chart", title: "Lighter on your phone", text: "Opens faster, gives memory back when the coach isn't thinking, and the wood board is a quarter of the size." },

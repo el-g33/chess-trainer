@@ -2,7 +2,7 @@
 
 import { type TourStep, runTour, tourOpen } from "../tour";
 
-import { $ } from "./dom";
+import { $, menu } from "./dom";
 import { refresh } from "./draw";
 import { currentView, demo, menuOpen, mode } from "./state";
 
@@ -79,6 +79,20 @@ export const PLAY_TOUR: TourStep[] = [
     text: "Back to the start. After a game I'll offer to go through it with you." },
 ];
 
+// The Game review screen (a menu screen): how a game gets in
+export const REVIEW_SETUP_TOUR: TourStep[] = [
+  { target: "#your-games", title: "Your games",
+    text: "Games you play here land in this list. Tap one and we'll go through it together." },
+  { target: "#your-games-get", title: "Get my games",
+    text: "Play on Lichess? Add your username once, and this brings in your latest games to review." },
+  { target: "#pgn-text", title: "Paste a game",
+    text: "Got a game from somewhere else? Most chess sites let you copy it as a PGN, the game written as text. Paste it here, or open a saved .pgn file." },
+  { target: "#fen", title: "Or one position",
+    text: "To look at a single position instead, paste its FEN here." },
+  { target: '[data-start="analysis"]', title: "Start",
+    text: "Once a game is in, press Start. I'll check every move and pick out the key moments." },
+];
+
 export function tourSeen(): Record<string, string> {
   try {
     return JSON.parse(localStorage.getItem(TOUR_KEY) ?? "{}");
@@ -99,14 +113,25 @@ export async function showTour(asked: boolean) {
     : demo ? [DEMO_TOUR, "Learn an opening"]
     : which === "practice" ? [PRACTICE_TOUR, "Practice mode tour"] : [PLAY_TOUR, "Play mode tour"];
   const end = await runTour(steps, title);
-  if (end.finished || end.neverAgain || asked) {
-    try {
-      localStorage.setItem(TOUR_KEY, JSON.stringify({ ...seen, [which]: end.neverAgain ? "never" : "seen" }));
-    } catch {
-      // storage blocked: it may be offered again next time
-    }
-  }
+  if (end.finished || end.neverAgain || asked) markSeen(which, end.neverAgain);
   refresh();
+}
+
+function markSeen(which: string, never: boolean) {
+  try {
+    localStorage.setItem(TOUR_KEY, JSON.stringify({ ...tourSeen(), [which]: never ? "never" : "seen" }));
+  } catch {
+    // storage blocked: it may be offered again next time
+  }
+}
+
+const reviewSetupOpen = () => menuOpen && !menu.querySelector<HTMLElement>('.screen[data-screen="analysis"]')!.hidden;
+
+/** The Game review screen's tour: by itself the first time it's opened, or from the ? menu. */
+export async function showReviewSetupTour(asked: boolean) {
+  if (tourOpen() || !reviewSetupOpen() || (!asked && tourSeen().reviewSetup)) return;
+  const end = await runTour(REVIEW_SETUP_TOUR, "Game review");
+  if (end.finished || end.neverAgain || asked) markSeen("reviewSetup", end.neverAgain);
 }
 
 /** The ? button: About, and (in a game) a tour of the screen you're on. */
@@ -129,6 +154,7 @@ export function toggleHelp(anchor: HTMLElement) {
     box.append(button);
   };
   if (!menuOpen) item("Show me around this screen", () => void showTour(true));
+  else if (reviewSetupOpen()) item("Show me around this screen", () => void showReviewSetupTour(true));
   item("About and licences", () => window.open("./about.html", "_blank"));
   const rect = anchor.getBoundingClientRect();
   box.hidden = false;

@@ -19,7 +19,7 @@ import {
   tcMinutes, timeControlBox,
 } from "./dom";
 import { refresh } from "./draw";
-import { showTour } from "./featureTour";
+import { showReviewSetupTour, showTour } from "./featureTour";
 import { maybeOpponentMove, startMatch, useDepth } from "./matches";
 import { startAnalysis } from "./moves";
 import { drawProgress, openingShortName, startDemo } from "./openingDemos";
@@ -72,10 +72,10 @@ export function pickGreeting(): string {
 }
 
 export const MODE_LINES: Record<HomeChoice, string> = {
-  play: "A real game against me. No hints until it's over, then we'll go through it together.",
-  practice: "A game against me, with help along the way: ratings, hints and plans.",
-  analysis: "Got a game from lichess or chess.com? Let's look at it together.",
-  train: "Openings, middlegame and endgame: short lessons, puzzles for every level, and your own positions to play out with me.",
+  play: "A real game: no hints until it's over, then we go through it together.",
+  practice: "A game with help along the way: ratings, hints and plans.",
+  analysis: "Got a game you'd like to analyse? Let's take a look together.",
+  train: "Lessons and puzzles for openings, middlegame and endgame.",
 };
 
 // The time controls under each icon (values as in the clock's PRESETS)
@@ -91,7 +91,10 @@ export const tcKindOf = (value: string) =>
 
 export function showScreen(screen: HomeScreen) {
   for (const section of menu.querySelectorAll<HTMLElement>(".screen")) section.hidden = section.dataset.screen !== screen;
-  if (screen === "analysis") drawYourGames();
+  if (screen === "analysis") {
+    drawYourGames();
+    requestAnimationFrame(() => void showReviewSetupTour(false)); // the first time: how a game gets in
+  }
   // The level box is shared by the Play and Practice screens
   const slot = menu.querySelector<HTMLElement>(`.screen[data-screen="${screen}"] .slot-level`);
   if (slot && levelBox.parentElement !== slot) {
