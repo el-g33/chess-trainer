@@ -11,6 +11,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.9",
+    items: [
+      { icon: "back", title: "A back button everywhere", text: "One round button, top left, on every screen. In a review it takes you from the board back to the summary." },
+      { icon: "bulb", title: "The coach talks like a coach", text: "One clear sentence per move, and every line ends with where it leaves you: level, better, or winning." },
+      { icon: "book", title: "Lesson notes, one idea at a time", text: "Tap the dots on a lesson move to go through its note a sentence at a time, each with its own picture." },
+      { icon: "eye", title: "A streamlined look", text: "Calmer pictures on the board and fewer labels in the coach's words, for a better experience." },
+    ],
+  },
+  {
     version: "3.8",
     items: [
       { icon: "flag", title: "Key moments", text: "A review picks out your game's turning points. Go through just those or every move, and switch whenever you like." },
