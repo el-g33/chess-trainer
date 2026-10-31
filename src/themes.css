@@ -40,6 +40,43 @@
   --card-radius: 10px;
 }
 
+/* -- Classic dark: Classic's blue and wood board, on neutral dark greys ------- */
+
+:root[data-ui="classicdark"] {
+  --r-brilliant: #b39dff;
+  --r-great: #9aa8ff;
+  --r-best: #7fd6a0;
+  --r-inaccuracy: #f2cf4a;
+  --r-mistake: #ffa04d;
+  --r-miss: #f08cbf;
+  --r-blunder: #ff6b5e;
+  color-scheme: dark;
+  --bg: #1c1d20;
+  --card: #25272b;
+  --text: #e8e8e8;
+  --muted: #9a9ea6;
+  --line: #34373d;
+  --line-strong: #3e4249;
+  --button: #2c2e33;
+  --button-hover: #35383e;
+  --accent: #4d9ef0;
+  --accent-hover: #6aaff4;
+  --on-accent: #0d1a2a;
+  --current-move: rgba(77, 158, 240, 0.24);
+  --disabled: #5f636b;
+  --input: #2c2e33;
+  --soft: #24262a;
+  --danger: #ff6b5b;
+  --danger-soft: #3a1f1c;
+  --good: #4cd18a;
+  --note: #a7abb3;
+  --book: #e0a46a;
+  --special: #c79bff;
+  --clock: #2c2e33;
+  --clock-text: #9a9ea6;
+  --clock-run: #4d9ef0;
+}
+
 /* -- Warm stone: taupe, cream and espresso cards, soft orange --------------- */
 
 :root[data-ui="stone"] {
@@ -212,6 +249,7 @@
 
 /* The running clock in a solid accent colour */
 :root[data-ui="ember"] .pb-clock.running,
+:root[data-ui="classicdark"] .pb-clock.running,
 :root[data-ui="forest"] .pb-clock.running,
 :root[data-ui="violet"] .pb-clock.running {
   color: var(--on-accent);
@@ -253,10 +291,10 @@
 }
 
 /* Move ratings, brighter so they read on the dark themes */
-:root[data-ui="ember"] .r-excellent, :root[data-ui="violet"] .r-excellent, :root[data-ui="forest"] .r-excellent { color: #8fcf9f; }
-:root[data-ui="ember"] .r-good, :root[data-ui="violet"] .r-good, :root[data-ui="forest"] .r-good { color: #b3c7b8; }
-:root[data-ui="ember"] .r-book, :root[data-ui="violet"] .r-book, :root[data-ui="forest"] .r-book { color: #d4b48f; }
-:root[data-ui="ember"] .r-forced, :root[data-ui="violet"] .r-forced, :root[data-ui="forest"] .r-forced { color: #b4b8bf; }
+:root[data-ui="ember"] .r-excellent, :root[data-ui="classicdark"] .r-excellent, :root[data-ui="violet"] .r-excellent, :root[data-ui="forest"] .r-excellent { color: #8fcf9f; }
+:root[data-ui="ember"] .r-good, :root[data-ui="classicdark"] .r-good, :root[data-ui="violet"] .r-good, :root[data-ui="forest"] .r-good { color: #b3c7b8; }
+:root[data-ui="ember"] .r-book, :root[data-ui="classicdark"] .r-book, :root[data-ui="violet"] .r-book, :root[data-ui="forest"] .r-book { color: #d4b48f; }
+:root[data-ui="ember"] .r-forced, :root[data-ui="classicdark"] .r-forced, :root[data-ui="violet"] .r-forced, :root[data-ui="forest"] .r-forced { color: #b4b8bf; }
 
 /* -- The matching boards (flat squares, light a8 at the top-left) ----------- */
 
@@ -338,7 +376,9 @@
 }
 
 :root[data-ui="ember"] option,
-:root[data-ui="ember"] optgroup {
+:root[data-ui="ember"] optgroup,
+:root[data-ui="classicdark"] option,
+:root[data-ui="classicdark"] optgroup {
   background-color: #262a33;
   color: #e8e9ed;
 }
@@ -348,6 +388,7 @@
 }
 
 :root[data-ui="ember"] select,
+:root[data-ui="classicdark"] select,
 :root[data-ui="violet"] select {
   color-scheme: dark;
 }

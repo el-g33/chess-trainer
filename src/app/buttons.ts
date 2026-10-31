@@ -16,7 +16,7 @@ import {
 import { drawLookRows } from "./lookPickers";
 import { openProfile, setupOnlineGames } from "./onlineGames";
 import {
-  $, arrowStyleBox, coachSpeedBox, demoPick, demoPlay, evalCheck, exitAnalysisButton, fenInput, lineBack, lineExit,
+  $, arrowStyleBox, coachFocusBox, coachSpeedBox, demoPick, demoPlay, evalCheck, exitAnalysisButton, fenInput, lineBack, lineExit,
   lineForward, navButtons, newButton, piecesBox, planModeBox, playerNameBox, lichessUserBox, chesscomUserBox,
   rateMovesBox, replyButton, resignButton,
   profileDialog, reviewButton, reviewDepthBox, settingsDialog, showDemoButton, soundOn, soundStyleBox, soundVolume, themeBox,
@@ -25,7 +25,7 @@ import {
 import { refresh } from "./draw";
 import { toggleHelp } from "./featureTour";
 import { stepBack } from "./backNav";
-import { everyMove, momentsOnly } from "./keyMoments";
+import { momentJump, switchReview } from "./keyMoments";
 import { onResign, onReviewGame, stopPreparing } from "./matches";
 import { exitAnalysis, goTo, navigate, onUndo, readFen } from "./moves";
 import { loadDemoLine, onDemoExit, onDemoPlay, onDemoTry, onNavPlay, onShowDemo } from "./openingDemos";
@@ -66,7 +66,7 @@ export function wireButtons() {
     applyUiTheme();
     themeBox.value = THEME_BOARDS[uiThemeBox.value] ?? themeBox.value;
     applyTheme();
-    piecesBox.value = uiThemeBox.value; // each theme has its own piece colours
+    piecesBox.value = uiThemeBox.value === "classicdark" ? "classic" : uiThemeBox.value; // each theme has its own piece colours (Classic dark: Classic's)
     setPalette(piecesBox.value);
     saveSettings();
     refresh();
@@ -160,8 +160,9 @@ export function wireButtons() {
   $("update-restart").addEventListener("click", () => void restartIntoUpdate());
   $("update-later").addEventListener("click", () => { $("update-toast").hidden = true; });
   $("prep-back").addEventListener("click", () => { stopPreparing(); showMenu(); });
-  $("mode-moments").addEventListener("click", momentsOnly);
-  $("mode-every").addEventListener("click", everyMove);
+  $("review-switch").addEventListener("click", switchReview);
+  $("moment-prev").addEventListener("click", () => momentJump("back"));
+  $("moment-next").addEventListener("click", () => momentJump("forward"));
   for (const tab of document.querySelectorAll<HTMLButtonElement>(".view-tabs button")) {
     tab.addEventListener("click", () => {
       set.currentView(tab.dataset.view as typeof currentView);
@@ -189,6 +190,10 @@ export function wireButtons() {
   reviewDepthBox.addEventListener("change", saveSettings); // (used from the next review)
   arrowStyleBox.addEventListener("change", () => {
     applyArrowStyle();
+    saveSettings();
+    refresh();
+  });
+  coachFocusBox.addEventListener("change", () => {
     saveSettings();
     refresh();
   });

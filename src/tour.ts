@@ -1,6 +1,9 @@
 // The feature tour: callout bubbles that point at each part of the screen in
 // turn, with Back / Next / No thanks and a "Don't show this again" tick box.
-// The rest of the page is dimmed and can't be clicked while it's open.
+// The rest of the page is dimmed and can't be clicked while it's open. The
+// coach pops up on the card, so it's clear on every theme that a tour is on.
+
+import { avatarSvg } from "./avatar";
 
 export interface TourStep {
   target: string; // CSS selector; steps whose target isn't on screen are skipped
@@ -35,6 +38,7 @@ export function runTour(steps: TourStep[], title: string): Promise<TourEnd> {
   bubble.setAttribute("role", "dialog");
   bubble.setAttribute("aria-label", title);
   bubble.innerHTML = `
+    <div class="tour-coach">${avatarSvg("talk", 44)}</div>
     <div class="tour-count"></div>
     <h3 class="tour-title"></h3>
     <p class="tour-text"></p>
@@ -64,7 +68,8 @@ export function runTour(steps: TourStep[], title: string): Promise<TourEnd> {
     const height = bubble.offsetHeight;
     const gap = 14;
     let top: number;
-    if (rect.bottom + gap + height <= window.innerHeight - 8) top = rect.bottom + gap; // below
+    const coach = 22; // the coach sticks out above the card
+    if (rect.bottom + gap + coach + height <= window.innerHeight - 8) top = rect.bottom + gap + coach; // below
     else if (rect.top - gap - height >= 8) top = rect.top - gap - height; // above
     else top = Math.max(8, window.innerHeight - height - 8); // over it, at the bottom of the screen
     const left = Math.min(Math.max(16, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - 16);

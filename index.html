@@ -20,8 +20,8 @@
           pieces = saved.pieces || "";
         } catch (e) {}
         document.documentElement.dataset.ui = theme;
-        document.documentElement.dataset.pieces = pieces || theme;
-        var bars = { classic: "#fafafa", ember: "#16181e", stone: "#9a908a", violet: "#33365e", forest: "#1d2b24", rose: "#e8d5d2" };
+        document.documentElement.dataset.pieces = pieces || (theme === "classicdark" ? "classic" : theme);
+        var bars = { classic: "#fafafa", classicdark: "#1c1d20", ember: "#16181e", stone: "#9a908a", violet: "#33365e", forest: "#1d2b24", rose: "#e8d5d2" };
         document.querySelector('meta[name="theme-color"]').setAttribute("content", bars[theme] || "#9a908a");
         // the theme's background straight away, while the page waits for its styles
         document.documentElement.style.background = bars[theme] || "#9a908a";
@@ -258,11 +258,9 @@
         <div class="board-col">
         <!-- Reviewing: back to the summary, and turning points only or every move -->
         <div id="review-bar" class="whatif-bar review-bar" hidden>
-          <span class="review-label">Reviewing</span>
-          <div id="review-mode" class="review-mode" role="group" aria-label="Which moves">
-            <button type="button" id="mode-moments"></button>
-            <button type="button" id="mode-every">Every move</button>
-          </div>
+          <span class="review-label" id="review-label">Reviewing</span>
+          <!-- Turning points while going through every move; Full review while going through the turning points -->
+          <button type="button" id="review-switch" class="review-switch"></button>
         </div>
         <div class="player-bar" id="bar-top">
           <span class="pb-name"></span><span class="pb-captured"></span><span class="pb-diff"></span>
@@ -329,6 +327,12 @@
           <button type="button" id="undo" title="Take back" hidden><span data-ico="undo"></span></button>
           <button type="button" id="flip" title="Flip board"><span data-ico="flip"></span></button>
           <button type="button" id="resign" title="Resign"><span data-ico="flag"></span></button>
+        </div>
+        <!-- Going through the turning points: big buttons from one to the next -->
+        <div id="moment-nav" class="moment-nav" hidden>
+          <button type="button" id="moment-prev" class="moment-jump">&lsaquo; Previous turning point</button>
+          <span class="moment-at"><b id="moment-count"></b><small id="moment-move"></small></span>
+          <button type="button" id="moment-next" class="moment-jump"></button>
         </div>
         <!-- An opening demonstration: the controls (the coach speaks the notes) -->
         <div id="demo-panel" class="demo-panel" hidden>
@@ -445,6 +449,7 @@
           <select id="ui-theme" class="dd-native" data-themed="picture" tabindex="-1" aria-hidden="true">
             <option value="stone">Warm stone</option>
             <option value="classic">Classic</option>
+            <option value="classicdark">Classic dark</option>
             <option value="ember">Midnight ember</option>
             <option value="violet">Violet glass</option>
             <option value="forest">Forest club</option>
@@ -484,6 +489,12 @@
           <select id="sound-style"></select>
           <label class="check wide"><input type="checkbox" id="clock-tick" checked /> Tick in your last 10 seconds</label>
           <h4 class="settings-group wide">The coach</h4>
+          <label for="coach-focus">Coach me on</label>
+          <select id="coach-focus">
+            <option value="auto">Automatic (by your level)</option>
+            <option value="fundamentals">The fundamentals</option>
+            <option value="everything">Everything</option>
+          </select>
           <label for="coach-speed">Coach speed</label>
           <select id="coach-speed">
             <option value="50">Relaxed</option>

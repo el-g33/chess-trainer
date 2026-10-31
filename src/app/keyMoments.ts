@@ -1,6 +1,6 @@
-// Turning points: the few moments that decided a reviewed game (the slips that cost
-// most, the chances missed, the masterstrokes), listed on the summary, and a
-// way through the review that stops only at those.
+// Turning points: the few moments that turned a reviewed game (the moves where the
+// eval swung from one side to the other, or a chance to swing it was missed),
+// listed on the summary, and a way through the review that stops only at those.
 
 import type { Color } from "chessops/types";
 
@@ -11,23 +11,53 @@ import type { Review } from "../review";
 import { listener, reviews } from "./coach";
 import { $ } from "./dom";
 import { refresh } from "./draw";
+import { type Fundamental, type FundamentalKind, fundamentalEvents, fundamentalWords, fundamentalsOn } from "./fundamentals";
 import { GRADE_JUMP_PAUSE, backToStats, watching, withBook } from "./matches";
 import { goTo } from "./moves";
 import { analysis, currentView, demo, game, reviewing, set } from "./state";
 
-const MOST = 5;
-const SLIPS = ["Mistake", "Blunder", "Miss", "Missed Win"];
+const MOST = 6;
+// A big swing in the mover's winning chance (0-100) that also changes who is
+// better: winning to level or losing, or level to losing. A slip that leaves
+// the game where it was (still winning, still lost) isn't a turning point.
+const SWING = 20;
+const side = (chance: number) => (chance >= 65 ? 1 : chance <= 35 ? -1 : 0);
+const turned = (review: Review | undefined) =>
+  !!review && review.chanceBefore - review.chanceAfter >= SWING && side(review.chanceAfter) < side(review.chanceBefore);
 
-/** The plies of the game's turning points, in move order: up to five, the
- *  biggest first (a masterstroke or key move always counts). */
-export function keyMoments(list: (Review | undefined)[]): number[] {
-  const scored = list.flatMap((review, i) => {
-    if (!review) return [];
-    if (review.rating === "Brilliant" || review.rating === "Great") return [{ ply: i + 1, size: 100 }];
-    if (SLIPS.includes(review.rating) && review.bestSan) return [{ ply: i + 1, size: Math.abs(review.chanceBefore - review.chanceAfter) }];
-    return [];
+const SIGNS: Record<FundamentalKind, { sign: string; ico: string }> = {
+  mated: { sign: "red", ico: "hazard" },
+  "mate-missed": { sign: "amber", ico: "hazard" },
+  hung: { sign: "red", ico: "hazard" },
+  fork: { sign: "red", ico: "hazard" },
+  pawn: { sign: "orange", ico: "hazard" },
+  left: { sign: "amber", ico: "gift" },
+  took: { sign: "chance", ico: "gift" },
+};
+
+/** The game's turning points, in move order (up to six, the biggest swings
+ *  first). A big swing only counts with a reason you can see on the board: a
+ *  piece left loose or walked into a fork, a threat ignored that loses
+ *  material, a checkmate walked into or missed, or a winning capture missed.
+ *  (A swing the engine sees in a quiet move is left to the full review.) With
+ *  the fundamentals lens, a piece left loose and taken shows as the take
+ *  ("Free knight: you took it") on the move after. */
+function turningPoints(list: (Review | undefined)[]): { ply: number; event?: Fundamental }[] {
+  const events = fundamentalEvents(list);
+  const reason = (ply: number) => events.some((e) => e.ply === ply && e.kind !== "took");
+  const swings = list.flatMap((review, i) =>
+    turned(review) && reason(i + 1) ? [{ ply: i + 1, size: review!.chanceBefore - review!.chanceAfter }] : []);
+  const biggest = swings.sort((a, b) => b.size - a.size).slice(0, MOST).sort((a, b) => a.ply - b.ply);
+  if (!fundamentalsOn()) return biggest.map(({ ply }) => ({ ply }));
+  return biggest.map(({ ply }) => {
+    const took = events.find((e) => e.ply === ply + 1 && e.kind === "took");
+    return took ? { ply: ply + 1, event: took } : { ply, event: events.find((e) => e.ply === ply) };
   });
-  return scored.sort((a, b) => b.size - a.size).slice(0, MOST).map((m) => m.ply).sort((a, b) => a - b);
+}
+
+/** The plies of the game's turning points, in move order. */
+export function keyMoments(list: (Review | undefined)[]): number[] {
+  return turningPoints(list).map((point) => point.ply);
 }
 
 /** A moment in a few words, from your side: "Your key move", "Their slip: your chance". */
@@ -50,19 +80,25 @@ let moments: number[] | null = null; // going through the turning points only
 
 export const keyMomentsOn = () => moments !== null && reviewing;
 
+/** The turning points being gone through (none when not in that mode). */
+export const turningPlies = (): number[] => (keyMomentsOn() ? moments! : []);
+
 /** The summary's list of moments, with the two ways into the review. */
 export function keyMomentsCard(list: (Review | undefined)[], startReview: () => void): HTMLElement {
   const box = document.createElement("div");
   box.className = "key-moments";
-  const plies = keyMoments(list);
+  const points = turningPoints(list);
+  const plies = points.map((point) => point.ply);
   const viewer: Color | null = watching() ? null : listener();
+  const events = new Map(points.flatMap((point) => (point.event ? [[point.ply, point.event] as const] : [])));
   if (plies.length) {
     const title = document.createElement("p");
     title.className = "key-moments-title";
     title.textContent = "Turning points";
     box.append(title);
     for (const ply of plies) {
-      const words = momentWords(list[ply - 1]!, viewer, game.moverOf(ply));
+      const event = events.get(ply);
+      const words = event ? { text: fundamentalWords(event, viewer), ...SIGNS[event.kind] } : momentWords(list[ply - 1]!, viewer, game.moverOf(ply));
       const row = document.createElement("button");
       row.type = "button";
       row.className = "key-moment";
@@ -108,58 +144,65 @@ export function showMoment(ply: number, plies: number[] = moments ?? []) {
   }, GRADE_JUMP_PAUSE);
 }
 
-/** Forward or back while going through the turning points: the next or the
- *  previous one (past the last: back to the summary). False if not in that mode. */
-export function momentStep(where: "back" | "forward"): boolean {
+/** Where the board is among the turning points: the one on screen (its move,
+ *  or the position just before it), else the ones either side. */
+function around(list: number[], now: number): { at: number; previous?: number; next?: number } {
+  const at = list.findIndex((ply) => now === ply || now === ply - 1);
+  if (at >= 0) return { at, previous: list[at - 1], next: list[at + 1] };
+  return { at: -1, previous: [...list].reverse().find((ply) => ply < now), next: list.find((ply) => ply > now) };
+}
+
+/** The big buttons while going through the turning points: the previous or
+ *  next one (past the last: back to the summary). The move buttons above them
+ *  still step one move at a time. False when not going through them. */
+export function momentJump(where: "back" | "forward"): boolean {
   if (!keyMomentsOn()) return false;
-  const list = moments!;
-  const now = currentPly();
-  if (where === "forward") {
-    const next = list.find((ply) => ply > now);
-    if (next) showMoment(next);
-    else {
-      moments = null;
-      backToStats();
-    }
-  } else {
-    const previous = [...list].reverse().find((ply) => ply < now - 1);
+  const { previous, next } = around(moments!, currentPly());
+  if (where === "back") {
     if (previous) showMoment(previous);
+  } else if (next) showMoment(next);
+  else {
+    moments = null;
+    backToStats();
   }
   return true;
 }
 
-/** The review bar above the board: back to the summary, and the switch
- *  between turning points only and every move (none for a game without any). */
+/** The review bar above the board, and the big buttons under it while going
+ *  through the turning points (the move buttons make way for them). */
 export function drawMomentsBar() {
   if (!reviewing) moments = null;
   const show = reviewing && currentView === "board" && !analysis && !demo;
   $("review-bar").hidden = !show;
+  const on = show && keyMomentsOn();
+  document.querySelector(".board-area")?.classList.toggle("moments", on);
+  $("moment-nav").hidden = !on;
   if (!show) return;
   const plies = keyMoments(withBook(reviews()));
-  $("review-mode").hidden = !plies.length;
-  const on = keyMomentsOn();
-  const at = on ? moments!.findIndex((ply) => ply >= currentPly()) : -1;
-  $("mode-moments").textContent = on ? `Turning points ${at < 0 ? moments!.length : at + 1}/${moments!.length}` : "Turning points";
-  $("mode-moments").classList.toggle("on", on);
-  $("mode-every").classList.toggle("on", !on);
+  $("review-label").textContent = on ? "Turning points" : "Reviewing";
+  $("review-switch").textContent = on ? "Full review ›" : "Turning points ›";
+  $("review-switch").hidden = !on && !plies.length;
+  if (!on) return;
+  const list = moments!;
+  const { at, previous, next } = around(list, currentPly());
+  const shown = at >= 0 ? at : list.indexOf(previous ?? list[0]);
+  $("moment-count").textContent = `${shown + 1} of ${list.length}`;
+  $("moment-move").textContent = `Move ${game.positionAt(list[shown] - 1).fullmoves}`;
+  // (no greyed-out button to mistake for the move buttons: the first has no Previous)
+  $("moment-prev").hidden = previous === undefined;
+  $("moment-next").textContent = next === undefined ? "Back to summary ›" : "Next turning point ›";
 }
 
-/** Every move: carry on from the move on screen, one at a time. */
-export function everyMove() {
-  moments = null;
-  refresh();
-}
-
-/** Turning points only: from the move on screen if it's one, else the next one ahead. */
-export function momentsOnly() {
-  if (keyMomentsOn()) return;
-  const plies = keyMoments(withBook(reviews()));
-  if (!plies.length) return;
-  const now = currentPly();
-  if (plies.includes(now)) {
-    moments = plies;
+/** The review bar's button: from the turning points to the full review (every
+ *  move, from the one on screen), or back into the turning points. */
+export function switchReview() {
+  if (keyMomentsOn()) {
+    moments = null;
     refresh();
     return;
   }
-  showMoment(plies.find((ply) => ply > now) ?? plies[plies.length - 1], plies);
+  const plies = keyMoments(withBook(reviews()));
+  if (!plies.length) return;
+  const now = currentPly();
+  showMoment(plies.find((ply) => ply >= now) ?? plies[0], plies);
 }

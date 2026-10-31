@@ -35,6 +35,7 @@ const LOOKS: Record<string, Look> = {
   stone: { dark: false, card: "#f2eeea" },
   rose: { dark: false, card: "#fff8f6" },
   ember: { dark: true, card: "#1f2229" },
+  classicdark: { dark: true, card: "#25272b" },
   violet: { dark: true, card: "#2c2f55" },
   forest: { dark: true, card: "#1d2b24" },
 };

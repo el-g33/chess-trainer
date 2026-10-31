@@ -1390,7 +1390,8 @@ cg-board square.check {
   position: fixed;
   z-index: 901;
   border-radius: 8px;
-  box-shadow: 0 0 0 3px var(--accent), 0 0 0 9999px rgba(0, 0, 0, 0.45);
+  /* a glowing outline round the part explained, the rest well dimmed */
+  box-shadow: 0 0 0 3px var(--accent), 0 0 18px 6px color-mix(in srgb, var(--accent) 60%, transparent), 0 0 0 9999px rgba(0, 0, 0, 0.7);
   pointer-events: none;
   transition: all 0.2s ease;
 }
@@ -1402,17 +1403,35 @@ cg-board square.check {
   padding: 14px 16px 12px;
   background: var(--card);
   color: var(--text);
-  border-radius: 10px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+}
+
+/* The coach, popping up on the card's top edge */
+.tour-coach {
+  position: absolute;
+  top: -24px;
+  left: 14px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px var(--card);
+}
+
+.tour-coach svg {
+  display: block;
 }
 
 .tour-count {
+  margin-left: 52px; /* beside the coach */
   color: var(--muted);
   font-size: 0.8rem;
 }
 
 .tour-title {
-  margin: 4px 0 6px;
+  margin: 8px 0 6px;
+  color: var(--accent);
   font-size: 1.05rem;
 }
 

@@ -67,6 +67,7 @@ export const planModeBox = $<HTMLSelectElement>("plan-mode");
 export const reviewDepthBox = $<HTMLSelectElement>("review-depth");
 export const arrowStyleBox = $<HTMLSelectElement>("arrow-style");
 export const coachSpeedBox = $<HTMLSelectElement>("coach-speed");
+export const coachFocusBox = $<HTMLSelectElement>("coach-focus"); // fundamentals only, everything, or by level
 export const planModeRow = $("plan-mode-row");
 // « ‹ › » - above the move list, and (on phones) right under the board
 export const navButtons = [...document.querySelectorAll<HTMLButtonElement>("button[data-nav]")];

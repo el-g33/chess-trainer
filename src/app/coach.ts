@@ -45,10 +45,11 @@ import { arrowEnd, refresh } from "./draw";
 import {
   gameKey, jumpToGrade, onReviewGame, startReview, stopPreparing, watching, withBook, restoreAnalysis,
 } from "./matches";
-import { keyMomentsCard } from "./keyMoments";
+import { HABITS, fundamentalCounts, fundamentalEvents, fundamentalsOn } from "./fundamentals";
+import { keyMomentsCard, turningPlies } from "./keyMoments";
 import { analysisLineText, goTo } from "./moves";
 import {
-  cap, depthCard, drillSays, lessonNotePages, openingShortName, practiceSays, scheduleDemo, showWhatYouGet, startDemoLine,
+  cap, depthButton, drillSays, lessonNotePages, openingShortName, practiceSays, scheduleDemo, showWhatYouGet, startDemoLine,
   movePicture, practiseGameSlips,
 } from "./openingDemos";
 import { importGames, importing, importNote, reviewImported } from "./onlineGames";
@@ -627,11 +628,22 @@ export async function explainSlip(ply: number, review: Review) {
       }
     }
     if (!frames.length) add("Why", [{ position: after, shapes }], ["It's a small slip."]);
+    // With the fundamentals: the habit that would have saved it
+    const basics = fundamentalsOn() && !theirSlip ? fundamentalEvents(reviews()).find((event) => event.ply === ply) : undefined;
+    const habit = basics && HABITS[basics.kind];
+    if (habit) add("The habit", [{ position: before, shapes: [] }], [habit]);
     // The better move: yours always; theirs only for a big slip that wasn't a simple take
     const best = parseSan(before, review.bestSan!) as NormalMove | undefined;
     if (!best || (theirSlip && (simple || review.rating !== "Blunder"))) return;
-    const heading = viewer === null ? "The better move" : theirSlip ? "Their better option" : "Your better option";
     const afterBest = positionAfter(before, best);
+    if (basics) {
+      // the simplest safe idea, not the engine's best line
+      const loose = basics.kind === "hung" && basics.role ? `Keep your ${basics.role} safe: move it away, or defend it. ` : "";
+      add("The safe choice", [{ position: afterBest, shapes: movePicture(before, afterBest, best, mine, viewer) }],
+        [loose + whyBetter(before, after, best, reply, viewer)]);
+      return;
+    }
+    const heading = viewer === null ? "The better move" : theirSlip ? "Their better option" : "Your better option";
     add(heading, [{ position: afterBest, shapes: movePicture(before, afterBest, best, mine, viewer) }], [whyBetter(before, after, best, reply, viewer)]);
     if (simple) return; // (nothing more to see after a simple take)
     // How it goes on: the better move's line, from their reply
@@ -1204,6 +1216,7 @@ export function showStyleAlternative(position: Chess, pv: NormalMove[], style: S
 export function drawMoveStrip(list: (Review | undefined)[], info: OpeningInfo[]) {
   const strip = $("move-strip");
   const current = currentPly();
+  const turning = turningPlies();
   strip.replaceChildren(...game.moves.map((played, i) => {
     const ply = i + 1;
     const position = game.positionAt(i);
@@ -1216,6 +1229,7 @@ export function drawMoveStrip(list: (Review | undefined)[], info: OpeningInfo[])
     button.append(`${played.san}${mark && !played.san.endsWith("#") ? mark : ""}`);
     button.className = ply === current ? "cur" : "";
     if (mark !== undefined) button.classList.add(ratingClass(review!.rating));
+    if (turning.includes(ply)) button.classList.add("turning"); // underlined while going through them
     button.addEventListener("click", () => goTo(ply));
     return button;
   }));
@@ -1262,7 +1276,8 @@ export function tabMessage(box: HTMLElement, text: string, button?: CoachButton)
   box.append(say);
 }
 
-let ratingInfo = false; // the rating's explanation, shown with its i
+let ratingInfo = false; // the level's explanation, shown with its i
+let statsDetails = false; // the statistics beyond overall accuracy (Details)
 
 export function drawStats() {
   const box = $("stats");
@@ -1321,68 +1336,86 @@ export function drawStats() {
     }
     return cell;
   };
-  row("", sides.map((c) => element("span", "stats-cell stats-name", name(c))), "head");
+  // The head: deep review (top left, beside the players), then the overall accuracy;
+  // Details opens the rest
+  row(reviewing ? depthButton(pending) : "", sides.map((c) => element("span", "stats-cell stats-name", name(c))), "head");
   row("Accuracy", sides.map((c) => percent(overall[c], true)));
-  row("Opening", sides.map((c) => percent(phases.opening[c])));
-  row("Middlegame", sides.map((c) => percent(phases.middlegame[c])));
-  row("Endgame", sides.map((c) => percent(phases.endgame[c])));
-  const ratingLabel = element("span", "stats-label", "Played like");
-  const info = element("button", "stats-tag stats-info", "ⓘ");
-  info.setAttribute("aria-label", "About this");
-  info.type = "button";
-  info.setAttribute("aria-expanded", String(ratingInfo));
-  info.addEventListener("click", () => {
-    ratingInfo = !ratingInfo;
-    drawStats();
-  });
-  ratingLabel.append(info);
-  row(ratingLabel, sides.map((c) => {
-    const cell = element("span", "stats-cell");
-    cell.append(element("span", "rating-block", pending ? "??" : levels[c] ?? "-"));
-    return cell;
-  }), "rating-row");
-  if (ratingInfo) {
-    const note = element("p", "stats-note stats-info-note",
-      "From how much each side gave away, move by move: Beginner, Improver, Club player, Strong club or Expert. " +
-      "One game is a small sample, so expect it to vary.");
-    table.append(note);
-  }
-
-  // More: how many moves got each grade
-  const toggle = element("button", "stats-more", statsMore ? "More ▴" : "More ▾");
-  toggle.addEventListener("click", () => {
-    set.statsMore(!statsMore);
-    drawStats();
-  });
-  row(toggle, ["", ""]);
-  if (statsMore) {
-    const counts: Record<Color, Record<string, number>> = { white: {}, black: {} };
-    const graded = withBook(list);
-    graded.forEach((review, i) => {
-      if (!review) return;
-      const colour = game.moverOf(i + 1);
-      counts[colour][review.rating] = (counts[colour][review.rating] ?? 0) + 1;
+  if (statsDetails) {
+    row("Opening", sides.map((c) => percent(phases.opening[c])));
+    row("Middlegame", sides.map((c) => percent(phases.middlegame[c])));
+    row("Endgame", sides.map((c) => percent(phases.endgame[c])));
+    const ratingLabel = element("span", "stats-label", "Played like");
+    const info = element("button", "stats-tag stats-info", "ⓘ");
+    info.setAttribute("aria-label", "About this");
+    info.type = "button";
+    info.setAttribute("aria-expanded", String(ratingInfo));
+    info.addEventListener("click", () => {
+      ratingInfo = !ratingInfo;
+      drawStats();
     });
-    for (const grade of GRADES) {
-      const label = element("span", "stats-label stats-grade");
-      label.append(element("span", `grade-dot ${ratingClass(grade)}`), element("span", "", ratingName(grade)));
-      row(label, sides.map((c) => {
-        const cell = element("span", "stats-cell");
-        const chip = element("span", `count-chip ${ratingClass(grade)}`, pending ? "??" : String(counts[c][grade] ?? 0));
-        if (!pending && counts[c][grade]) {
-          // tap: the board at the first such move, illustrated; tap again for the next
-          chip.classList.add("tappable");
-          chip.setAttribute("role", "button");
-          chip.tabIndex = 0;
-          chip.addEventListener("click", () => jumpToGrade(c, grade, graded));
-        }
-        cell.append(chip);
-        return cell;
-      }));
+    ratingLabel.append(info);
+    row(ratingLabel, sides.map((c) => {
+      const cell = element("span", "stats-cell");
+      cell.append(element("span", "rating-block", pending ? "??" : levels[c] ?? "-"));
+      return cell;
+    }), "rating-row");
+    if (ratingInfo) {
+      const note = element("p", "stats-note stats-info-note",
+        "From how much each side gave away, move by move: Beginner, Improver, Club player, Strong club or Expert. " +
+        "One game is a small sample, so expect it to vary.");
+      table.append(note);
+    }
+    // At beginner levels: what decides the game there, counted for each side
+    if (fundamentalsOn()) {
+      const counts = fundamentalCounts(list);
+      const plain = (cells: string[]) => cells.map((cell) => element("span", "stats-cell", pending ? "??" : cell));
+      row("Pieces left loose", plain(sides.map((c) => String(counts[c].hung))));
+      row("Free pieces taken", plain(sides.map((c) => `${counts[c].took} of ${counts[c].took + counts[c].left}`)));
+      row("Checkmates missed", plain(sides.map((c) => String(counts[c].matesMissed))));
+      row("Safe moves in a row", plain(sides.map((c) => String(counts[c].safeRun))));
+    }
+    // Every grade counted (a further tap)
+    const grades = element("button", "stats-more", statsMore ? "Every grade ▴" : "Every grade ▾");
+    grades.addEventListener("click", () => {
+      set.statsMore(!statsMore);
+      drawStats();
+    });
+    row(grades, ["", ""]);
+    if (statsMore) {
+      const counts: Record<Color, Record<string, number>> = { white: {}, black: {} };
+      const graded = withBook(list);
+      graded.forEach((review, i) => {
+        if (!review) return;
+        const colour = game.moverOf(i + 1);
+        counts[colour][review.rating] = (counts[colour][review.rating] ?? 0) + 1;
+      });
+      for (const grade of GRADES) {
+        const label = element("span", "stats-label stats-grade");
+        label.append(element("span", `grade-dot ${ratingClass(grade)}`), element("span", "", ratingName(grade)));
+        row(label, sides.map((c) => {
+          const cell = element("span", "stats-cell");
+          const chip = element("span", `count-chip ${ratingClass(grade)}`, pending ? "??" : String(counts[c][grade] ?? 0));
+          if (!pending && counts[c][grade]) {
+            // tap: the board at the first such move, illustrated; tap again for the next
+            chip.classList.add("tappable");
+            chip.setAttribute("role", "button");
+            chip.tabIndex = 0;
+            chip.addEventListener("click", () => jumpToGrade(c, grade, graded));
+          }
+          cell.append(chip);
+          return cell;
+        }));
+      }
     }
   }
+  const details = element("button", "stats-more stats-details", statsDetails ? "Details ▴" : "Details ▾");
+  details.addEventListener("click", () => {
+    statsDetails = !statsDetails;
+    drawStats();
+  });
+  row(details, ["", ""]);
   card.append(table);
-  if (statsMore) {
+  if (statsDetails && statsMore) {
     // Where each phase began, so the scores make sense
     const division = divide(positions);
     const moveNumber = (ply: number) => positions[ply].fullmoves;
@@ -1394,9 +1427,7 @@ export function drawStats() {
   }
   // the game's turning points, and the two ways in: just those, or every move
   if (reviewing) box.append(keyMomentsCard(withBook(list), startReview));
-
   box.append(card);
-  if (reviewing) box.append(depthCard(pending));
   // Save this game: as a PGN, for elsewhere (Lichess, chess.com, a friend)
   const save = element("button", "link-button stats-save", "Save this game (PGN)");
   save.type = "button";

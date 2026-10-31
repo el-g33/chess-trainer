@@ -11,6 +11,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.18",
+    items: [
+      { icon: "target", title: "Coaching for your level", text: "At beginner level the coach focuses on what decides those games: pieces left loose, free pieces taken or missed, and checkmates, with the habit that would have saved each slip. Choose it in Settings, under Coach me on." },
+      { icon: "flag", title: "Real turning points", text: "Only moves that swung the game for a reason you can see on the board. Jump between them with the big buttons, and step through the moves around each one." },
+      { icon: "chart", title: "Tidier statistics", text: "Overall accuracy first, with Details for the rest, and Look deeper tucked in the corner." },
+      { icon: "eye", title: "A streamlined look", text: "A new Classic dark theme, and tours the coach presents himself, for a better experience." },
+    ],
+  },
+  {
     version: "3.17",
     items: [
       { icon: "chart", title: "Played like", text: "Statistics now say the level each side played at, from Beginner to Expert, instead of a rating number." },

@@ -13,6 +13,7 @@ const THEME_LOOKS: Record<string, { bg: string; card: string; accent: string }> 
   stone: { bg: "#9a908a", card: "#f2eeea", accent: "#e8743b" },
   classic: { bg: "#fafafa", card: "#ffffff", accent: "#005fb8" },
   ember: { bg: "#16181e", card: "#1f2229", accent: "#ff5a36" },
+  classicdark: { bg: "#1c1d20", card: "#25272b", accent: "#4d9ef0" },
   violet: { bg: "#33365e", card: "#3f4277", accent: "#5de0e6" },
   forest: { bg: "#1d2b24", card: "#26372e", accent: "#d4a83a" },
   rose: { bg: "#e8d5d2", card: "#fff8f6", accent: "#b0285f" },

@@ -12,7 +12,7 @@ import { SOUND_STYLES, type SoundStyle, play, setSound, soundForMove } from "../
 import { setTypeSpeed } from "../talk";
 
 import {
-  $, arrowStyleBox, clockTickBox, coachSpeedBox, colourBox, evalCheck, levelBox, menu, menuCard, myOpeningBox,
+  $, arrowStyleBox, clockTickBox, coachFocusBox, coachSpeedBox, colourBox, evalCheck, levelBox, menu, menuCard, myOpeningBox,
   opponentBox, piecesBox, planModeBox, playerNameBox, lichessUserBox, chesscomUserBox, rateMovesBox, reviewDepthBox,
   sfOpeningBox, soundOn,
   soundStyleBox, soundVolume, tcIncrement, tcMinutes, themeBox, timeControlBox, uiThemeBox,
@@ -63,6 +63,7 @@ export function buildMenu() {
   reviewDepthBox.value = saved.reviewDepth === "deep" ? "deep" : "quick";
   arrowStyleBox.value = saved.arrowStyle === "colourblind" ? "colourblind" : "standard";
   coachSpeedBox.value = ["50", "33", "16", "0"].includes(saved.coachSpeed ?? "") ? saved.coachSpeed! : "33";
+  coachFocusBox.value = ["auto", "fundamentals", "everything"].includes(saved.coachFocus ?? "") ? saved.coachFocus! : "auto";
   if (PUZZLE_LEVELS.some(([v]) => v === saved.puzzleLevel)) set.puzzleLevel(saved.puzzleLevel as PuzzleLevel);
   applyArrowStyle();
   setTypeSpeed(Number(coachSpeedBox.value));
@@ -88,7 +89,7 @@ export function buildMenu() {
   if (uiThemeBox.selectedIndex < 0) uiThemeBox.value = DEFAULT_THEME;
   if (!saved.uiTheme) themeBox.value = THEME_BOARDS[DEFAULT_THEME];
   for (const [value, label] of Object.entries(PIECE_CHOICES)) piecesBox.add(new Option(label, value));
-  piecesBox.value = saved.pieces && PIECE_CHOICES[saved.pieces] ? saved.pieces : uiThemeBox.value;
+  piecesBox.value = saved.pieces && PIECE_CHOICES[saved.pieces] ? saved.pieces : uiThemeBox.value === "classicdark" ? "classic" : uiThemeBox.value;
   if (piecesBox.selectedIndex < 0) piecesBox.selectedIndex = 0;
   setPalette(piecesBox.value);
   applyUiTheme();
@@ -122,10 +123,10 @@ export function moveSound(san: string, mover: Color) {
 // Each look comes with a board that suits it (the Board box can still change it)
 export const DEFAULT_THEME = "stone";
 export const THEME_BOARDS: Record<string, string> = {
-  classic: "wood", ember: "slate", stone: "walnut", violet: "lavender", forest: "green", rose: "rose",
+  classic: "wood", classicdark: "wood", ember: "slate", stone: "walnut", violet: "lavender", forest: "green", rose: "rose",
 };
 export const THEME_BARS: Record<string, string> = {
-  classic: "#fafafa", ember: "#16181e", stone: "#9a908a", violet: "#33365e", forest: "#1d2b24", rose: "#e8d5d2",
+  classic: "#fafafa", classicdark: "#1c1d20", ember: "#16181e", stone: "#9a908a", violet: "#33365e", forest: "#1d2b24", rose: "#e8d5d2",
 };
 
 /** The colours of the whole page: Classic, Midnight ember, Warm stone or Violet glass. */

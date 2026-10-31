@@ -27,7 +27,6 @@ import { readPgn, today } from "../pgn";
 import {
   type GamePhase, PROGRESS_MIN, SLIP_THEMES, SLIP_WORDS, type SlipKind, picture, saveSummary,
 } from "../progress";
-import { withRatingNames } from "../ratingNames";
 import { type Review, fenOf, winningChance } from "../review";
 import { play } from "../sounds";
 
@@ -1340,70 +1339,27 @@ export function checkDeeper(list: (Review | undefined)[]) {
   saveGameSummary(graded);
 }
 
-let depthOpen = false; // the deep review's changes (or the quick review's note), shown under the line
-
-/** The statistics: which review this is, as one slim line - Look deeper, its
- *  progress while it runs, then what changed. */
-export function depthCard(pending: boolean): HTMLElement {
-  const box = element("div", "depth-box");
-  const line = element("div", "depth-line");
-  const deep = analyser.depth === "deep";
-  const toggle = (label: string) => {
-    const button = element("button", "depth-go", label);
-    button.type = "button";
-    button.setAttribute("aria-expanded", String(depthOpen));
-    button.addEventListener("click", () => {
-      depthOpen = !depthOpen;
-      refresh();
-    });
-    return button;
-  };
-  let note = "";
+/** Deep review, as a small button in the statistics' top-left corner: Look
+ *  deeper, its progress while it runs (tap to stop), then Deep with a tick. */
+export function depthButton(pending: boolean): HTMLElement {
+  const button = element("button", "depth-button", "");
+  button.type = "button";
   if (deepening && !deepening.done) {
     const { done, total } = analyser.progress();
-    line.append(element("span", "depth-which", "Looking deeper"));
-    const track = element("div", "depth-track");
-    const fill = element("div", "depth-fill");
-    fill.style.width = `${Math.round(100 * Math.min(1, total ? done / total : 0))}%`;
-    track.append(fill);
-    const stop = element("button", "round soft depth-stop", "");
-    stop.type = "button";
-    stop.innerHTML = icon("close", 14);
-    stop.title = "Stop and keep the quick review";
-    stop.setAttribute("aria-label", "Stop and keep the quick review");
-    stop.addEventListener("click", stopDeeper);
-    line.append(track, element("span", "depth-count", `${Math.min(done, total)} / ${total}`), stop);
-  } else if (deep) {
-    const which = element("span", "depth-which", "Deep review ");
-    if (!pending) which.append(element("span", "depth-done", "✓"));
-    line.append(which);
-    const changes = deepening?.done ? deepening.changes : null;
-    // the changes that matter in full; Good / Excellent / Best swapping places just counted
-    const SMALL = /^\S+ (Best|Excellent|Good|Book|Forced) → (Best|Excellent|Good|Book|Forced)$/;
-    const big = (changes ?? []).filter((c) => !SMALL.test(c));
-    const small = (changes ?? []).length - big.length;
-    const smallWords = small ? `${small} small one${small === 1 ? "" : "s"} (Solid, Strong and Top move swapping places)` : "";
-    if (changes?.length) {
-      line.append(toggle(`${changes.length} rating${changes.length === 1 ? "" : "s"} changed ${depthOpen ? "▴" : "›"}`));
-      note = big.length ? `What changed: ${withRatingNames(big.join(", "))}.${small ? ` Also ${smallWords}.` : ""}` : `${cap(smallWords)}. None of the slips changed.`;
-    } else {
-      line.append(element("span", "depth-count", changes ? "no ratings changed" : "every move checked longer"));
-    }
+    button.textContent = `Deeper ${Math.round(100 * Math.min(1, total ? done / total : 0))}%`;
+    button.classList.add("running");
+    button.title = "Stop and keep the quick review";
+    button.addEventListener("click", stopDeeper);
+  } else if (analyser.depth === "deep") {
+    button.textContent = pending ? "Deep" : "Deep ✓";
+    button.classList.add("done");
+    button.disabled = true;
   } else {
-    const info = toggle("ⓘ");
-    info.classList.add("depth-info");
-    info.setAttribute("aria-label", "About the quick review");
-    line.append(element("span", "depth-which", "Quick review"), info);
-    const button = element("button", "depth-go", "Look deeper ›");
-    button.type = "button";
-    button.title = "1-3 minutes";
+    button.textContent = "Look deeper";
+    button.title = "Every move checked again, for longer (1-3 minutes)";
     button.addEventListener("click", lookDeeper);
-    line.append(button);
-    note = "Your phone's Stockfish, at a quick depth. A longer look (1-3 minutes) may rate a few moves a step differently.";
   }
-  box.append(line);
-  if (depthOpen && note) box.append(element("p", "stats-note depth-note", note));
-  return box;
+  return button;
 }
 
 /** Back to Training, on the tab you came from. */
