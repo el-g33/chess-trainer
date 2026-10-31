@@ -15,8 +15,8 @@
   --last-move: rgba(246, 226, 122, 0.55);
   --selected: rgba(246, 226, 122, 0.75);
   --dot: rgba(58, 58, 58, 0.28);
-  --coord-on-light: #8c5e3c;
-  --coord-on-dark: #e8d3b4;
+  --coord-on-light: #64422a;
+  --coord-on-dark: #d1b58c;
   --on-accent: #ffffff; /* text on accent-coloured buttons */
   --disabled: #a0a0a0;
   --line-strong: #cfcfcf;
@@ -1100,8 +1100,8 @@ cg-board {
 #board.grey {
   --last-move: rgba(246, 226, 122, 0.6);
   --selected: rgba(246, 226, 122, 0.8);
-  --coord-on-light: #7d8287;
-  --coord-on-dark: #f4f4f4;
+  --coord-on-light: #686c6f;
+  --coord-on-dark: #eeeeee;
 }
 
 /* Flat squares: light a8 at the top-left, dark a1 at the bottom-left */
@@ -1238,16 +1238,28 @@ cg-board square.check {
   accent-color: var(--accent);
 }
 
-/* Coordinates in the corners, in the colour that shows on each square */
+/* Coordinates in the corners, each in the opposite square's colour (the
+   dark square's pushed a little darker, so it stands out on the light ones) */
 .cg-wrap coords {
   font-size: clamp(9px, 1.6vmin, 13px);
   font-weight: 600;
 }
 
+/* Numbers at the top-left of each square, kept inside the board
+   (chessground's default lifts the top one past the board's edge) */
+.cg-wrap coords.ranks {
+  top: 3px;
+}
+
+.cg-wrap coords.ranks coord {
+  transform: none;
+}
+
 /* Letters at the bottom-right of each square, kept inside the board
-   (chessground's default shifts them right, past the board's edge) */
+   (chessground's default shifts them right and down, past the board's edge) */
 .cg-wrap coords.files {
   left: 0;
+  bottom: 1px;
 }
 
 .cg-wrap coords.files coord {
@@ -1255,16 +1267,19 @@ cg-board square.check {
   padding-right: 4px;
 }
 
-.cg-wrap coords.ranks coord,
-.cg-wrap coords.files coord {
+/* The bottom-left square is dark from either side (a1 or h8). From White's
+   side the first coordinate is there, so every second one is on a light
+   square; from Black's side the list is reversed, so it's the other way round */
+.cg-wrap coords coord:nth-child(odd),
+.cg-wrap coords.black coord:nth-child(even) {
   color: var(--coord-on-dark);
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.45); /* light letters on mid-tone squares */
 }
 
-/* The bottom-left square is dark from either side (a1 or h8), and both
-   rows of coordinates start there, so every second one is on a light square */
-.cg-wrap coords.ranks coord:nth-child(even),
-.cg-wrap coords.files coord:nth-child(even) {
+.cg-wrap coords coord:nth-child(even),
+.cg-wrap coords.black coord:nth-child(odd) {
   color: var(--coord-on-light);
+  text-shadow: none;
 }
 
 /* -- Opening demo -------------------------------------------------------------- */

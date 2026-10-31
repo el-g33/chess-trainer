@@ -11,6 +11,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.10",
+    items: [
+      { icon: "back", title: "Back goes where you came from", text: "Leaving a lesson, puzzles or a game takes you back to the screen you started it from, not all the way Home." },
+      { icon: "book", title: "Castled means castled", text: "The coach no longer calls your king castled when it has only walked over and its rook is still stuck in the corner." },
+      { icon: "eye", title: "A streamlined look", text: "Clearer board coordinates, from either side of the board, for a better experience." },
+    ],
+  },
+  {
     version: "3.9",
     items: [
       { icon: "back", title: "A back button everywhere", text: "One round button, top left, on every screen. In a review it takes you from the board back to the summary." },

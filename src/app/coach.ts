@@ -1681,10 +1681,12 @@ export function newWhat(): string {
   }
 }
 
-/** New game (or match, review...): the setup screen of the mode you're in. */
-export async function onNewGame() {
-  if (inProgress() && !(await message(`New ${newWhat()}?`, "Are you sure? This game will end.", true))) return;
+/** New game (or match, review...): the setup screen of the mode you're in.
+ *  Back uses it too, asking "Leave this game?" instead. */
+export async function onNewGame(ask = `New ${newWhat()}?`) {
+  if (inProgress() && !(await message(ask, "Are you sure? This game will end.", true))) return;
   const learning = demo ? demo.demo.opening : drill ? drill.demo.opening : null;
+  const inLesson = lesson;
   const screen: HomeChoice | null = gameOrigin === "learn" ? "train" : gameOrigin;
   if (screen === "train") $("lesson-list").hidden = true;
   endGame();
@@ -1700,6 +1702,7 @@ export async function onNewGame() {
   }
   showScreen(screen);
   drawTrainScreen();
+  if (inLesson) showLessonList(); // back to the lessons you picked it from
 }
 
 // -- Updates: check for a new version, and restart into it -------------------------

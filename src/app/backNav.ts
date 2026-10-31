@@ -3,7 +3,7 @@
 // view you came from, then the menu screen's own back - and only at Home does
 // it leave the app. One extra history entry catches each back press.
 
-import { closeOverlay, closeStepper, onHome, overlayOpen } from "./coach";
+import { closeOverlay, closeStepper, onNewGame, overlayOpen } from "./coach";
 import { $, menu } from "./dom";
 import { refresh } from "./draw";
 import { analysis, currentView, menuOpen, reviewing, set, stepper, viewTrail } from "./state";
@@ -38,12 +38,13 @@ export function stepBack(): boolean {
     back.click();
     return true;
   }
-  // in a game: the view you came from; a review's board goes back to its summary; else Home (which asks first if a game is on)
+  // in a game: the view you came from; a review's board goes back to its summary;
+  // else the screen it was started from, as New game does (asking first if a game is on)
   const previous = viewTrail.pop() ?? (reviewing && currentView === "board" ? "stats" : undefined);
   if (previous) {
     set.viewBack(previous);
     refresh();
-  } else void onHome();
+  } else void onNewGame("Leave this game?");
   return true;
 }
 

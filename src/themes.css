@@ -263,8 +263,8 @@
 #board.slate {
   --last-move: rgba(255, 90, 54, 0.45);
   --selected: rgba(255, 90, 54, 0.6);
-  --coord-on-light: #3b4150;
-  --coord-on-dark: #d8dce6;
+  --coord-on-light: #333842;
+  --coord-on-dark: #9aa3b5;
 }
 
 .slate cg-board {
@@ -274,8 +274,8 @@
 #board.walnut {
   --last-move: rgba(232, 116, 59, 0.4);
   --selected: rgba(232, 116, 59, 0.55);
-  --coord-on-light: #a9805e;
-  --coord-on-dark: #f2e9dc;
+  --coord-on-light: #7d5f46;
+  --coord-on-dark: #ede3d3;
 }
 
 .walnut cg-board {
@@ -285,8 +285,8 @@
 #board.lavender {
   --last-move: rgba(93, 224, 230, 0.5);
   --selected: rgba(93, 224, 230, 0.65);
-  --coord-on-light: #6f69b8;
-  --coord-on-dark: #ecebfb;
+  --coord-on-light: #56527c;
+  --coord-on-dark: #cfcbf0;
 }
 
 .lavender cg-board {
@@ -296,7 +296,7 @@
 #board.green {
   --last-move: rgba(212, 168, 58, 0.5);
   --selected: rgba(212, 168, 58, 0.65);
-  --coord-on-light: #6f8f55;
+  --coord-on-light: #546d41;
   --coord-on-dark: #e9e4c8;
 }
 
@@ -307,8 +307,8 @@
 #board.rose {
   --last-move: rgba(176, 40, 95, 0.3);
   --selected: rgba(176, 40, 95, 0.45);
-  --coord-on-light: #b07a7e;
-  --coord-on-dark: #fbefec;
+  --coord-on-light: #855e61;
+  --coord-on-dark: #f7e6e2;
 }
 
 .rose cg-board {

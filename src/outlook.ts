@@ -195,11 +195,17 @@ export async function whatYouGet(engine: CoachEngine, position: Chess, you: Colo
   if (chain && chain.length >= 3) page("Your position", "Your pawns form a strong chain, each one guarding the next.", [], chain.map((s) => [s, "good"]));
   const king = position.board.kingOf(you);
   const homeRank = you === "white" ? 0 : 7;
-  const castled = king !== undefined && rank(king) === homeRank && (file(king) >= 6 || file(king) <= 2);
+  const tucked = king !== undefined && rank(king) === homeRank && (file(king) >= 6 || file(king) <= 2);
+  // a king that walked to g8 (say, after taking on f7) has its rook still stuck in the corner beside it
+  const cornerRook = tucked && [...position.board.pieces(you, "rook")].some((sq) =>
+    rank(sq) === homeRank && (file(king!) >= 6 ? file(sq) > file(king!) : file(sq) < file(king!)));
+  const canCastle = position.castles.rook[you].a !== undefined || position.castles.rook[you].h !== undefined;
   const next = yours[0];
   const castlesNext = next?.step.startsWith("castle");
-  if (castled && king !== undefined) page("Your position", "Your king is safely castled.", [], [[king, "good"]]);
-  else if (!castlesNext) page("Your position", "Castle soon, to get your king safe.");
+  if (tucked && !cornerRook) page("Your position", "Your king is safely castled.", [], [[king!, "good"]]);
+  else if (tucked) page("Your position", "Your king is tucked away but hasn't castled: the rook beside it is stuck in the corner.", [], [[king!, "good"]]);
+  else if (canCastle && !castlesNext) page("Your position", "Castle soon, to get your king safe.");
+  else if (!canCastle && king !== undefined) page("Your position", "Your king can't castle any more, so keep it well covered.");
 
   // Your plan: the next step (its arrow, then the piece's range from there), an attack, a knight square
   if (next) {
