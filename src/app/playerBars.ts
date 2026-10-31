@@ -322,7 +322,8 @@ export const MOVE_MARKS: Record<string, string> = {
 };
 
 export function drawReview(reviews: (Review | undefined)[], info: OpeningInfo[]) {
-  if (mode !== "practice") return;
+  // (nothing to draw while its panel is hidden: the old review panel, kept for now)
+  if (mode !== "practice" || reviewBox.closest("[hidden]")) return;
   reviewBox.replaceChildren();
   const paragraph = (text: string, className = "") => {
     const p = document.createElement("p");

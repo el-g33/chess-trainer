@@ -43,7 +43,7 @@ function miniBoard(board: string, n: number, className: string): HTMLElement {
   box.className = className;
   if (board === "wood") {
     box.classList.add("lp-wood");
-    box.style.backgroundImage = `url("${import.meta.env.BASE_URL}boards/wood.png")`;
+    box.style.backgroundImage = `url("${import.meta.env.BASE_URL}boards/wood.jpg")`;
     return box;
   }
   const [dark, light] = BOARD_LOOKS[board] ?? BOARD_LOOKS.walnut;

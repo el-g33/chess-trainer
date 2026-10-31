@@ -43,6 +43,9 @@ export type ReviewDepth = "quick" | "deep";
 
 // How many copies of Stockfish work at once: the spare cores, at most three
 const POOL = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 2) - 1));
+// Copies with nothing to do for this long are shut down, to give the phone its
+// memory back (each holds tens of MB); they start again when there's work
+const REST_AFTER_MS = 30_000;
 
 type Job =
   | { kind: "eval"; position: Chess; fens: string[] }
@@ -69,6 +72,7 @@ export class Analyser {
   private readonly poisoned = new Set<string>(); // "fen uci" of moves offering a piece that can't be taken
   private generation = 0; // goes up when the results are forgotten
   private reviewDepth: ReviewDepth = "quick";
+  private restTimer = 0;
 
   /** Called after each position Stockfish finishes. */
   constructor(private onUpdate: () => void) {}
@@ -164,6 +168,7 @@ export class Analyser {
   /** Put idle copies of Stockfish to work, while there's work for them. */
   private start() {
     while (this.peek()) {
+      window.clearTimeout(this.restTimer); // (only real work keeps the copies running)
       let engine = this.engines.find((e) => !this.busy.has(e));
       if (!engine) {
         if (this.engines.length >= POOL) break;
@@ -207,7 +212,17 @@ export class Analyser {
       }
     } finally {
       this.busy.delete(engine);
+      if (!this.busy.size) this.restSoon();
     }
+  }
+
+  /** Once every copy is idle: shut them all down after a while, unless work comes first. */
+  private restSoon() {
+    window.clearTimeout(this.restTimer);
+    this.restTimer = window.setTimeout(() => {
+      if (this.busy.size) return;
+      for (const engine of this.engines.splice(0)) engine.quit();
+    }, REST_AFTER_MS);
   }
 
   private async do(engine: Engine, job: Job) {

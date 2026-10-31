@@ -1094,7 +1094,7 @@ cg-board {
 }
 
 .wood cg-board {
-  background-image: url("/boards/wood.png");
+  background-image: url("/boards/wood.jpg");
   background-size: cover;
 }
 

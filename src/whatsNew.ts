@@ -11,6 +11,12 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.14",
+    items: [
+      { icon: "chart", title: "Lighter on your phone", text: "Opens faster, gives memory back when the coach isn't thinking, and the wood board is a quarter of the size." },
+    ],
+  },
+  {
     version: "3.13",
     items: [
       { icon: "upload", title: "Lighter updates", text: "From now on, an update downloads only what changed, not the whole app, so it uses far less of your data." },

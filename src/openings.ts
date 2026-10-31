@@ -58,6 +58,14 @@ export interface OpeningInfo {
   notes: string[]; // transpositions, opening changes
 }
 
+/** One move of a line as it went in: its book entry, and the position after it. */
+interface Step {
+  token: string;
+  entry: BookMove;
+  after: Chess;
+  key: string; // epdOf(after)
+}
+
 export class OpeningBook {
   readonly named = new Map<string, Named>(); // position -> (eco, name, usual moves)
   readonly continuations = new Map<string, Map<string, BookMove>>(); // position -> {move: opening names}
@@ -72,35 +80,48 @@ export class OpeningBook {
         return response.text();
       }),
     );
+    let trail: Step[] = [];
     for (const text of files) {
+      await new Promise((resolve) => setTimeout(resolve)); // a breath between files, so taps aren't held up
       const [header, ...rows] = text.split(/\r?\n/);
       const columns = header.split("\t");
       const [eco, name, pgn] = ["eco", "name", "pgn"].map((c) => columns.indexOf(c));
       for (const row of rows) {
         if (!row.trim()) continue;
         const cells = row.split("\t");
-        book.addLine(cells[eco], cells[name], cells[pgn]);
+        trail = book.addLine(cells[eco], cells[name], cells[pgn], trail);
       }
     }
     return book;
   }
 
-  private addLine(eco: string, name: string, pgn: string) {
-    const board = Chess.default();
-    for (const token of pgn.split(/\s+/)) {
-      if (!token || /^\d/.test(token)) continue; // move numbers like "1." or "3..."
+  /** Adds one line. The lines come sorted, so most begin with the line before's
+   *  moves: those are taken from `before` rather than played again (playing
+   *  them was most of the work at start-up). Returns this line's steps. */
+  private addLine(eco: string, name: string, pgn: string, before: Step[]): Step[] {
+    const tokens = pgn.split(/\s+/).filter((token) => token && !/^\d/.test(token)); // not move numbers like "1." or "3..."
+    let same = 0;
+    while (same < tokens.length && same < before.length && before[same].token === tokens[same]) same++;
+    const steps = before.slice(0, same);
+    for (const step of steps) step.entry.names.add(name);
+    let board = same ? steps[same - 1].after : Chess.default();
+    let key = same ? steps[same - 1].key : epdOf(board);
+    for (const token of tokens.slice(same)) {
       const move = parseSan(board, token) as NormalMove | undefined;
       if (!move) throw new Error(`Bad move ${token} in ${name}`);
-      const key = epdOf(board);
       let moves = this.continuations.get(key);
       if (!moves) this.continuations.set(key, (moves = new Map()));
       const uci = makeUci(move);
       let entry = moves.get(uci);
       if (!entry) moves.set(uci, (entry = { move, names: new Set() }));
       entry.names.add(name);
+      board = board.clone(); // (the steps keep their boards for the next line)
       board.play(move);
+      key = epdOf(board);
+      steps.push({ token, entry, after: board, key });
     }
-    this.named.set(epdOf(board), [eco, name, pgn]);
+    this.named.set(key, [eco, name, pgn]);
+    return steps;
   }
 
   /** (eco, name, usual moves) if this exact position has a name. */
