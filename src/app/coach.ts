@@ -1154,8 +1154,10 @@ export async function openStrategy() {
       positions = plan.positions.slice(0, moves.length + 1);
       // spoken to the side to move, unless you've picked a side
       const viewer = listener() ?? position.turn;
-      texts = moves.map((move, i) => narrateMove(positions[i], move, viewer));
-      if (moves.length && isSacrifice(positions[0], moves[0], positions[1])) texts[0] = `A masterstroke! ${texts[0]}`;
+      // the first move says what it's for; the rest play out; the last says where it leaves you
+      texts = moves.map((move, i) => (i === 0 ? moveInWords : narrateMove)(positions[i], move, viewer));
+      if (moves.length && isSacrifice(positions[0], moves[0], positions[1])) texts[0] = `A masterstroke! ${narrateMove(positions[0], moves[0], viewer)}`;
+      if (moves.length > 1) endWith(texts, `${coachVerdict(plan.score, listener())}.`);
     }
     setBusy(false);
     // (the plan's own first move isn't an alternative to itself)
