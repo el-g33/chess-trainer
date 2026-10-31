@@ -143,7 +143,17 @@ export const brilliantShown = new Set<string>(); // positions where you asked to
 
 // Ratings and the eval bar
 export const reviewCache = new Map<string, Review>(); // finished ratings never change
-export const analyser = new Analyser(() => refresh());
+// Each finished look by Stockfish redraws the screen. During a review they come
+// many times a second, so they're gathered into one redraw every 250 ms at most
+// (the board answers your own taps and moves straight away, as before).
+const ANALYSIS_REDRAW_MS = 250;
+let redrawSoon = 0;
+export const analyser = new Analyser(() => {
+  redrawSoon ||= window.setTimeout(() => {
+    redrawSoon = 0;
+    refresh();
+  }, ANALYSIS_REDRAW_MS);
+});
 
 // Openings: the database loads in the background
 export const bookReady = OpeningBook.load().then(

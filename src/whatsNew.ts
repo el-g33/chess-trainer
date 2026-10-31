@@ -11,6 +11,13 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.13",
+    items: [
+      { icon: "upload", title: "Lighter updates", text: "From now on, an update downloads only what changed, not the whole app, so it uses far less of your data." },
+      { icon: "chart", title: "Smoother reviews", text: "While a game is being analysed, the screen updates in calm steps, which is easier on your phone's battery." },
+    ],
+  },
+  {
     version: "3.12",
     items: [
       { icon: "eye", title: "A streamlined look", text: "The coach now wears your theme's colour, and Rose quartz shows the last move in sage green, for a better experience." },
