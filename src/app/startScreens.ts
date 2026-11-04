@@ -213,6 +213,12 @@ export function setupHome() {
     drawProgress();
   });
   setupTrain();
+  for (const button of menu.querySelectorAll<HTMLButtonElement>(".train-home")) {
+    button.addEventListener("click", () => {
+      closeLessonList();
+      showScreen("welcome");
+    });
+  }
   for (const button of menu.querySelectorAll<HTMLButtonElement>(".setup-back")) {
     // (on Training with a tab's lessons open: back to that tab first)
     button.addEventListener("click", () => closeLessonList() || showScreen("welcome"));

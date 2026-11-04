@@ -11,6 +11,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.21",
+    items: [
+      { icon: "bulb", title: "Clearer explanations", text: "A warning sign now means something can really be won from you; a move that only left you worse placed gets the bulb. The coach also names pins, pawns advancing on your king, and lines opening in front of it." },
+      { icon: "home", title: "Home and back", text: "A Home button sits beside Back. On a phone, Home, your profile, Settings and the quick tour are in the menu at the top right." },
+      { icon: "eye", title: "A streamlined look", text: "On a computer, explanations appear beside the board and the moves panel is roomier, plus clearer review labels, for a better experience." },
+    ],
+  },
+  {
     version: "3.20",
     items: [
       { icon: "download", title: "Updates find you", text: "The installed app now looks for a new version whenever you come back to it, not only when it starts afresh." },

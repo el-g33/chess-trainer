@@ -10,7 +10,7 @@ import { setTypeSpeed } from "../talk";
 import { tourOpen } from "../tour";
 
 import {
-  backUp, checkForUpdates, closeOverlay, closeStepper, onNewGame, openMore, overlay,
+  backUp, checkForUpdates, closeOverlay, closeStepper, onHome, onNewGame, openMore, overlay,
   overlayOpen, restartIntoUpdate, restoreFromFile, setHistoryFromReview, stepTo, stepTyper, stripTyper,
 } from "./coach";
 import { drawLookRows } from "./lookPickers";
@@ -133,7 +133,7 @@ export function wireButtons() {
   for (const help of document.querySelectorAll<HTMLElement>(".help-button")) {
     help.addEventListener("click", (event) => {
       event.stopPropagation();
-      toggleHelp(help);
+      toggleHelp(help, help.dataset.more === "true");
     });
   }
   document.addEventListener("pointerdown", (event) => {
@@ -153,6 +153,7 @@ export function wireButtons() {
   for (const button of document.querySelectorAll(".var-prev")) button.addEventListener("click", () => demo && demo.line > 0 && loadDemoLine(demo.line - 1));
   for (const button of document.querySelectorAll(".var-next")) button.addEventListener("click", () => demo && demo.line + 1 < demo.demo.lines.length && loadDemoLine(demo.line + 1));
   $("home-button").addEventListener("click", () => void stepBack()); // one step back, like the phone's own back
+  $("go-home").addEventListener("click", () => void onHome()); // straight to the main menu (asks first in a game)
   $("check-updates").addEventListener("click", () => void checkForUpdates());
   $("data-backup").addEventListener("click", () => void backUp());
   $("data-restore").addEventListener("click", () => $<HTMLInputElement>("data-file").click());

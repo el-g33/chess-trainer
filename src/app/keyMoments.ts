@@ -112,7 +112,7 @@ export function keyMomentsCard(list: (Review | undefined)[], startReview: () => 
   const start = document.createElement("div");
   start.className = "stats-start";
   if (plies.length) start.append(startButton(`Turning points (${plies.length})`, "accent", () => showMoment(plies[0], plies)));
-  start.append(startButton(plies.length ? "Every move" : "Start the review", plies.length ? "soft" : "accent", () => {
+  start.append(startButton(plies.length ? "Full review" : "Start the review", plies.length ? "soft" : "accent", () => {
     moments = null;
     startReview();
   }));
@@ -179,7 +179,7 @@ export function drawMomentsBar() {
   $("moment-nav").hidden = !on;
   if (!show) return;
   const plies = keyMoments(withBook(reviews()));
-  $("review-label").textContent = on ? "Turning points" : "Reviewing";
+  $("review-label").textContent = on ? "Turning points" : "Full review";
   $("review-switch").textContent = on ? "Full review ›" : "Turning points ›";
   $("review-switch").hidden = !on && !plies.length;
   if (!on) return;

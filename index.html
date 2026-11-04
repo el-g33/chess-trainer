@@ -188,7 +188,7 @@
             <div class="setup-head">
               <button type="button" class="back-round setup-back" aria-label="Back" title="Back"><span data-ico="back"></span></button>
               <h2>Training</h2>
-              <span></span>
+              <button type="button" class="back-round train-home" aria-label="Home" title="Home"><span data-ico="home"></span></button>
             </div>
             <div class="tabs" role="tablist">
               <button type="button" role="tab" data-train-tab="openings">Openings</button>
@@ -237,6 +237,7 @@
     <main id="game">
       <header class="game-top">
         <button type="button" id="home-button" class="back-round" aria-label="Back" title="Back"><span data-ico="back"></span></button>
+        <button type="button" id="go-home" class="back-round home-round" aria-label="Home" title="Home"><span data-ico="home"></span></button>
         <button type="button" id="new-game" class="new-game accent"><span data-ico="plus" data-ico-size="18"></span>New<span class="ng-long">&nbsp;game</span></button>
         <nav class="view-tabs" aria-label="Views">
           <button type="button" data-view="board" class="on" aria-label="Board" title="Board"><span data-ico="board"></span></button>
@@ -246,6 +247,8 @@
         <button type="button" class="icon-button profile-button" aria-label="Your profile" title="Your profile"><span data-ico="user"></span></button>
         <button type="button" class="icon-button help-button" aria-label="Help" title="Help"><span data-ico="quiz"></span></button>
         <button type="button" class="icon-button gear-button" aria-label="Settings" title="Settings"><span data-ico="gear"></span></button>
+        <!-- On a phone: Home, profile, help and settings in one menu, so the bar fits -->
+        <button type="button" class="icon-button more-button help-button" data-more="true" aria-label="Menu" title="Menu"><span data-ico="menu"></span></button>
       </header>
 
       <section class="board-area view" data-view-panel="board">
@@ -261,7 +264,7 @@
         <div class="board-col">
         <!-- Reviewing: back to the summary, and turning points only or every move -->
         <div id="review-bar" class="whatif-bar review-bar" hidden>
-          <span class="review-label" id="review-label">Reviewing</span>
+          <span class="review-label" id="review-label">Full review</span>
           <!-- Turning points while going through every move; Full review while going through the turning points -->
           <button type="button" id="review-switch" class="review-switch"></button>
         </div>

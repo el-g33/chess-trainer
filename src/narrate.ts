@@ -80,12 +80,49 @@ export function narrateMove(before: Chess, move: NormalMove, listener: Color | n
     text += `${victim ? "," : " and"} pins ${target(after.board.get(pinned)!.role)} to the king.`;
     return text;
   }
+  // ...or it can't move without leaving their queen to be taken
+  const toQueen = pinnedTo(after, move.to, "queen");
+  if (toQueen !== undefined && !check) {
+    text += `${victim ? "," : " and"} pins ${target(after.board.get(toQueen)!.role)} to the queen.`;
+    return text;
+  }
+  // A pawn on the march: towards their king, and what it will attack next
+  if (piece.role === "pawn" && !victim && !check && !hits.length) {
+    const king = after.board.kingOf(opposite(piece.color));
+    const step = piece.color === "white" ? 8 : -8;
+    const ahead = move.to + step;
+    const storm = king !== undefined && Math.abs((king & 7) - (move.to & 7)) <= 2 &&
+      (piece.color === "white" ? (move.to >> 3) >= 3 : (move.to >> 3) <= 4);
+    const next = ahead >= 0 && ahead < 64 && !after.board.occupied.has(ahead)
+      ? [...attacks(piece, ahead, after.board.occupied).intersect(after.board[opposite(piece.color)])]
+        .map((sq) => after.board.get(sq)!.role).filter((role) => role !== "king")
+      : [];
+    if (storm) text = `${subject} advances towards ${owner(opposite(piece.color), listener)} king`;
+    if (next.length) text += `, getting ready to attack ${next.slice(0, 2).map(target).join(" and ")}`;
+  }
   if (check && hits.length) text += `, with check, and also hits ${target(hits[0])}`;
   else if (check) text += ", with check";
   else if (fork) text += ` and attacks ${target(hits[0])} and ${target(hits[1])} at once: a fork!`;
   else if (hits.length) text += ` and hits ${target(hits[0])}`;
   if (!fork) text += ".";
   return text;
+}
+
+/** An enemy piece the slider on `square` pins to their `role` behind it (one in
+ *  between, worth less than what's behind it). */
+export function pinnedTo(position: Chess, square: number, role: Role): number | undefined {
+  const piece = position.board.get(square);
+  if (!piece || !["bishop", "rook", "queen"].includes(piece.role) || piece.role === role) return undefined;
+  const occupied = position.board.occupied;
+  const theirs = position.board[opposite(piece.color)];
+  for (const hit of attacks(piece, square, occupied).intersect(theirs)) {
+    const hitRole = position.board.get(hit)!.role;
+    if (hitRole === role || hitRole === "king" || PIECE_VALUES[hitRole] >= PIECE_VALUES[role]) continue;
+    for (const behind of attacks(piece, square, occupied.without(hit)).intersect(theirs)) {
+      if (position.board.get(behind)?.role === role && !attacks(piece, square, occupied).has(behind)) return hit;
+    }
+  }
+  return undefined;
 }
 
 /** An enemy piece the slider on `square` pins to its king (one in between, the king behind). */
@@ -476,7 +513,8 @@ function rawDanger(review: Review, before: Chess, after: Chess, beforeEval: Eval
   // ...otherwise how much the score dropped (the loss comes a little later)
   if (loss >= 6) return { level: "red", text: "This is about to cost you a lot." };
   if (loss >= 2.5) return { level: "orange", text: "You can lose a piece here." };
-  if (loss >= 0.8) return { level: "amber", text: "You can lose a pawn here." };
+  // (a smaller drop with nothing to take is about where the pieces stand - a
+  // better move existed - not something that can be won from you: no warning)
   // A small slip: only worth a warning if they take over the centre
   if (!inBook && reply && CENTRE.includes(reply.to)) return { level: "yellow", text: "They can take over the centre." };
   return null;

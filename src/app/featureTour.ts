@@ -134,8 +134,9 @@ export async function showReviewSetupTour(asked: boolean) {
   if (end.finished || end.neverAgain || asked) markSeen("reviewSetup", end.neverAgain);
 }
 
-/** The ? button: About, and (in a game) a tour of the screen you're on. */
-export function toggleHelp(anchor: HTMLElement) {
+/** The ? button: About, and (in a game) a tour of the screen you're on. The
+ *  phone's ⋯ button (`more`) also holds Home, your profile and Settings. */
+export function toggleHelp(anchor: HTMLElement, more = false) {
   const box = $("help-menu");
   if (!box.hidden) {
     box.hidden = true;
@@ -153,8 +154,13 @@ export function toggleHelp(anchor: HTMLElement) {
     });
     box.append(button);
   };
-  if (!menuOpen) item("Show me around this screen", () => void showTour(true));
-  else if (reviewSetupOpen()) item("Show me around this screen", () => void showReviewSetupTour(true));
+  if (more) {
+    item("Home", () => $("go-home").click());
+    item("Your profile", () => document.querySelector<HTMLElement>(".game-top .profile-button")?.click());
+    item("Settings", () => document.querySelector<HTMLElement>(".game-top .gear-button")?.click());
+  }
+  if (!menuOpen) item("Quick tour", () => void showTour(true));
+  else if (reviewSetupOpen()) item("Quick tour", () => void showReviewSetupTour(true));
   item("About and licences", () => window.open("./about.html", "_blank"));
   const rect = anchor.getBoundingClientRect();
   box.hidden = false;

@@ -250,6 +250,10 @@ button.round:disabled {
   font-size: 1.15rem;
 }
 
+.setup-head .train-home {
+  justify-self: end;
+}
+
 .setup-start {
   justify-self: end;
   border-radius: 999px;
@@ -394,7 +398,7 @@ html body.practice #game {
   --coach-h: 58px;
   --controls: 46px;
   --board: min(
-    calc(100dvh - 2 * var(--gutter) - var(--bars) - var(--top) - var(--coach-h) - var(--controls) - 30px),
+    calc(100dvh - 2 * var(--gutter) - var(--bars) - var(--top) - var(--coach-h) - var(--controls) - var(--review-extra, 0px) - 30px),
     calc(100vw - 2 * var(--gutter) - 330px)
   );
   display: grid;
@@ -412,9 +416,18 @@ html body.practice #game {
 html body.practice #game {
   --evalw: 28px;
   --board: min(
-    calc(100dvh - 2 * var(--gutter) - var(--bars) - var(--top) - var(--coach-h) - var(--controls) - 30px),
+    calc(100dvh - 2 * var(--gutter) - var(--bars) - var(--top) - var(--coach-h) - var(--controls) - var(--review-extra, 0px) - 30px),
     calc(100vw - 2 * var(--gutter) - 360px)
   );
+}
+
+/* While reviewing, the board makes room for the review bar (and, going through
+   the turning points, their buttons), so the page still fits without scrolling */
+html body #game:has(#review-bar:not([hidden])) {
+  --review-extra: 38px;
+}
+html body #game:has(#moment-nav:not([hidden])) {
+  --review-extra: 92px;
 }
 
 .game-top {
@@ -792,7 +805,34 @@ html body .board-area .board-controls {
 
 /* -- Phones ------------------------------------------------------------------- */
 
+/* The phone's ⋯ menu button: only on a phone (see below) */
+.game-top .more-button {
+  display: none;
+}
+
 @media (max-width: 900px) {
+  /* The top bar: Back, New, the views and ⋯ (Home, profile, help and settings
+     inside it), so it fits a phone's width */
+  .game-top #go-home,
+  .game-top .profile-button,
+  .game-top .help-button:not(.more-button),
+  .game-top .gear-button {
+    display: none;
+  }
+  .game-top .more-button {
+    display: inline-flex;
+  }
+  /* (as wide as the board: Back at its left edge, the menu at its right, the
+     rest evenly between) */
+  .game-top {
+    justify-self: stretch;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .game-top > * {
+    margin-inline: 0;
+  }
+
   html body #game,
   html body.practice #game {
     --board: min(calc(100vw - 2 * var(--gutter)), 64dvh);
@@ -2953,5 +2993,180 @@ dialog[open]::backdrop {
   dialog[open],
   dialog[open]::backdrop {
     animation: none;
+  }
+}
+
+/* -- Wide screens (a computer, or a tablet on its side): use the width, so the
+   main menu, Analyse a game, Statistics and History fit without scrolling.
+   Phones and upright tablets keep the single column. */
+@media (min-width: 1000px) and (orientation: landscape) {
+  /* Every menu screen in one card of the same size, in the same place: short
+     screens start at its top, longer ones scroll inside it */
+  .card.home {
+    box-sizing: border-box;
+    width: min(100%, 900px);
+    height: min(calc(100dvh - 2 * var(--gutter)), 640px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  /* (each screen starts at the top, so the heading and back button never move;
+     the main menu, which has neither, sits in the middle) */
+  .card.home > .screen[data-screen="welcome"]:not([hidden]) {
+    margin-block: auto;
+  }
+  .cover:has(.screen[data-screen="train"]:not([hidden])) {
+    align-items: center;
+  }
+  /* (the narrower setups keep a comfortable width in the middle) */
+  .screen[data-screen="play"] > :not(.setup-head),
+  .screen[data-screen="practice"] > :not(.setup-head) {
+    box-sizing: border-box;
+    width: min(100%, 640px);
+    margin-inline: auto;
+  }
+  /* Training: a tab's lessons two to a row */
+  .lesson-list:not([hidden]) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .lesson-list > :not(.train-card) {
+    grid-column: 1 / -1;
+  }
+  /* Your progress: its cards in two columns */
+  .screen[data-screen="progress"] .progress {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+  }
+  .screen[data-screen="progress"] .progress > :not(.progress-card),
+  .screen[data-screen="progress"] .progress > .progress-say {
+    grid-column: 1 / -1;
+  }
+
+  /* The main menu: the coach and his welcome on the left, the choices on the right */
+  .screen[data-screen="welcome"]:not([hidden]) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    grid-template-areas:
+      "top top"
+      "face choices"
+      "bubble choices"
+      "level choices"
+      "progress next";
+    column-gap: 28px;
+    row-gap: 12px;
+    align-items: center;
+  }
+  .screen[data-screen="welcome"] .home-top { grid-area: top; }
+  .screen[data-screen="welcome"] .home-face { grid-area: face; justify-self: center; }
+  .screen[data-screen="welcome"] .home-bubble { grid-area: bubble; }
+  .screen[data-screen="welcome"] .level-check { grid-area: level; }
+  .screen[data-screen="welcome"] .home-progress { grid-area: progress; justify-self: center; }
+  .screen[data-screen="welcome"] .mode-choices { grid-area: choices; align-self: stretch; justify-content: center; }
+  .screen[data-screen="welcome"] .home-next { grid-area: next; }
+  .screen[data-screen="welcome"] .engine-status { grid-column: 1 / -1; }
+
+  /* Analyse a game: your games on the left, pasting a game or position on the right */
+  .screen[data-screen="analysis"]:not([hidden]) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 24px;
+    row-gap: 10px;
+    align-content: start;
+  }
+  .screen[data-screen="analysis"] > * { grid-column: 2; }
+  .screen[data-screen="analysis"] > .setup-head { grid-column: 1 / -1; }
+  .screen[data-screen="analysis"] > #your-games { grid-column: 1; grid-row: 2 / span 12; align-self: start; }
+  .screen[data-screen="analysis"] textarea { min-height: 0; }
+  .screen[data-screen="analysis"] .pgn-status:empty { display: none; }
+
+  /* (room kept for a scroll bar, so a long page doesn't shift everything sideways) */
+  html {
+    scrollbar-gutter: stable;
+  }
+  /* The game screen keeps one width on every tab (Board, Statistics,
+     History), so the top bar and its buttons never move: on the board the
+     panel beside it takes the rest of the width */
+  html body #game,
+  html body.practice #game {
+    /* the moves panel: in proportion to the board, wide enough that its
+       (smaller) text has room */
+    --panel: clamp(340px, calc(var(--board) * 0.75), 440px);
+    --game-w: calc(var(--board) + var(--evalw) + 22px + var(--panel));
+    grid-template-columns: calc(var(--board) + var(--evalw)) var(--panel);
+    width: min(100%, var(--game-w));
+    margin-inline: auto;
+  }
+  /* the panel: smaller text and buttons, so more fits without squeezing */
+  .moves-area {
+    font-size: 0.82rem;
+  }
+  .moves-area h2 {
+    font-size: 1rem;
+  }
+  .moves-area .list-nav {
+    grid-template-columns: repeat(5, 1fr); /* the five buttons on one row */
+    gap: 4px;
+  }
+  .moves-area .list-nav button {
+    min-height: 0;
+    height: 30px;
+    padding: 0;
+  }
+  .moves-area .list-nav button svg {
+    width: 16px;
+    height: 16px;
+  }
+  /* Statistics and History: one column, as wide as the board and panel together */
+  html body[data-view="stats"] #game,
+  html body[data-view="history"] #game,
+  html body.practice[data-view="stats"] #game,
+  html body.practice[data-view="history"] #game {
+    grid-template-columns: minmax(0, var(--game-w));
+    grid-template-areas: "top" "board";
+  }
+  /* Statistics: the turning points beside the accuracy card */
+  .stats-view,
+  .history-view {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  #stats {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+    column-gap: 20px;
+    align-items: start;
+  }
+  #stats > * { grid-column: 1 / -1; }
+  #stats > .key-moments { grid-column: 1; }
+  #stats:has(> .key-moments) > .stats-card { grid-column: 2; }
+  .stats-card .stats-row { padding: 4px 0; }
+  /* every grade counted: two to a row */
+  .stats-card .stats-table {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 18px;
+  }
+  .stats-card .stats-table > * { grid-column: 1 / -1; }
+  .stats-card .stats-table > .grade-row {
+    grid-column: auto;
+    grid-template-columns: minmax(0, 1fr) 64px 64px;
+  }
+
+  /* Going through the turning points: the moves panel on the right has its own
+     step buttons, so the turning-point buttons take the row under the board */
+  html body .board-area.moments .board-controls {
+    display: none;
+  }
+  html body #game:has(#moment-nav:not([hidden])) {
+    --review-extra: 38px;
+  }
+
+  /* History: the games in columns */
+  .history-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   }
 }

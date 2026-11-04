@@ -26,6 +26,7 @@ const PATHS: Record<string, string> = {
   rapid: '<circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M10 2.5h4M12 2.5v3.5M18.5 6.5l1.5-1.5"/>',
   infinity: '<path d="M12 12c-2-2.6-3.6-4-5.4-4a4 4 0 0 0 0 8c1.8 0 3.4-1.4 5.4-4zm0 0c2 2.6 3.6 4 5.4 4a4 4 0 0 0 0-8c-1.8 0-3.4 1.4-5.4 4z"/>',
   shuffle: '<path d="M4 7h3.5c3.5 0 5.5 10 9 10H20M4 17h3.5c1.5 0 2.7-1.8 3.7-3.8M20 7h-3.5c-1.5 0-2.7 1.8-3.7 3.8M17.5 4.5L20 7l-2.5 2.5M17.5 14.5L20 17l-2.5 2.5"/>',
+  menu: '<path d="M4.5 7h15M4.5 12h15M4.5 17h15"/>', // three stripes: the phone's menu (the dots are the coach's Tell me more)
   dots: '<circle cx="5.5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="18.5" cy="12" r="1.2"/>',
   target: '<circle cx="11" cy="13" r="8"/><circle cx="11" cy="13" r="4.5"/><circle cx="11" cy="13" r="1"/><path d="M11 13l8.5-8.5M16.5 4.5h3v3"/>',
   hazard: '<path d="M12 3.5L21.5 20h-19z"/><path d="M12 10v4.5M12 17.2v.3"/>',

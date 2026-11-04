@@ -3,6 +3,7 @@
 
 import type { DrawShape } from "@lichess-org/chessground/draw";
 import type { Key } from "@lichess-org/chessground/types";
+import { attacks } from "chessops/attacks";
 import { Chess, normalizeMove } from "chessops/chess";
 import { makeSan, parseSan } from "chessops/san";
 import type { Color, NormalMove, Role as PieceRole } from "chessops/types";
@@ -129,7 +130,10 @@ export function moveButton(ply: number, review: Review): CoachButton | null {
       if (review.rating === "Inaccuracy" && !danger) return null;
       return { ico: "gift", label: "Your chance", run, kind: "sign chance", more: true };
     }
-    return { ico: "hazard", label: "What went wrong", run, kind: `hazard ${danger?.level ?? "yellow"}`, more: true };
+    // The hazard only when something concrete can be won from you (material, mate);
+    // otherwise the move just left you worse placed: the bulb, a better move existed
+    if (!danger) return { ico: "bulb", label: "A better move", run, kind: "sign idea", more: true };
+    return { ico: "hazard", label: "What went wrong", run, kind: `hazard ${danger.level}`, more: true };
   }
   if (review.rating === "Brilliant" || review.rating === "Great") return { ico: "star", label: "Why it works", run, kind: "sign star", more: true };
   if (notTheBest(ply, review)) return { ico: "bulb", label: "See the best move", run: () => void showBestLine(ply), kind: "sign idea", more: true };
@@ -533,6 +537,56 @@ export function moveShapes(before: Chess, move: NormalMove, viewer: Color | null
 }
 
 /** A line as pages: the board after each move, with its arrow and a sentence. */
+const FILES = "abcdefgh";
+const whose = (side: Color, viewer: Color | null) => (viewer === null ? `${colourName(side)}'s` : side === viewer ? "your" : "their");
+
+/** The files beside `side`'s king that had a pawn of theirs at the start and
+ *  none at the end: "The a- and b-files are now open in front of your king." */
+function openedFiles(start: Chess, end: Chess, side: Color, viewer: Color | null): string {
+  const king = end.board.kingOf(side);
+  if (king === undefined) return "";
+  const pawnOn = (position: Chess, file: number) => [...position.board.pieces(side, "pawn")].some((square) => (square & 7) === file);
+  const files = [(king & 7) - 1, king & 7, (king & 7) + 1]
+    .filter((file) => file >= 0 && file < 8 && pawnOn(start, file) && !pawnOn(end, file)).map((file) => FILES[file]);
+  if (!files.length) return "";
+  const named = files.length === 1 ? `The ${files[0]}-file is` : `The ${files.slice(0, -1).join("-, ")}- and ${files[files.length - 1]}-files are`;
+  return `${named} now open in front of ${whose(side, viewer)} king.`;
+}
+
+/** A castle that puts the king where the other side's pawns can storm it
+ *  (their line pushes pawns on the king's wing), above all next to one of
+ *  the mover's own pushed pawns, which gives those pawns something to hit. */
+function castledIntoStorm(before: Chess, played: NormalMove, after: Chess, line: NormalMove[], viewer: Color | null): string {
+  if (!isCastling(before, played)) return "";
+  const side = before.turn;
+  const king = after.board.kingOf(side);
+  if (king === undefined) return "";
+  const near = (square: number) => Math.abs((square & 7) - (king & 7)) <= 2;
+  const home = side === "white" ? 1 : 6;
+  let position = after;
+  let storms = false;
+  let hook: number | undefined; // a pushed pawn of the mover's that the storm aims at
+  for (const move of line) {
+    const piece = position.board.get(move.from);
+    position = positionAfter(position, move);
+    if (piece?.role !== "pawn" || piece.color === side || !near(move.to)) continue;
+    storms = true;
+    // what the pawn attacks from there, or one step further on
+    const ahead = move.to + (piece.color === "white" ? 8 : -8);
+    const aims = attacks(piece, move.to, position.board.occupied)
+      .union(ahead >= 0 && ahead < 64 ? attacks(piece, ahead, position.board.occupied) : attacks(piece, move.to, position.board.occupied));
+    for (const square of aims.intersect(after.board.pieces(side, "pawn"))) {
+      if (hook === undefined && square >> 3 !== home && near(square)) hook = square;
+    }
+  }
+  if (!storms) return "";
+  const yours = whose(side, viewer);
+  const theirs = whose(opposite(side), viewer);
+  return hook !== undefined
+    ? `Castling here puts ${yours} king next to ${yours} pushed ${FILES[hook & 7]}-pawn, which ${theirs} pawns can attack to open lines towards it.`
+    : `Castling here puts ${yours} king where ${theirs} pawns can storm towards it.`;
+}
+
 export function linePages(start: Chess, line: NormalMove[], viewer: Color | null): { frames: StepFrame[]; texts: string[] } {
   const story = talkLine(start, line, viewer);
   const frames = line.map((move, i) => ({ position: story.positions[i + 1], shapes: moveShapes(story.positions[i], move, viewer) }));
@@ -623,7 +677,14 @@ export async function explainSlip(ply: number, review: Review) {
         const plain = wholeLine(after, pv, 3);
         const line = won && won.length > plain.length ? won : plain;
         const pages = linePages(after, line, viewer);
+        // King safety: the lines it opens in front of the mover's king
+        const end = line.reduce((position, move) => positionAfter(position, move), after);
+        const opened = openedFiles(after, end, mover, viewer);
+        if (opened && pages.texts.length) pages.texts[pages.texts.length - 1] += ` ${opened}`;
         if (punish) endWith(pages.texts, lineOutcome(after, line, punish.score, opposite(mover), viewer));
+        // a castle into their pawns: said first, as what the slip was about
+        const storm = castledIntoStorm(before, played, after, line, viewer);
+        if (storm) add("Why", [{ position: after, shapes }], [storm]);
         add("Why", pages.frames, pages.texts);
       }
     }
@@ -1054,10 +1115,25 @@ export function closeStepper() {
 
 export const stepTyper = new Typer($("step-text"));
 
+// On a wide screen the stepper sits in the panel beside the board (under the
+// moves, in the room there), so the board keeps its size; otherwise under the
+// board, where it began
+const WIDE = window.matchMedia("(min-width: 1000px) and (orientation: landscape)");
+let stepperSpot: Comment | null = null;
+
+function placeStepper(box: HTMLElement) {
+  if (!stepperSpot) box.before((stepperSpot = document.createComment("stepper")));
+  const panel = document.querySelector<HTMLElement>(".moves-area");
+  if (WIDE.matches && panel) {
+    if (box.parentElement !== panel) panel.append(box);
+  } else if (box.previousSibling !== stepperSpot) stepperSpot.after(box);
+}
+
 export function drawStepper() {
   const box = $("stepper");
   const area = document.querySelector<HTMLElement>(".board-area")!;
   area.classList.toggle("stepping", stepper !== null);
+  placeStepper(box);
   box.hidden = !stepper;
   if (!stepper) return;
   $("step-count").textContent = stepCount() > 1 ? `${stepper.step}/${stepCount()}` : "";
@@ -1404,7 +1480,7 @@ export function drawStats() {
           }
           cell.append(chip);
           return cell;
-        }));
+        }), "grade-row");
       }
     }
   }
