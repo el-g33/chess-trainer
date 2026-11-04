@@ -11,6 +11,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.22",
+    items: [
+      { icon: "hazard", title: "Pieces left hanging", text: "When their move threatened a piece and yours didn't deal with it, the coach says so plainly, and the explanation starts from their threat on the board before your move." },
+      { icon: "bulb", title: "Castling into trouble", text: "Castle beside a weak pawn and the coach tells you, then shows how their pawns attack it, your best fight back, and why blocking makes it worse." },
+      { icon: "search", title: "Try moves while you learn", text: "From any explanation, try your own moves on the board, then go straight back to the coaching." },
+      { icon: "eye", title: "A streamlined look", text: "On a computer the board fills the screen with everything else beside it, and explanations show each move's squares and start from the position before, for a better experience." },
+    ],
+  },
+  {
     version: "3.21",
     items: [
       { icon: "bulb", title: "Clearer explanations", text: "A warning sign now means something can really be won from you; a move that only left you worse placed gets the bulb. The coach also names pins, pawns advancing on your king, and lines opening in front of it." },

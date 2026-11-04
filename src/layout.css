@@ -3086,18 +3086,59 @@ dialog[open]::backdrop {
   html {
     scrollbar-gutter: stable;
   }
-  /* The game screen keeps one width on every tab (Board, Statistics,
-     History), so the top bar and its buttons never move: on the board the
-     panel beside it takes the rest of the width */
-  html body #game,
-  html body.practice #game {
-    /* the moves panel: in proportion to the board, wide enough that its
-       (smaller) text has room */
-    --panel: clamp(340px, calc(var(--board) * 0.75), 440px);
+  /* The game screen, board first: the board takes the full height on the
+     left, the sidebar (players, coach, moves, explanations, buttons) sits
+     beside it (see sidebar.ts). The screen keeps one width on every tab
+     (Board, Statistics, History), so the top bar never moves. */
+  html body.sidebar #game,
+  html body.sidebar.practice #game {
+    --panel: clamp(320px, 26vw, 420px);
+    --board: min(
+      calc(100dvh - 2 * var(--gutter) - var(--top) - 16px),
+      calc(100vw - 2 * var(--gutter) - var(--panel) - var(--evalw) - 22px)
+    );
     --game-w: calc(var(--board) + var(--evalw) + 22px + var(--panel));
-    grid-template-columns: calc(var(--board) + var(--evalw)) var(--panel);
+    grid-template-columns: minmax(0, var(--game-w));
+    grid-template-areas: "top" "board";
     width: min(100%, var(--game-w));
     margin-inline: auto;
+  }
+  body.sidebar .board-area {
+    display: grid;
+    grid-template-columns: calc(var(--board) + var(--evalw)) var(--panel);
+    column-gap: 22px;
+    align-items: start;
+  }
+  body.sidebar .board-col {
+    grid-column: 1;
+  }
+  body.sidebar .board-side {
+    grid-column: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    height: var(--board);
+    min-height: 0;
+  }
+  body.sidebar .board-side > * {
+    margin: 0;
+  }
+  /* the moves fill what's left, and scroll inside */
+  body.sidebar .board-side .moves-area {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  body.sidebar .board-side #move-list {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+  }
+  body.sidebar .board-side .moves-area[hidden] {
+    display: none !important;
   }
   /* the panel: smaller text and buttons, so more fits without squeezing */
   .moves-area {
@@ -3118,14 +3159,6 @@ dialog[open]::backdrop {
   .moves-area .list-nav button svg {
     width: 16px;
     height: 16px;
-  }
-  /* Statistics and History: one column, as wide as the board and panel together */
-  html body[data-view="stats"] #game,
-  html body[data-view="history"] #game,
-  html body.practice[data-view="stats"] #game,
-  html body.practice[data-view="history"] #game {
-    grid-template-columns: minmax(0, var(--game-w));
-    grid-template-areas: "top" "board";
   }
   /* Statistics: the turning points beside the accuracy card */
   .stats-view,
@@ -3155,13 +3188,10 @@ dialog[open]::backdrop {
     grid-template-columns: minmax(0, 1fr) 64px 64px;
   }
 
-  /* Going through the turning points: the moves panel on the right has its own
-     step buttons, so the turning-point buttons take the row under the board */
+  /* Going through the turning points: the moves panel has its own step
+     buttons, so the turning-point buttons take the action buttons' place */
   html body .board-area.moments .board-controls {
     display: none;
-  }
-  html body #game:has(#moment-nav:not([hidden])) {
-    --review-extra: 38px;
   }
 
   /* History: the games in columns */

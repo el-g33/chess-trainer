@@ -222,11 +222,26 @@ export function drawWhatIf() {
   document.querySelector(".board-area")!.classList.toggle("whatif", analysis !== null);
   if (!analysis) return;
   $("whatif-text").innerHTML = `${icon("search", 18)}<span>Trying moves</span>`;
+  $("whatif-exit").textContent = analysis.resume ? "Back to coaching" : "Back to game";
 }
 
 export function exitAnalysis() {
   if (!analysis) return;
+  const resume = analysis.resume;
   set.analysis(null);
+  set.preview(null);
+  if (resume) set.stepper(resume); // back to the explanation, on the page you left it
+  refresh();
+}
+
+/** From inside the coach's explanation: try your own moves from the position
+ *  on the page, then come back to the explanation. */
+export function tryFromStepper() {
+  if (!stepper) return;
+  const from = stepper.frames ? stepper.frames[stepper.step - 1].position : stepper.positions[stepper.step];
+  const resume = stepper;
+  set.stepper(null);
+  set.analysis({ fromPly: currentPly(), line: new Game(fenOf(from)), ahead: [], resume });
   set.preview(null);
   refresh();
 }

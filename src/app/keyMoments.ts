@@ -5,9 +5,10 @@
 import type { Color } from "chessops/types";
 
 import { colourName } from "../coach";
+import { ignoredThreat } from "../narrate";
 import { icon } from "../icons";
-import { currentPly } from "../main";
-import type { Review } from "../review";
+import { analyser, currentPly } from "../main";
+import { type Review, fenOf } from "../review";
 import { listener, reviews } from "./coach";
 import { $ } from "./dom";
 import { refresh } from "./draw";
@@ -61,9 +62,19 @@ export function keyMoments(list: (Review | undefined)[]): number[] {
 }
 
 /** A moment in a few words, from your side: "Your key move", "Their slip: your chance". */
-function momentWords(review: Review, viewer: Color | null, mover: Color): { text: string; sign: string; ico: string } {
+function momentWords(review: Review, viewer: Color | null, mover: Color, ply: number): { text: string; sign: string; ico: string } {
   const whose = viewer === null ? `${colourName(mover)}'s` : mover === viewer ? "Your" : "Their";
   const theirs = viewer !== null && mover !== viewer;
+  // a piece left hanging: a threat they already had, not dealt with
+  const after = game.positionAt(ply);
+  let hung: ReturnType<typeof ignoredThreat>;
+  if (!["Brilliant", "Great"].includes(review.rating) && !(theirs && ["Miss", "Missed Win"].includes(review.rating))
+    && (hung = ignoredThreat(game.positionAt(ply - 1), after, analyser.evals.get(fenOf(after))?.best))) {
+    const sign = review.rating === "Blunder" ? "red" : "orange";
+    const what = hung.victim === "pawn" ? "a pawn" : `${viewer === null ? "the" : theirs ? "their" : "your"} ${hung.victim}`;
+    if (viewer === null) return { text: `${colourName(mover)} left ${what} hanging`, sign, ico: "hazard" };
+    return theirs ? { text: `They left ${what} hanging`, sign: "chance", ico: "gift" } : { text: `You left ${what} hanging`, sign, ico: "hazard" };
+  }
   if (review.rating === "Brilliant") return { text: `${whose} masterstroke`, sign: "star", ico: "star" };
   if (review.rating === "Great") return { text: `${whose} key move`, sign: "star", ico: "star" };
   if (theirs) {
@@ -98,7 +109,7 @@ export function keyMomentsCard(list: (Review | undefined)[], startReview: () => 
     box.append(title);
     for (const ply of plies) {
       const event = events.get(ply);
-      const words = event ? { text: fundamentalWords(event, viewer), ...SIGNS[event.kind] } : momentWords(list[ply - 1]!, viewer, game.moverOf(ply));
+      const words = event ? { text: fundamentalWords(event, viewer), ...SIGNS[event.kind] } : momentWords(list[ply - 1]!, viewer, game.moverOf(ply), ply);
       const row = document.createElement("button");
       row.type = "button";
       row.className = "key-moment";

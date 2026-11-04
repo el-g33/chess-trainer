@@ -3,9 +3,9 @@
 // played. The board shows WHICH move; these say what it means, so they never
 // name the move itself.
 import { Chess } from "chessops/chess";
-import { attacks } from "chessops/attacks";
+import { attacks, between } from "chessops/attacks";
 import type { Color, NormalMove, Role } from "chessops/types";
-import { opposite } from "chessops/util";
+import { makeSquare, opposite } from "chessops/util";
 
 import { PIECE_VALUES } from "./coach";
 import type { Evaluation, Review } from "./review";
@@ -77,13 +77,13 @@ export function narrateMove(before: Chess, move: NormalMove, listener: Color | n
   // A pin: the piece it hits can't move, because their king stands behind it
   const pinned = pinnedBy(after, move.to);
   if (pinned !== undefined && !check) {
-    text += `${victim ? "," : " and"} pins ${target(after.board.get(pinned)!.role)} to the king.`;
+    text = victim ? `${text}, pinning ${target(after.board.get(pinned)!.role)} to the king.` : `${subject} pins ${target(after.board.get(pinned)!.role)} to the king.`;
     return text;
   }
   // ...or it can't move without leaving their queen to be taken
   const toQueen = pinnedTo(after, move.to, "queen");
   if (toQueen !== undefined && !check) {
-    text += `${victim ? "," : " and"} pins ${target(after.board.get(toQueen)!.role)} to the queen.`;
+    text = victim ? `${text}, pinning ${target(after.board.get(toQueen)!.role)} to the queen.` : `${subject} pins ${target(after.board.get(toQueen)!.role)} to the queen.`;
     return text;
   }
   // A pawn on the march: towards their king, and what it will attack next
@@ -99,6 +99,12 @@ export function narrateMove(before: Chess, move: NormalMove, listener: Color | n
       : [];
     if (storm) text = `${subject} advances towards ${owner(opposite(piece.color), listener)} king`;
     if (next.length) text += `, getting ready to attack ${next.slice(0, 2).map(target).join(" and ")}`;
+  }
+  // A quiet move that eyes a piece (even one that's defended): say what it aims at
+  if (!victim && !check && !hits.length && piece.role !== "pawn" && piece.role !== "king") {
+    const eyed = [...attacks(piece, move.to, after.board.occupied).intersect(after.board[opposite(piece.color)])]
+      .map((square) => after.board.get(square)!.role).filter((role) => role !== "pawn" && role !== "king");
+    if (eyed.length) return `${text}, eyeing ${target(eyed[0])}.`;
   }
   if (check && hits.length) text += `, with check, and also hits ${target(hits[0])}`;
   else if (check) text += ", with check";
@@ -170,18 +176,54 @@ function pick(options: string[], seed: number): string {
   return options[Math.abs(seed) % options.length];
 }
 
+/** A threat they already had before the move and still have after it: their
+ *  best reply takes a piece of the mover's that stood on that square before,
+ *  with the same piece, and it was already worth taking then (nothing guarded
+ *  it, or the taker is worth less), and still is. The move didn't deal with it. `fresh` when
+ *  their last move made the threat (the taker moved there, or moved out of
+ *  its way). */
+export interface IgnoredThreat { move: NormalMove; victim: Role; taker: Role; fresh: boolean }
+
+export function ignoredThreat(before: Chess, after: Chess, reply: NormalMove | undefined, lastMove?: NormalMove): IgnoredThreat | null {
+  if (!reply || before.isCheck() || after.isEnd()) return null;
+  const mover = before.turn;
+  const victim = after.board.get(reply.to);
+  const taker = after.board.get(reply.from);
+  if (!victim || !taker || victim.color !== mover || taker.color === mover || victim.role === "king") return null;
+  const was = before.board.get(reply.to);
+  const wasTaker = before.board.get(reply.from);
+  if (was?.role !== victim.role || was.color !== mover || wasTaker?.role !== taker.role || wasTaker.color !== taker.color) return null;
+  // (as if the mover had passed: their take was there to play)
+  const passed = before.clone();
+  passed.turn = opposite(mover);
+  passed.epSquare = undefined;
+  if (!passed.isLegal(reply)) return null;
+  // worth taking before the move, and still after it (a guard added since is a different story)
+  const cheaper = PIECE_VALUES[taker.role] < PIECE_VALUES[victim.role];
+  const guarded = (position: Chess) => position.kingAttackers(reply.to, mover, position.board.occupied).nonEmpty();
+  if (!cheaper && (guarded(before) || guarded(after))) return null;
+  const fresh = !!lastMove && (lastMove.to === reply.from || between(reply.from, reply.to).has(lastMove.from));
+  return { move: reply, victim: victim.role, taker: taker.role, fresh };
+}
+
 /** The coach's verdict, in plain words, on the move that led from `before`
  *  to `after` (played by `mover`; the listener is `you`, or null for neither). */
 export function verdict(review: Review, before: Chess, after: Chess,
   afterEval: Evaluation | undefined, you: Color | null, seed: number, neutral = false): string {
   const mover = before.turn;
-  if (neutral) return neutralVerdict(review, after, afterEval, mover, seed);
+  if (neutral) return neutralVerdict(review, before, after, afterEval, mover, seed);
   const mine = !you || you === mover;
   const them = !you ? (mover === "white" ? "Black" : "White") : mine ? "them" : "you";
   if (PRAISE[review.rating]) {
     const line = pick(PRAISE[review.rating], seed);
     if (mine) return line;
     return you ? THEIR_PRAISE[review.rating] : line.replace("you found", "they found");
+  }
+  // A threat they already had, not dealt with (said first: it matters more than what you missed)
+  const ignored = ignoredThreat(before, after, afterEval?.best);
+  if (ignored && (mine || !["Miss", "Missed Win"].includes(review.rating))) {
+    const what = ignored.victim === "pawn" ? `${makeSquare(ignored.move.to)} pawn` : NAMES[ignored.victim];
+    return mine ? `You left your ${what} hanging.` : `They left their ${what} hanging!`;
   }
   if (review.rating === "Missed Win") return mine ? "You had a winning move there!" : pick(THEY_MISSED, seed);
   if (review.rating === "Miss") return mine ? "You missed a chance to win material." : pick(THEY_MISSED, seed);
@@ -211,6 +253,9 @@ export function verdict(review: Review, before: Chess, after: Chess,
     }
     if (victim && victim.color === mover) return mine ? `That gives ${them} a free ${NAMES[victim.role]}.` : `That gives you a free ${NAMES[victim.role]}.`;
   }
+  // A castle next to one of its own pushed pawns: a weakened wing, a target for their pawns
+  const wing = weakenedWing(before, after, mover);
+  if (wing) return mine ? `You've castled into a weakened ${wing}.` : `They've castled into a weakened ${wing}: go after it!`;
   const generic: Record<string, string[]> = {
     Inaccuracy: ["Not bad, but there was something stronger.", "Playable, but there was a better move."],
     Mistake: ["Hmm, that hands over the advantage.", "That's a mistake: there was a much better move."],
@@ -218,6 +263,22 @@ export function verdict(review: Review, before: Chess, after: Chess,
   };
   if (!mine) return pick(THEIR_SLIP[review.rating] ?? ["Not their best move."], seed);
   return pick(generic[review.rating] ?? ["Interesting choice."], seed);
+}
+
+/** "queenside" or "kingside" when the move was a castle that put the king
+ *  beside one of the mover's own pushed pawns (a target for the other side's
+ *  pawns), else "". */
+export function weakenedWing(before: Chess, after: Chess, mover: Color): string {
+  const from = before.board.kingOf(mover);
+  const to = after.board.kingOf(mover);
+  if (from === undefined || to === undefined || from >> 3 !== to >> 3 || Math.abs((to & 7) - (from & 7)) < 2) return "";
+  const home = mover === "white" ? 1 : 6;
+  const queenside = (to & 7) <= 2;
+  const pushed = [...after.board.pieces(mover, "pawn")].some((square) => {
+    const file = square & 7;
+    return (queenside ? file <= 2 : file >= 5) && Math.abs(file - (to & 7)) <= 2 && square >> 3 !== home;
+  });
+  return pushed ? (queenside ? "queenside" : "kingside") : "";
 }
 
 /** Their slip, said from your side of the board: how bad it was for them. */
@@ -231,7 +292,7 @@ const THEIR_SLIP: Record<string, string[]> = {
 const THEY_MISSED = ["Lucky you: they missed a strong move.", "They let you off the hook there.", "You got away with one."];
 
 /** The verdict for someone watching (no "you"): "White has allowed Black to win the rook." */
-function neutralVerdict(review: Review, after: Chess, afterEval: Evaluation | undefined, mover: Color, seed: number): string {
+function neutralVerdict(review: Review, before: Chess, after: Chess, afterEval: Evaluation | undefined, mover: Color, seed: number): string {
   const me = mover === "white" ? "White" : "Black";
   const other = mover === "white" ? "Black" : "White";
   const praise: Record<string, string> = {
@@ -245,6 +306,11 @@ function neutralVerdict(review: Review, after: Chess, afterEval: Evaluation | un
   const reply = afterEval?.best;
   const score = afterEval?.score;
   if (score?.mate !== undefined && (mover === "white" ? score.mate < 0 : score.mate > 0)) return `${me} walks into a checkmate.`;
+  const ignored = ignoredThreat(before, after, reply);
+  if (ignored) {
+    const what = ignored.victim === "pawn" ? `${makeSquare(reply!.to)} pawn` : NAMES[ignored.victim];
+    return `${me} left the ${what} hanging.`;
+  }
   if (reply) {
     const victim = after.board.get(reply.to);
     const piece = after.board.get(reply.from);
@@ -261,6 +327,8 @@ function neutralVerdict(review: Review, after: Chess, afterEval: Evaluation | un
     }
     if (victim && victim.color === mover) return `${me} gives ${other} a free ${NAMES[victim.role]}.`;
   }
+  const wing = weakenedWing(before, after, mover);
+  if (wing) return `${me} has castled into a weakened ${wing}.`;
   // how bad it was, said from the outside, by the colour of the pieces
   const generic: Record<string, string[]> = {
     Inaccuracy: [`A small slip by ${me}.`, `Not ${me}'s best: there was something stronger.`, `A loose move by ${me}.`],

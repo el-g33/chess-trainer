@@ -4,6 +4,7 @@ import type { DrawShape } from "@lichess-org/chessground/draw";
 import type { Key } from "@lichess-org/chessground/types";
 import { Chess } from "chessops/chess";
 import { chessgroundDests } from "chessops/compat";
+import { makeBoardFen } from "chessops/fen";
 import type { NormalMove } from "chessops/types";
 import { makeSquare, makeUci, parseSquare } from "chessops/util";
 
@@ -186,13 +187,34 @@ export function badgeShapes(reviews: (Review | undefined)[], info: OpeningInfo[]
   return [{ orig: square as Key, customSvg: { html: badgeSvg(rating) } }];
 }
 
+/** The move that leads from one position to the next, as its from and to
+ *  squares; undefined when they aren't one move apart. */
+function moveBetween(from: Chess, to: Chess): [Key, Key] | undefined {
+  const wanted = makeBoardFen(to.board);
+  if (from.turn === to.turn) return undefined;
+  for (const [square, dests] of from.allDests()) {
+    for (const dest of dests) {
+      const move: NormalMove = { from: square, to: dest };
+      const promote = from.board.get(square)?.role === "pawn" && (dest >> 3 === 0 || dest >> 3 === 7);
+      const tried = positionAfter(from, promote ? { ...move, promotion: "queen" } : move);
+      if (makeBoardFen(tried.board) === wanted) return [makeSquare(square) as Key, arrowEnd(from, move)];
+    }
+  }
+  return undefined;
+}
+
 export function drawBoard(reviews: (Review | undefined)[], info: OpeningInfo[]) {
   const position = shown();
   let last: [Key, Key] | undefined;
   const plan = previewPlan();
   const quizLine = quizLinePositions();
   if (stepper?.frames) {
-    last = undefined;
+    // the from and to squares of the move this page shows (one move on from the page before, or the game)
+    const frame = stepper.frames[stepper.step - 1];
+    const page = frame?.position;
+    const previous = stepper.step > 1 ? stepper.frames[stepper.step - 2].position : base();
+    // (a page back in time names its own move: their move before it, say)
+    last = frame?.last ? [makeSquare(frame.last.from) as Key, makeSquare(frame.last.to) as Key] : page ? moveBetween(previous, page) : undefined;
   } else if (stepper && stepper.step > 0) {
     const move = stepper.moves[stepper.step - 1];
     last = [makeSquare(move.from) as Key, arrowEnd(stepper.positions[stepper.step - 1], move)];

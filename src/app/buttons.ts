@@ -27,7 +27,7 @@ import { toggleHelp } from "./featureTour";
 import { stepBack } from "./backNav";
 import { momentJump, switchReview } from "./keyMoments";
 import { onResign, onReviewGame, stopPreparing } from "./matches";
-import { exitAnalysis, goTo, navigate, onUndo, readFen } from "./moves";
+import { exitAnalysis, goTo, navigate, onUndo, readFen, tryFromStepper } from "./moves";
 import { loadDemoLine, onDemoExit, onDemoPlay, onDemoTry, onNavPlay, onShowDemo } from "./openingDemos";
 import { openPgnDialog, pgnText, readPgnText, saveCopy, saveDownload } from "./pgnScreens";
 import { clockTick } from "./playerBars";
@@ -174,6 +174,7 @@ export function wireButtons() {
   $("step-back").addEventListener("click", () => stepper && stepTo(stepper.step - 1));
   $("step-next").addEventListener("click", () => stepper && stepTo(stepper.step + 1));
   $("step-close").addEventListener("click", closeStepper);
+  $("step-try").addEventListener("click", tryFromStepper);
   overlay().addEventListener("click", (event) => {
     if (event.target === overlay()) closeOverlay();
   });

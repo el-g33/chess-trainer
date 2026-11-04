@@ -23,10 +23,10 @@ import { icon } from "../icons";
 import { LESSONS } from "../lessons";
 import { LEVELS, shortName } from "../levels";
 import {
-  HINT_TEXT, type Mode, analyser, base, brilliantShown, coachAnalysis, coachLine, currentPly, gameMoves, insights,
+  HINT_TEXT, type Mode, analyser, base, bestLine, brilliantShown, coachAnalysis, coachLine, currentPly, gameMoves, insights,
   previewPlan, quizLinePositions, quizScore, quizWaiting, ratingsOn,
 } from "../main";
-import { controlledSquares, dangerAfter, moveInWords, narrateMove, targetsOf, verdict, whyMove } from "../narrate";
+import { controlledSquares, dangerAfter, ignoredThreat, moveInWords, narrateMove, targetsOf, verdict, whyMove } from "../narrate";
 import {
   type OpeningInfo, REPERTOIRE, firstMoveOf, goalWords, isStartPosition, mainFamily, systemFor,
 } from "../openings";
@@ -546,7 +546,7 @@ function openedFiles(start: Chess, end: Chess, side: Color, viewer: Color | null
   const king = end.board.kingOf(side);
   if (king === undefined) return "";
   const pawnOn = (position: Chess, file: number) => [...position.board.pieces(side, "pawn")].some((square) => (square & 7) === file);
-  const files = [(king & 7) - 1, king & 7, (king & 7) + 1]
+  const files = [(king & 7) - 2, (king & 7) - 1, king & 7, (king & 7) + 1, (king & 7) + 2]
     .filter((file) => file >= 0 && file < 8 && pawnOn(start, file) && !pawnOn(end, file)).map((file) => FILES[file]);
   if (!files.length) return "";
   const named = files.length === 1 ? `The ${files[0]}-file is` : `The ${files.slice(0, -1).join("-, ")}- and ${files[files.length - 1]}-files are`;
@@ -585,6 +585,145 @@ function castledIntoStorm(before: Chess, played: NormalMove, after: Chess, line:
   return hook !== undefined
     ? `Castling here puts ${yours} king next to ${yours} pushed ${FILES[hook & 7]}-pawn, which ${theirs} pawns can attack to open lines towards it.`
     : `Castling here puts ${yours} king where ${theirs} pawns can storm towards it.`;
+}
+
+interface StoryPage {
+  heading: string;
+  frames: StepFrame[];
+  texts: string[];
+}
+
+/** After a castle into their pawn storm, a short story instead of a long
+ *  line, in plain words: why (the king beside a weak pawn, both circled, then
+ *  their pawn on its way), your best (hitting back, and how the lines still
+ *  open), and why blocking makes it worse. Null when there's no storm. */
+async function stormStory(after: Chess, pv: NormalMove[], viewer: Color | null): Promise<StoryPage[] | null> {
+  const side = opposite(after.turn);
+  const king = after.board.kingOf(side);
+  if (king === undefined) return null;
+  const near = (square: number) => Math.abs((square & 7) - (king & 7)) <= 2;
+  // the storm: their first pawn move on the king's side (a move or two of theirs may come first)
+  let position = after;
+  let storm: NormalMove | undefined;
+  for (const move of pv) {
+    const piece = position.board.get(move.from);
+    if (piece?.role === "pawn" && piece.color !== side && near(move.to)) {
+      storm = move;
+      break;
+    }
+    position = positionAfter(position, move);
+  }
+  if (!storm || position.turn === side) return null;
+  const stormPos = positionAfter(position, storm);
+  const pawn = stormPos.board.get(storm.to)!;
+  const ahead = storm.to + (pawn.color === "white" ? 8 : -8);
+  const aimed = ahead >= 0 && ahead < 64 && !stormPos.board.occupied.has(ahead)
+    ? [...attacks(pawn, ahead, stormPos.board.occupied).intersect(stormPos.board[side])] : [];
+  const home = side === "white" ? 1 : 6;
+  const hook = aimed.find((square) => after.board.get(square)?.role === "pawn" && square >> 3 !== home);
+  const yours = whose(side, viewer);
+  const theirs = whose(opposite(side), viewer);
+  const circle = (square: number): DrawShape => ({ orig: makeSquare(square) as Key, brush: "threat" });
+  const named = (square: number) => (after.board.get(square)?.role === "pawn" ? `${yours} ${makeSquare(square)} pawn` : `${yours} ${NAME[after.board.get(square)!.role]}`);
+  const pages: StoryPage[] = [{
+    heading: "Why",
+    frames: [
+      { position: after, shapes: [circle(king), ...(hook !== undefined ? [circle(hook)] : [])] },
+      { position: stormPos, shapes: [...moveShapes(position, storm, viewer).slice(0, 1),
+        ...(aimed.length ? [{ orig: makeSquare(storm.to) as Key, dest: makeSquare(ahead) as Key, brush: "them" } as DrawShape] : []), ...aimed.map(circle)] },
+    ],
+    texts: [
+      hook !== undefined ? `${cap(yours)} king is now next to ${yours} weak ${makeSquare(hook)} pawn.` : `${cap(yours)} king is now where ${theirs} pawns can attack it.`,
+      aimed.length ? `${cap(theirs)} ${FILES[storm.to & 7]}-pawn is coming: next it hits ${aimed.slice(0, 2).map(named).join(" and ")}.`
+        : `${cap(theirs)} pawns are coming for ${yours} king.`,
+    ],
+  }];
+
+  const sign = side === "white" ? 1 : -1;
+  const value = (score: Score) => (score.mate !== undefined ? (score.mate * sign > 0 ? 10000 : -10000) : score.cp * sign);
+  // your best: hit back; then their pawn carries on as the Why card warned
+  // (it pushes to the square it was aiming at) and the best moves from there.
+  // The words say only what this line shows.
+  const answer = await coachLine(stormPos, 1);
+  let best: { score: Score; pv: NormalMove[] } | undefined;
+  if (answer?.pv.length) {
+    const hit = answer.pv[0];
+    const positions = [stormPos, positionAfter(stormPos, hit)];
+    const line: NormalMove[] = [hit];
+    let score = answer.score;
+    // their pawn on: the push it was getting ready for, if it can still go
+    const push = { from: storm.to, to: ahead };
+    if (aimed.length && positions[1].turn !== side && positions[1].isLegal(push)) {
+      line.push(push);
+      positions.push(positionAfter(positions[1], push));
+      // then the best two moves from there (usually a trade on that square)
+      for (let i = 0; i < 2 && !positions[positions.length - 1].isEnd(); i++) {
+        const step = await coachLine(positions[positions.length - 1], 0.6);
+        if (!step?.pv.length) break;
+        score = step.score;
+        line.push(step.pv[0]);
+        positions.push(positionAfter(positions[positions.length - 1], step.pv[0]));
+      }
+    }
+    best = { score, pv: line };
+    const end = positions[positions.length - 1];
+    const pushed = line.length > 1;
+    const opened = pushed ? openedFiles(after, end, side, viewer) : "";
+    const first = narrateMove(stormPos, hit, viewer);
+    // one page a move: your hit back, their pawn's push, the take, the retake
+    const texts = line.map((move, i) => {
+      if (i === 0) return `Best is to hit back: ${first.charAt(0).toLowerCase()}${first.slice(1)}`;
+      // their pawn arrives: both of the things it hits (a pawn too, not only the pieces)
+      if (i === 1 && aimed.length) return `${cap(theirs)} pawn arrives, hitting ${aimed.slice(0, 2).map(named).join(" and ")}.`;
+      return narrateMove(positions[i], move, viewer);
+    });
+    if (pushed) {
+      // where it leaves you: their small edge said plainly, and the open file for their pieces
+      const edge = value(score);
+      const standing = edge <= -150 ? coachVerdict(score, viewer) : edge < -15 ? `${theirs === "their" ? "they're" : `${cap(theirs).replace("'s", "")} is`} slightly better` : coachVerdict(score, viewer);
+      texts[texts.length - 1] += opened
+        ? ` ${opened} ${cap(theirs)} other pieces can now use it to attack, so ${standing}.`
+        : ` Now ${standing}.`;
+    }
+    pages.push({
+      heading: "Your best",
+      // (each with what the move attacks circled: the push hits two things at once)
+      frames: line.map((move, i) => ({ position: positions[i + 1], shapes: moveShapes(positions[i], move, viewer) })),
+      texts,
+    });
+  }
+
+  // blocking (or running) makes it worse: the clearest one Stockfish rates well below the best
+  const top = best?.pv[0] ? makeUci(best.pv[0]) : "";
+  const candidates: { move: NormalMove; kind: "king" | "pawn" }[] = [];
+  for (const [from, dests] of stormPos.allDests()) {
+    const piece = stormPos.board.get(from);
+    if (!piece) continue;
+    for (const to of dests) {
+      const move = { from, to };
+      if (makeUci(move) === top || stormPos.board.get(to)) continue; // (quiet moves only)
+      if (piece.role === "pawn" && near(from)) candidates.push({ move, kind: "pawn" });
+      else if (piece.role === "king" && Math.abs((to & 7) - (from & 7)) <= 1) candidates.push({ move, kind: "king" });
+    }
+  }
+  candidates.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "pawn" ? -1 : 1)); // blocking first
+  if (best) {
+    for (const candidate of candidates.slice(0, 5)) {
+      const line = await coachLine(stormPos, 0.6, [candidate.move]);
+      if (!line?.pv[1] || value(best.score) - value(line.score) < 75) continue;
+      const tried = positionAfter(stormPos, candidate.move);
+      const answer = line.pv[1];
+      pages.push({
+        heading: candidate.kind === "pawn" ? "Don't block" : "Don't run",
+        frames: [{ position: stormPos, shapes: [] }, { position: tried, shapes: moveShapes(stormPos, candidate.move, viewer).slice(0, 1) },
+          { position: positionAfter(tried, answer), shapes: moveShapes(tried, answer, viewer).slice(0, 1) }],
+        texts: [`Back to ${theirs} pawn push. What if you try to stop it?`, candidate.kind === "pawn" ? "Blocking with a pawn looks safe, but it leaves holes." : `Running with ${yours} king is too slow.`,
+          `${narrateMove(tried, answer, viewer)} Now ${coachVerdict(line.score, viewer)}.`],
+      });
+      break;
+    }
+  }
+  return pages;
 }
 
 export function linePages(start: Chess, line: NormalMove[], viewer: Color | null): { frames: StepFrame[]; texts: string[] } {
@@ -658,9 +797,30 @@ export async function explainSlip(ply: number, review: Review) {
     chapterOf.push(...more.map(() => chapters.indexOf(heading)));
   };
   let simple = false;
+  let storyPages: StoryPage[] | null = null; // a king-safety story, told instead of the line
+  // A threat they already had (often made by their last move), not dealt with:
+  // the threat first, on the board before the move, then the move that ignores it
+  const lastMove = ply >= 2 ? game.moves[ply - 2].move as NormalMove : undefined;
+  const threat = ignoredThreat(before, after, reply, lastMove);
+  if (threat) {
+    const yours = whose(mover, viewer);
+    const theirs = whose(opposite(mover), viewer);
+    const what = threat.victim === "pawn" ? `${yours} ${makeSquare(threat.move.to)} pawn` : `${yours} ${NAME[threat.victim]}`;
+    const taker = `${theirs} ${NAME[threat.taker]}`;
+    const circle: DrawShape = { orig: makeSquare(threat.move.to) as Key, brush: "threat" };
+    const arrow: DrawShape = { orig: makeSquare(threat.move.from) as Key, dest: makeSquare(threat.move.to) as Key, brush: "threat" };
+    const lastWords = viewer === null ? `${colourName(opposite(mover))}'s last move` : mine ? "Their last move" : "Your last move";
+    add("The threat", [{ position: before, shapes: [arrow, circle], last: threat.fresh ? lastMove : undefined }],
+      [threat.fresh ? `${lastWords} made a threat: ${taker} can take ${what}.` : `${cap(taker)} was attacking ${what}.`]);
+    const didnt = viewer === null ? `${colourName(mover)}'s move doesn't deal with it.` : mine ? "Your move doesn't deal with it." : "Their move doesn't deal with it.";
+    add("The threat", [{ position: after, shapes }], [mine && viewer !== null ? `${didnt} Before every move, ask: what does their last move want?` : didnt]);
+  }
   try {
     if (reply) {
-      const punish = await coachLine(after, 1.5);
+      // their best reply and the line it starts, each move the best in its
+      // position (after castling, just far enough to find their pawn storm)
+      const castled = isCastling(before, played);
+      const punish = await bestLine(after, castled ? 4 : 6, 0.6);
       const pv = punish?.pv.length ? punish.pv : [reply];
       const victim = after.board.get(reply.to);
       const took = positionAfter(after, reply);
@@ -669,12 +829,15 @@ export async function explainSlip(ply: number, review: Review) {
       simple = !!victim && victim.color === mover && !(next && (took.board.get(next.to) || positionAfter(took, next).isCheck()));
       if (simple) {
         add("Why", [{ position: took, shapes: moveShapes(after, reply, viewer).slice(0, 1) }], [freeTakeWords(after, reply, mover, viewer)]);
+      } else if (castled && (storyPages = await stormStory(after, pv, viewer))) {
+        // a castle into their pawns: the idea, the tempting defences that fail, the answer
+        for (const page of storyPages) add(page.heading, page.frames, page.texts);
       } else {
         // a real tactic: its moves, played on until the material is won
         const danger = dangerAfter(review, before, after, analyser.evals.get(fenOf(before)), analyser.evals.get(fenOf(after)), !!openingInfo()[ply - 1]?.book, viewer);
         const promised = danger ? promisedGain(danger.text) : 0;
         const won = promised ? lineToGain(after, pv, opposite(mover), promised) : undefined;
-        const plain = wholeLine(after, pv, 3);
+        const plain = wholeLine(after, pv, castled ? 7 : 3);
         const line = won && won.length > plain.length ? won : plain;
         const pages = linePages(after, line, viewer);
         // King safety: the lines it opens in front of the mover's king
@@ -689,9 +852,10 @@ export async function explainSlip(ply: number, review: Review) {
       }
     }
     if (!frames.length) add("Why", [{ position: after, shapes }], ["It's a small slip."]);
+    if (storyPages) return; // (a king-safety story says it all)
     // With the fundamentals: the habit that would have saved it
     const basics = fundamentalsOn() && !theirSlip ? fundamentalEvents(reviews()).find((event) => event.ply === ply) : undefined;
-    const habit = basics && HABITS[basics.kind];
+    const habit = basics && !threat && HABITS[basics.kind];
     if (habit) add("The habit", [{ position: before, shapes: [] }], [habit]);
     // The better move: yours always; theirs only for a big slip that wasn't a simple take
     const best = parseSan(before, review.bestSan!) as NormalMove | undefined;
@@ -700,15 +864,19 @@ export async function explainSlip(ply: number, review: Review) {
     if (basics) {
       // the simplest safe idea, not the engine's best line
       const loose = basics.kind === "hung" && basics.role ? `Keep your ${basics.role} safe: move it away, or defend it. ` : "";
-      add("The safe choice", [{ position: afterBest, shapes: movePicture(before, afterBest, best, mine, viewer) }],
-        [loose + whyBetter(before, after, best, reply, viewer)]);
+      add("The safe choice", [{ position: before, shapes: [] }, { position: afterBest, shapes: movePicture(before, afterBest, best, mine, viewer) }],
+        ["Back to before your move.", loose + whyBetter(before, after, best, reply, viewer)]);
       return;
     }
     const heading = viewer === null ? "The better move" : theirSlip ? "Their better option" : "Your better option";
-    add(heading, [{ position: afterBest, shapes: movePicture(before, afterBest, best, mine, viewer) }], [whyBetter(before, after, best, reply, viewer)]);
-    if (simple) return; // (nothing more to see after a simple take)
+    // (back to the position before the move first, so the better one is seen being played)
+    add(heading, [{ position: before, shapes: [] }, { position: afterBest, shapes: movePicture(before, afterBest, best, mine, viewer) }],
+      [mine ? "Back to before your move: there was a better one." : "Back to before their move: there was a better one.", whyBetter(before, after, best, reply, viewer)]);
+    if (simple || storyPages) return; // (nothing more to see after a simple take, or a king-safety story)
     // How it goes on: the better move's line, from their reply
-    const better = await coachLine(before, 1.5, [best]);
+    // (its line: the better move, then the best move in each position in turn)
+    const then = await bestLine(afterBest, 5, 0.5);
+    const better = then && { score: then.score, pv: [best, ...then.pv] };
     const line = wholeLine(before, better?.pv.length ? better.pv : [best], 3);
     if (line.length < 2) return;
     const pages = linePages(afterBest, line.slice(1), viewer);
@@ -748,10 +916,13 @@ export async function explainEscape(ply: number, review: Review) {
   const mover = game.moverOf(ply);
   const viewer = listener();
   const afterBest = positionAfter(before, best);
-  const card = startStory({ position: afterBest, shapes: movePicture(before, afterBest, best, false, viewer) },
-    ideaWords(before, best, viewer), moodForRating(review.rating), ["What they missed", "How it would have gone"]);
+  // the position they had first, then the move they missed played in
+  const who = viewer === null ? colourName(mover) : mover === viewer ? "You" : "They";
+  const card = startStory({ position: before, shapes: [] }, `${who} had a strong move here.`, moodForRating(review.rating), ["What they missed", "How it would have gone"]);
+  extendPages(card, [{ position: afterBest, shapes: movePicture(before, afterBest, best, false, viewer) }], [ideaWords(before, best, viewer)], 0);
   try {
-    const line = await coachLine(before, 1.5, [best]);
+    const then = await bestLine(afterBest, 4, 0.6);
+    const line = then && { score: then.score, pv: [best, ...then.pv] };
     const moves = wholeLine(before, line?.pv.length ? line.pv : [best], 3);
     if (moves.length < 2) return;
     const pages = linePages(afterBest, moves.slice(1), viewer);
@@ -846,7 +1017,8 @@ export async function showBestLine(ply: number) {
     const pages = linePages(before, moves, viewer);
     pages.texts[0] = cap(moveInWords(before, best, viewer));
     if (line && moves.length > 1) endWith(pages.texts, lineOutcome(before, moves, line.score, mover, viewer));
-    extendPages(card, pages.frames, pages.texts, 1);
+    // (back to the position before first, so the top move is seen being played)
+    extendPages(card, [{ position: before, shapes: [] }, ...pages.frames], ["Back one move: here's the top move instead.", ...pages.texts], 1);
   } catch (error) {
     set.errorText(`Something went wrong: ${error}`);
     refresh();
@@ -1077,6 +1249,7 @@ export interface StepFrame {
   shapes: DrawShape[];
   odds?: LikelyMove[]; // their likely moves, with chances
   others?: number; // the chance of anything else
+  last?: NormalMove; // the move to highlight, when it isn't the one from the page before
 }
 
 
@@ -1115,25 +1288,10 @@ export function closeStepper() {
 
 export const stepTyper = new Typer($("step-text"));
 
-// On a wide screen the stepper sits in the panel beside the board (under the
-// moves, in the room there), so the board keeps its size; otherwise under the
-// board, where it began
-const WIDE = window.matchMedia("(min-width: 1000px) and (orientation: landscape)");
-let stepperSpot: Comment | null = null;
-
-function placeStepper(box: HTMLElement) {
-  if (!stepperSpot) box.before((stepperSpot = document.createComment("stepper")));
-  const panel = document.querySelector<HTMLElement>(".moves-area");
-  if (WIDE.matches && panel) {
-    if (box.parentElement !== panel) panel.append(box);
-  } else if (box.previousSibling !== stepperSpot) stepperSpot.after(box);
-}
-
 export function drawStepper() {
   const box = $("stepper");
   const area = document.querySelector<HTMLElement>(".board-area")!;
   area.classList.toggle("stepping", stepper !== null);
-  placeStepper(box);
   box.hidden = !stepper;
   if (!stepper) return;
   $("step-count").textContent = stepCount() > 1 ? `${stepper.step}/${stepCount()}` : "";

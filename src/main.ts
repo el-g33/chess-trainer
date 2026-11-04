@@ -41,8 +41,9 @@ import { answerQuiz, startTask } from "./app/strategyCoach";
 import { startDemo, startDrill } from "./app/openingDemos";
 import { editorTap, startEditor, startLesson, startPuzzles } from "./app/train";
 import { refresh } from "./app/draw";
-import { installed } from "./app/coach";
+import { type Stepper, installed } from "./app/coach";
 import { setupBackGesture } from "./app/backNav";
+import { setupSidebar } from "./app/sidebar";
 import { buildMenu, showMenu } from "./app/startMenu";
 import { onBoardMove, onUndo } from "./app/moves";
 import { wireButtons } from "./app/buttons";
@@ -100,6 +101,7 @@ export interface Analysis {
   fromPly: number;
   line: Game; // starts at the game position, holds the analysis moves
   ahead: NormalMove[]; // moves stepped back over (forward replays them)
+  resume?: Stepper; // tried from inside the coach's explanation: back to it (on the same page)
 }
 
 export interface Insight {
@@ -218,6 +220,24 @@ export async function coachLine(position: Chess, seconds: number, first: NormalM
     walk = positionAfter(walk, move);
   }
   return { score: lineScore(position, line), pv };
+}
+
+/** A line made of the coach's best move in each position in turn - as Trying
+ *  moves shows them, one at a time - rather than one search's guess at the
+ *  whole line (whose later moves are often not the best). The score is the
+ *  first position's. */
+export async function bestLine(position: Chess, plies: number, seconds: number): Promise<{ score: Score; pv: NormalMove[] } | undefined> {
+  let walk = position;
+  const pv: NormalMove[] = [];
+  let first: { score: Score } | undefined;
+  for (let i = 0; i < plies && !walk.isEnd(); i++) {
+    const step = await coachLine(walk, seconds);
+    if (!step?.pv.length) break;
+    first ??= step;
+    pv.push(step.pv[0]);
+    walk = positionAfter(walk, step.pv[0]);
+  }
+  return first ? { score: first.score, pv } : undefined;
 }
 
 export const ground: Api = Chessground($("board"), {
@@ -406,6 +426,7 @@ if (import.meta.env.DEV) {
 
 buildMenu();
 wireButtons();
+setupSidebar(); // a computer: the board on the left, everything else beside it
 refresh();
 showMenu();
 setupWhatsNew(); // after an update: what's new
