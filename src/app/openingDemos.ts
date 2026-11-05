@@ -168,7 +168,7 @@ export function drawDemo() {
   for (const button of document.querySelectorAll<HTMLButtonElement>(".var-next")) button.disabled = demo.line + 1 >= demo.demo.lines.length;
 }
 
-export const lowerFirst = (text: string) => (/^(White|Black)/.test(text) ? text : text.charAt(0).toLowerCase() + text.slice(1));
+export const lowerFirst = (text: string) => (/^(White|Black)\b/.test(text) ? text : text.charAt(0).toLowerCase() + text.slice(1));
 export const cap = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /** "London · Main", "London · Nf3 variation" */

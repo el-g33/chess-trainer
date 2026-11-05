@@ -11,6 +11,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.23",
+    items: [
+      { icon: "bulb", title: "The real reason", text: "When a move loses nothing you can see but leaves you worse placed, the coach names why: a hole in front of your king, loosened king cover, or an isolated, doubled or backward pawn, with why it matters." },
+      { icon: "target", title: "Better moves, explained", text: "Your better option is said in one line, like stopping their pawn from chasing your bishop, and your next pawn ideas are drawn as arrows." },
+      { icon: "shield", title: "What you got away with", text: "When they miss a strong move, the coach shows it, such as their bishop jumping into a hole in front of your king. A plain trade is no longer called a blunder or a chance." },
+    ],
+  },
+  {
     version: "3.22",
     items: [
       { icon: "hazard", title: "Pieces left hanging", text: "When their move threatened a piece and yours didn't deal with it, the coach says so plainly, and the explanation starts from their threat on the board before your move." },

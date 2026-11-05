@@ -26,7 +26,8 @@ import {
   HINT_TEXT, type Mode, analyser, base, bestLine, brilliantShown, coachAnalysis, coachLine, currentPly, gameMoves, insights,
   previewPlan, quizLinePositions, quizScore, quizWaiting, ratingsOn,
 } from "../main";
-import { controlledSquares, dangerAfter, ignoredThreat, moveInWords, narrateMove, targetsOf, verdict, whyMove } from "../narrate";
+import { asGerund, controlledSquares, dangerAfter, ignoredThreat, moveInWords, narrateMove, quietReason, stopsPawn, targetsOf, verdict, whyMove } from "../narrate";
+import { REASON_LESSON, isKingHole, reasonWords } from "../reasons";
 import {
   type OpeningInfo, REPERTOIRE, firstMoveOf, goalWords, isStartPosition, mainFamily, systemFor,
 } from "../openings";
@@ -34,7 +35,7 @@ import { SOURCE_NAMES, type Source } from "../online";
 import { readPgn, writePgn } from "../pgn";
 import { ratingName } from "../ratingNames";
 import { type Review, fenOf, isDrawnPosition, isSacrifice, verdictWords, winningChance } from "../review";
-import { planAhead } from "../strategy";
+import { passMove, planAhead } from "../strategy";
 import { type Style, styleAlternative } from "../style";
 import { Typer, fitsIn, readingTime, splitToFit } from "../talk";
 
@@ -126,8 +127,9 @@ export function moveButton(ply: number, review: Review): CoachButton | null {
     if (theirs) {
       // they missed a chance against you: you got away with it (no gift in that)
       if (review.rating === "Miss" || review.rating === "Missed Win") return { ico: "shield", label: "What you got away with", run, kind: "sign escape", more: true };
-      // a small slip of theirs is rarely a real chance: a gift only if it gives you something
-      if (review.rating === "Inaccuracy" && !danger) return null;
+      // a slip of theirs is a gift only if it gives you something concrete; otherwise
+      // (a mistake) it's the stronger move they missed, and a small one gets no sign
+      if (!danger) return review.rating === "Inaccuracy" ? null : { ico: "shield", label: "What you got away with", run, kind: "sign escape", more: true };
       return { ico: "gift", label: "Your chance", run, kind: "sign chance", more: true };
     }
     // The hazard only when something concrete can be won from you (material, mate);
@@ -726,9 +728,19 @@ async function stormStory(after: Chess, pv: NormalMove[], viewer: Color | null):
   return pages;
 }
 
-export function linePages(start: Chess, line: NormalMove[], viewer: Color | null): { frames: StepFrame[]; texts: string[] } {
+export function linePages(start: Chess, line: NormalMove[], viewer: Color | null, previous?: NormalMove): { frames: StepFrame[]; texts: string[] } {
   const story = talkLine(start, line, viewer);
   const frames = line.map((move, i) => ({ position: story.positions[i + 1], shapes: moveShapes(story.positions[i], move, viewer) }));
+  // a piece the move before attacked, stepping away without taking: "This forces your rook to move out of the way."
+  line.forEach((move, i) => {
+    const last = i ? line[i - 1] : previous;
+    const position = story.positions[i];
+    const piece = position.board.get(move.from);
+    const chaser = last && position.board.get(last.to);
+    if (!last || !piece || !chaser || chaser.color === piece.color || position.board.get(move.to) || piece.role === "pawn" || piece.role === "king") return;
+    if (!attacks(chaser, last.to, position.board.occupied).has(move.from) || positionAfter(position, move).isCheck()) return;
+    story.texts[i] = `This forces ${whose(piece.color, viewer)} ${NAME[piece.role]} to move out of the way.`;
+  });
   return { frames, texts: story.texts };
 }
 
@@ -780,6 +792,10 @@ export async function explainSlip(ply: number, review: Review) {
   const mine = viewer === null || mover === viewer;
   const theirSlip = !mine && viewer !== null;
   if (theirSlip && (review.rating === "Miss" || review.rating === "Missed Win")) return void explainEscape(ply, review);
+  // their slip that gives you nothing concrete: what they missed, not a chance for you
+  if (theirSlip && !dangerAfter(review, before, after, analyser.evals.get(fenOf(before)), analyser.evals.get(fenOf(after)), !!openingInfo()[ply - 1]?.book, viewer)) {
+    return void explainEscape(ply, review);
+  }
   const reply = after.isEnd() ? undefined : analyser.evals.get(fenOf(after))?.best;
   const shapes = moveShapes(before, played, viewer).slice(0, 1);
   const card = startStory({ position: after, shapes }, "", moodForRating(review.rating), []); // (filled in below, shown once ready)
@@ -848,7 +864,33 @@ export async function explainSlip(ply: number, review: Review) {
         // a castle into their pawns: said first, as what the slip was about
         const storm = castledIntoStorm(before, played, after, line, viewer);
         if (storm) add("Why", [{ position: after, shapes }], [storm]);
-        add("Why", pages.frames, pages.texts);
+        // a quiet slip: the weakness it made, circled, and why it matters; then how they go after it
+        const reason = !storm && !threat && !danger ? quietReason(review, before, after) : undefined;
+        if (reason) {
+          const marks: DrawShape[] = reason.squares.map((square) => ({ orig: makeSquare(square) as Key, brush: "threat" }));
+          if (reason.kind === "open-file" && reason.file !== undefined) {
+            const ends = mover === "white" ? [reason.file, 56 + reason.file] : [56 + reason.file, reason.file];
+            marks.push({ orig: makeSquare(ends[1]) as Key, dest: makeSquare(ends[0]) as Key, brush: "threat" });
+          }
+          // (the bubble has just said the reason: the card says why it matters)
+          const said = verdict(review, before, after, analyser.evals.get(fenOf(after)), listener(), ply, watching());
+          const words = reasonWords(reason, mover, viewer);
+          add("Why", [{ position: after, shapes: [...shapes, ...marks] }], [said === words ? REASON_LESSON[reason.kind] : `${words} ${REASON_LESSON[reason.kind]}`]);
+        }
+        // (their line only when it goes after the weakness: a piece onto the hole or the
+        // open file, or hitting the weak pawn; otherwise it would only be noise)
+        const usesIt = () => {
+          let position = after;
+          for (const move of line) {
+            const piece = position.board.get(move.from);
+            position = positionAfter(position, move);
+            if (!piece || piece.color === mover) continue;
+            if (reason!.kind === "open-file" ? (move.to & 7) === reason!.file && ["rook", "queen"].includes(piece.role)
+              : reason!.squares.includes(move.to) || reason!.squares.some((square) => attacks(piece, move.to, position.board.occupied).has(square))) return true;
+          }
+          return false;
+        };
+        if (!reason || usesIt()) add("Why", pages.frames, pages.texts);
       }
     }
     if (!frames.length) add("Why", [{ position: after, shapes }], ["It's a small slip."]);
@@ -869,16 +911,24 @@ export async function explainSlip(ply: number, review: Review) {
       return;
     }
     const heading = viewer === null ? "The better move" : theirSlip ? "Their better option" : "Your better option";
-    // (back to the position before the move first, so the better one is seen being played)
-    add(heading, [{ position: before, shapes: [] }, { position: afterBest, shapes: movePicture(before, afterBest, best, mine, viewer) }],
-      [mine ? "Back to before your move: there was a better one." : "Back to before their move: there was a better one.", whyBetter(before, after, best, reply, viewer)]);
+    // (straight to the better move, played in: its squares lit, and what it's for in one line)
+    add(heading, [{ position: afterBest, shapes: movePicture(before, afterBest, best, mine, viewer), last: best }], [betterWords(before, after, best, reply, viewer, mine)]);
     if (simple || storyPages) return; // (nothing more to see after a simple take, or a king-safety story)
+    if (stopsPawn(before, best, viewer)) return; // (stopping their pawn is the point: the rest is ordinary play)
     // How it goes on: the better move's line, from their reply
     // (its line: the better move, then the best move in each position in turn)
     const then = await bestLine(afterBest, 5, 0.5);
     const better = then && { score: then.score, pv: [best, ...then.pv] };
     const line = wholeLine(before, better?.pv.length ? better.pv : [best], 3);
     if (line.length < 2) return;
+    // the next idea when it's a pawn push or two: what you'd play with a free move (whatever
+    // they do, it's the plan), drawn as arrows, not played out
+    const plan = afterBest.isCheck() ? undefined : await bestLine(passMove(afterBest), 3, 0.5);
+    const idea = plan ? nextIdea(afterBest, plan.pv, mover, viewer) : undefined;
+    if (idea && better) {
+      add("The idea", [idea.frame], [idea.text]);
+      return;
+    }
     const pages = linePages(afterBest, line.slice(1), viewer);
     if (better) endWith(pages.texts, lineOutcome(before, line, better.score, mover, viewer));
     add("How it goes on", pages.frames, pages.texts);
@@ -903,8 +953,62 @@ function freeTakeWords(after: Chess, take: NormalMove, mover: Color, viewer: Col
   if (viewer === null) {
     return `${guarded ? "It's guarded, but taking still wins material" : `Nothing guards it, so ${colourName(taker)} can just take it`}, and ${colourName(mover)} has no good way to hit back.`;
   }
-  if (viewer === taker) return `${guarded ? "It's guarded, but taking still wins material" : "Nothing guards it, so it's yours to take"}, and they've no good way to hit back.`;
+  if (viewer === taker) return guarded ? "It's guarded, but taking still wins material, and they've no good way to hit back." : "Nothing guards it, so it's yours, easy. And they've no good way to hit back.";
   return `${guarded ? "It was guarded, but taking still won them material" : "Nothing guarded it, so they could just take it"}, and you'd have no good way to hit back.`;
+}
+
+/** The better move in one coach's line: "Your better option was bringing the
+ *  rook into play." A pawn move that stops their pawn chasing a piece says so. */
+function betterWords(before: Chess, after: Chess, best: NormalMove, reply: NormalMove | undefined, viewer: Color | null, mine: boolean): string {
+  const lead = viewer === null ? "The better move was" : mine ? "Your better option was" : "Their better option was";
+  const clause = stopsPawn(before, best, viewer) ?? whyMove(before, best, viewer).replace(/^it /, "");
+  const also = whyBetter(before, after, best, reply, viewer).endsWith("It also stops the reply you just saw.") ? " It also stops the reply you just saw." : "";
+  // (a clause that isn't a verb, like "it's checkmate", is said as it is)
+  if (/^(it's|it is)/.test(clause)) return `${lead} there: ${clause}.${also}`;
+  return `${lead} ${asGerund(clause)}.${also}`;
+}
+
+/** The plan after the better move (`pv`: the best line if they passed), when its next steps are pawn pushes: the
+ *  board right after the better move (whatever they reply: it's a plan),
+ *  with an arrow for each push and what it hits circled, and the idea in
+ *  words ("Your next idea: your a-pawn to a4,
+ *  which stops their b-pawn coming to b5 to chase your bishop."). */
+function nextIdea(start: Chess, pv: NormalMove[], side: Color, viewer: Color | null): { frame: StepFrame; text: string } | undefined {
+  if (!pv.length || start.isEnd()) return undefined;
+  // (the plan: your moves as if they passed, starting with yours)
+  let position = passMove(start);
+  const shapes: DrawShape[] = [];
+  const squares: string[] = []; // where the pawns go
+  const aims: string[] = []; // what they go for
+  let stop: string | undefined;
+  for (let i = 0; i < Math.min(pv.length, 3); i++) {
+    const move = pv[i];
+    const piece = position.board.get(move.from);
+    if (piece?.color === side) {
+      if (piece.role !== "pawn" || position.board.get(move.to)) break; // (the plan stops at a piece move or a take)
+      const next = positionAfter(position, move);
+      stop ??= stopsPawn(position, move, viewer);
+      const hits = [...attacks(piece, move.to, next.board.occupied).intersect(next.board[opposite(side)])].filter((square) => next.board.get(square)!.role !== "king");
+      shapes.push({ orig: makeSquare(move.from) as Key, dest: makeSquare(move.to) as Key, brush: "you" });
+      for (const square of hits) shapes.push({ orig: makeSquare(square) as Key, brush: "threat" });
+      squares.push(makeSquare(move.to));
+      for (const square of hits) {
+        const role = NAME[next.board.get(square)!.role];
+        if (!aims.includes(role)) aims.push(role);
+      }
+    }
+    position = positionAfter(position, move);
+  }
+  if (!squares.length) return undefined;
+  // said simply: "You have c3 and d4 ideas to attack their pawn and bishop."
+  const who = viewer === null ? `${colourName(side)} has` : side === viewer ? "You have" : "They have";
+  const an = (square: string) => (/^[aefh]/.test(square) ? "an" : "a");
+  const ideas = squares.length === 1 ? `${an(squares[0])} ${squares[0]} idea` : `${squares.slice(0, -1).join(", ")} and ${squares[squares.length - 1]} ideas`;
+  const their = whose(opposite(side), viewer);
+  const centre = squares.some((square) => /^[de][45]$/.test(square));
+  const why = stop ? stop.replace(/^stops (\S+) (\S+) coming to \S+ to chase/, "to stop $1 $2 chasing")
+    : aims.length ? `to attack ${their} ${aims.slice(0, 2).join(" and ")}` : centre ? "to take the centre" : "to gain space";
+  return { frame: { position: start, shapes }, text: `${who} ${ideas} ${why}.` };
 }
 
 /** A chance they missed against you: what they could have played, shown
@@ -916,16 +1020,23 @@ export async function explainEscape(ply: number, review: Review) {
   const mover = game.moverOf(ply);
   const viewer = listener();
   const afterBest = positionAfter(before, best);
-  // the position they had first, then the move they missed played in
-  const who = viewer === null ? colourName(mover) : mover === viewer ? "You" : "They";
-  const card = startStory({ position: before, shapes: [] }, `${who} had a strong move here.`, moodForRating(review.rating), ["What they missed", "How it would have gone"]);
-  extendPages(card, [{ position: afterBest, shapes: movePicture(before, afterBest, best, false, viewer) }], [ideaWords(before, best, viewer)], 0);
+  // straight to the move they missed, played in (its squares lit)
+  // (a piece that would have jumped into a hole in front of the king: said so, the hole circled)
+  const piece = before.board.get(best.from);
+  const hole = piece && piece.role !== "pawn" && isKingHole(before, opposite(mover), best.to);
+  const hits = hole ? targetsOf(afterBest, best.to).map((square) => `${whose(opposite(mover), viewer)} ${NAME[afterBest.board.get(square)!.role]}`) : [];
+  const words = hole
+    ? `${cap(whose(mover, viewer))} ${NAME[piece.role]} could jump into the hole on ${makeSquare(best.to)}, right in front of ${whose(opposite(mover), viewer)} king${hits.length ? `, hitting ${hits[0]}` : ""}.`
+    : ideaWords(before, best, viewer);
+  const shapes = movePicture(before, afterBest, best, false, viewer);
+  if (hole) shapes.push({ orig: makeSquare(best.to) as Key, brush: "threat" });
+  const card = startStory({ position: afterBest, shapes, last: best }, words, moodForRating(review.rating), ["What they missed", "How it would have gone"]);
   try {
     const then = await bestLine(afterBest, 4, 0.6);
     const line = then && { score: then.score, pv: [best, ...then.pv] };
     const moves = wholeLine(before, line?.pv.length ? line.pv : [best], 3);
     if (moves.length < 2) return;
-    const pages = linePages(afterBest, moves.slice(1), viewer);
+    const pages = linePages(afterBest, moves.slice(1), viewer, best);
     if (line) endWith(pages.texts, lineOutcome(before, moves, line.score, mover, viewer));
     extendPages(card, pages.frames, pages.texts, 1);
   } catch (error) {
