@@ -33,6 +33,7 @@ export function readPgnText() {
   set.pgnGames(text ? readPgn(text).filter((g) => g.load().game.length > 0 || g.headers.FEN) : []);
   pgnPick.replaceChildren(...pgnGames.map((g, i) => new Option(`${i + 1}. ${g.title}`, String(i))));
   $("pgn-pick-row").hidden = pgnGames.length < 2;
+  $("pgn-clear").hidden = !pgnText.value; // (a quick way to empty the box)
   drawHome();
   pgnStatus.classList.toggle("problem", !!text && !pgnGames.length);
   pgnStatus.textContent = !text
@@ -42,6 +43,15 @@ export function readPgnText() {
       : pgnGames.length === 1
         ? `Found: ${pgnGames[0].title}`
         : `Found ${pgnGames.length} games - choose one.`;
+}
+
+/** Empty the text box (and forget the file it came from), ready for another game. */
+export function clearPgnText() {
+  pgnText.value = "";
+  $("pgn-file-name").textContent = "";
+  $<HTMLInputElement>("pgn-file").value = "";
+  readPgnText();
+  pgnText.focus();
 }
 
 export async function reviewPgnGame(event: Event) {

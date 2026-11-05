@@ -11,6 +11,13 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.25",
+    items: [
+      { icon: "star", title: "Why it's the key move", text: "For a key move, the coach now shows why nothing else works: another move, and the answer that punishes it. When you miss the only good move, the coach tells you." },
+      { icon: "close", title: "Clear a pasted game", text: "In Analyse a game, a Clear button empties the game box in one tap." },
+    ],
+  },
+  {
     version: "3.24",
     items: [
       { icon: "bulb", title: "Reasons about your pieces", text: "The coach now spots the opening habits that cost you: the queen out early, the king left in the centre, the same piece moved again, a centre pawn blocked in, a knight on the edge, or a piece that does less where it went." },

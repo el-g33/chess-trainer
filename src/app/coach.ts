@@ -52,7 +52,7 @@ import { keyMomentsCard, turningPlies } from "./keyMoments";
 import { analysisLineText, goTo } from "./moves";
 import {
   cap, depthButton, drillSays, lessonNotePages, openingShortName, practiceSays, scheduleDemo, showWhatYouGet, startDemoLine,
-  movePicture, practiseGameSlips,
+  lowerFirst, movePicture, practiseGameSlips,
 } from "./openingDemos";
 import { importGames, importing, importNote, reviewImported } from "./onlineGames";
 import { openPgnDialog, openSave } from "./pgnScreens";
@@ -255,7 +255,7 @@ export function coachSays(reviews: (Review | undefined)[]): CoachSay {
   // the move's own button, a sign of what kind of move it was (none for a quiet one)
   const more = moveButton(ply, review);
   // (its card worked out while you read this, so it opens at once)
-  if (more?.more && reviewing && WORTH_SHOWING.has(review.rating)) prepareSlip(ply, review);
+  if (more?.more && reviewing && (WORTH_SHOWING.has(review.rating) || review.rating === "Great")) prepareSlip(ply, review);
   const buttons = more ? [more, STRATEGY] : [STRATEGY];
   // Your slips saved as puzzles: said once, at the first, and offered at the end of the game
   const saved = reviewing && savedFromReview?.key === gameKey() ? savedFromReview : null;
@@ -794,12 +794,13 @@ let aheadOf = "";
 /** Work out the card for a slip ahead, without showing it. */
 export function prepareSlip(ply: number, review: Review) {
   const key = `${fenOf(game.positionAt(ply - 1))} ${makeUci(game.moves[ply - 1].move)} ${review.rating}`;
-  if (key === aheadOf || !WORTH_SHOWING.has(review.rating) || !review.bestSan) return;
+  const key_ = review.rating === "Great" || (WORTH_SHOWING.has(review.rating) && !!review.bestSan);
+  if (key === aheadOf || !key_) return;
   aheadOf = key;
   const token = ++ahead;
   dry = true;
   try {
-    void explainSlip(ply, review, token).catch(() => {});
+    void (review.rating === "Great" ? explainGreat(ply, token) : explainSlip(ply, review, token)).catch(() => {});
   } finally {
     dry = false; // (the card is made before its first search, so this covers it)
   }
@@ -1007,7 +1008,10 @@ function freeTakeWords(after: Chess, take: NormalMove, mover: Color, viewer: Col
 function betterWords(before: Chess, after: Chess, best: NormalMove, reply: NormalMove | undefined, viewer: Color | null, mine: boolean): string {
   const lead = viewer === null ? "The better move was" : mine ? "Your better option was" : "Their better option was";
   const clause = stopsPawn(before, best, viewer) ?? whyMove(before, best, viewer).replace(/^it /, "");
-  const also = whyBetter(before, after, best, reply, viewer).endsWith("It also stops the reply you just saw.") ? " It also stops the reply you just saw." : "";
+  let also = whyBetter(before, after, best, reply, viewer).endsWith("It also stops the reply you just saw.") ? " It also stops the reply you just saw." : "";
+  // (the only good move: the next best was much worse)
+  const known = analyser.evals.get(fenOf(before));
+  if (known?.secondScore && winningChance(known.score, before.turn) - winningChance(known.secondScore, before.turn) >= 25) also += " It was the only good move here.";
   // (a clause that isn't a verb, like "it's checkmate", is said as it is)
   if (/^(it's|it is)/.test(clause)) return `${lead} there: ${clause}.${also}`;
   return `${lead} ${asGerund(clause)}.${also}`;
@@ -1349,10 +1353,17 @@ export async function explainBrilliant(ply: number) {
 
 /** Tell me more about a great move: it was the only good one, and the board
  *  plays out the opportunity it creates. The card opens at once. */
-export async function explainGreat(ply: number) {
+/** The key move (the only good one): why it, then why not something else (the
+ *  next best move, and the answer that punishes it), then how it goes on. */
+export async function explainGreat(ply: number, token?: number) {
+  if (token === undefined) {
+    ahead++;
+    aheadOf = "";
+  }
+  const stale = () => token !== undefined && token !== ahead;
   const before = game.positionAt(ply - 1);
   const after = game.positionAt(ply);
-  const played = game.moves[ply - 1].move;
+  const played = game.moves[ply - 1].move as NormalMove;
   const mover = game.moverOf(ply);
   const viewer: Color | null = watching() ? null : listener() ?? mover;
   const why = whyMove(before, played, viewer);
@@ -1362,23 +1373,56 @@ export async function explainGreat(ply: number) {
   const reason = attacked && piece.role !== "king" ? `It gets ${whoseOf(mover, viewer)} ${NAME[piece.role]} out of danger.` : why && why !== "it's a useful waiting move" ? `${cap(why)}.` : "";
   // (the board shows the move: the words say why it was the one)
   const intro = `The key move, and the only good one. ${reason}`.trim();
-  startStepper([before, after], [played], [intro], "happy");
-  const card = stepper;
+  const card = startStory({ position: after, shapes: moveShapes(before, played, viewer).slice(0, 1), last: played }, intro, "happy", []);
+  if (!card.dry) moveSound(makeSan(before, played), before.turn);
+  const frames: StepFrame[] = [...card.frames!];
+  const texts: string[] = [...card.texts];
+  const chapterOf: number[] = [0];
+  const chapters = ["The key move"];
+  const add = (heading: string, more: StepFrame[], words: string[]) => {
+    if (!chapters.includes(heading)) chapters.push(heading);
+    frames.push(...more);
+    texts.push(...words);
+    chapterOf.push(...more.map(() => chapters.indexOf(heading)));
+  };
   try {
-    const best = await coachLine(after, 1.5);
-    const line = wholeLine(after, best?.pv ?? [], 3);
-    if (!best || !line.length) return;
-    const story = talkLine(after, line, viewer);
-    const texts = [...story.texts];
-    // still worse after the only move: it keeps you in the game
-    const behind = winningChance(best.score, mover) < 45;
-    texts[texts.length - 1] += behind
-      ? ` ${cap(verdictWords(best.score))}, but this move keeps ${viewer === null ? colourName(mover) : mover === viewer ? "you" : "them"} in the game.`
-      : ` In the end, ${lineOutcome(after, line, best.score, mover, viewer)}`;
-    extendStepper(card, story.positions.slice(1), line, texts);
+    // Why not something else: the next best move (much worse, or it wouldn't be the key move), and its answer
+    const known = analyser.evals.get(fenOf(before));
+    const alt = known?.second && makeUci(known.second) !== makeUci(played) ? known.second : undefined;
+    if (alt && !stale()) {
+      const afterAlt = positionAfter(before, alt);
+      const answer = afterAlt.isEnd() ? undefined : await coachLine(afterAlt, 0.8);
+      const reply = answer?.pv[0];
+      if (answer && reply) {
+        add("Why not something else", [{ position: afterAlt, shapes: moveShapes(before, alt, viewer).slice(0, 1), last: alt }],
+          [`Anything else falls short. For example, ${lowerFirst(narrateMove(before, alt, viewer))}`]);
+        add("Why not something else", [{ position: positionAfter(afterAlt, reply), shapes: moveShapes(afterAlt, reply, viewer).slice(0, 1) }],
+          [`${narrateMove(afterAlt, reply, viewer)} Now ${coachVerdict(answer.score, viewer)}.`]);
+      }
+    }
+    // How it goes on after the key move (each move the best in its position)
+    const then = await bestLine(after, 2, 0.6, stale);
+    const line = wholeLine(after, then?.pv ?? [], 2);
+    if (then && line.length) {
+      const pages = linePages(after, line, viewer, played);
+      // still worse after the only move: it keeps you in the game
+      const behind = winningChance(then.score, mover) < 45;
+      pages.texts[pages.texts.length - 1] += behind
+        ? ` ${cap(verdictWords(then.score))}, but this move keeps ${viewer === null ? colourName(mover) : mover === viewer ? "you" : "them"} in the game.`
+        : ` In the end, ${lineOutcome(after, line, then.score, mover, viewer)}`;
+      add("How it goes on", pages.frames, pages.texts);
+    }
   } catch (error) {
-    set.errorText(`Something went wrong: ${error}`);
-    refresh();
+    if (!card.dry) {
+      set.errorText(`Something went wrong: ${error}`);
+      refresh();
+    }
+  } finally {
+    card.frames = frames;
+    card.texts = texts;
+    card.chapterOf = chapterOf;
+    card.chapters = chapters.length > 1 ? chapters : [];
+    showStory(card);
   }
 }
 

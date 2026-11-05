@@ -1223,6 +1223,17 @@ cg-board square.check {
   background: var(--button-hover);
 }
 
+/* Clear the pasted game: at the end of the row, only when there's text */
+.pgn-clear {
+  margin-left: auto;
+  font: inherit;
+  color: inherit;
+}
+
+.pgn-clear[hidden] {
+  display: none;
+}
+
 .pgn-status {
   min-height: 1.3em;
   margin: 0 0 12px;

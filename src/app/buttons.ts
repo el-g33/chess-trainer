@@ -29,7 +29,7 @@ import { momentJump, switchReview } from "./keyMoments";
 import { onResign, onReviewGame, stopPreparing } from "./matches";
 import { exitAnalysis, goTo, navigate, onUndo, readFen, tryFromStepper } from "./moves";
 import { loadDemoLine, onDemoExit, onDemoPlay, onDemoTry, onNavPlay, onShowDemo } from "./openingDemos";
-import { openPgnDialog, pgnText, readPgnText, saveCopy, saveDownload } from "./pgnScreens";
+import { clearPgnText, openPgnDialog, pgnText, readPgnText, saveCopy, saveDownload } from "./pgnScreens";
 import { clockTick } from "./playerBars";
 import { closeDialog, dialog } from "./popups";
 import { saveSettings, setupSettingsTabs } from "./settings";
@@ -182,6 +182,7 @@ export function wireButtons() {
   $("demo-exit").addEventListener("click", onDemoExit);
 
   pgnText.addEventListener("input", readPgnText);
+  $("pgn-clear").addEventListener("click", clearPgnText);
   $<HTMLInputElement>("pgn-file").addEventListener("change", async (event) => {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
