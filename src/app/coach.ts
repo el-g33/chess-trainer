@@ -251,9 +251,11 @@ export function coachSays(reviews: (Review | undefined)[]): CoachSay {
   if (!review) return { mood: "think", text: "Let me check that move…", buttons: [STRATEGY] };
   const before = game.positionAt(ply - 1);
   const after = game.positionAt(ply);
-  let text = verdict(review, before, after, analyser.evals.get(fenOf(after)), listener(), ply, watching());
+  let text = verdict(review, before, after, analyser.evals.get(fenOf(after)), listener(), ply, watching(), analyser.evals.get(fenOf(before)));
   // the move's own button, a sign of what kind of move it was (none for a quiet one)
   const more = moveButton(ply, review);
+  // (its card worked out while you read this, so it opens at once)
+  if (more?.more && reviewing && WORTH_SHOWING.has(review.rating)) prepareSlip(ply, review);
   const buttons = more ? [more, STRATEGY] : [STRATEGY];
   // Your slips saved as puzzles: said once, at the first, and offered at the end of the game
   const saved = reviewing && savedFromReview?.key === gameKey() ? savedFromReview : null;
@@ -761,6 +763,10 @@ let pending: { card: Stepper; ply: number } | null = null;
  *  `showStory` says all its pages are in; meanwhile "Tell me more" pulses. */
 export function startStory(first: StepFrame, text: string, mood: Mood, chapters: string[]): Stepper {
   const card: Stepper = { positions: [], moves: [], texts: [text], step: 1, mood, frames: [first], chapters, chapterOf: [0] };
+  if (dry) {
+    card.dry = true;
+    return card;
+  }
   pending = { card, ply: currentPly() };
   document.body.classList.add("story-loading");
   return card;
@@ -768,7 +774,7 @@ export function startStory(first: StepFrame, text: string, mood: Mood, chapters:
 
 /** Every page is in: open the card (if it's still the one asked for). */
 export function showStory(card: Stepper) {
-  if (pending?.card !== card) return;
+  if (card.dry || pending?.card !== card) return;
   const asked = pending.ply;
   pending = null;
   document.body.classList.remove("story-loading");
@@ -778,12 +784,39 @@ export function showStory(card: Stepper) {
   refresh();
 }
 
+// Working a card out ahead: while you read the bubble on a slip, the coach
+// runs its searches, so the card opens at once when you tap. Only the latest
+// one carries on (moving to another move, or opening a card, stops it).
+let dry = false;
+let ahead = 0; // the latest card being worked out ahead
+let aheadOf = "";
+
+/** Work out the card for a slip ahead, without showing it. */
+export function prepareSlip(ply: number, review: Review) {
+  const key = `${fenOf(game.positionAt(ply - 1))} ${makeUci(game.moves[ply - 1].move)} ${review.rating}`;
+  if (key === aheadOf || !WORTH_SHOWING.has(review.rating) || !review.bestSan) return;
+  aheadOf = key;
+  const token = ++ahead;
+  dry = true;
+  try {
+    void explainSlip(ply, review, token).catch(() => {});
+  } finally {
+    dry = false; // (the card is made before its first search, so this covers it)
+  }
+}
+
 /** A slip, told in as many pages as it needs. A simple take (they can just
  *  take something, and nothing takes back) is one page: the take, and why
  *  it's free. A real tactic plays out its moves. Then, for your own slip (or
  *  a big one of theirs), the better move - and its line only when the slip
  *  wasn't a simple one. The card never repeats what the bubble just said. */
-export async function explainSlip(ply: number, review: Review) {
+export async function explainSlip(ply: number, review: Review, token?: number) {
+  // (shown for real: a card being worked out ahead stops, its searches so far kept)
+  if (token === undefined) {
+    ahead++;
+    aheadOf = "";
+  }
+  const stale = () => token !== undefined && token !== ahead;
   const before = game.positionAt(ply - 1);
   const after = game.positionAt(ply);
   const played = game.moves[ply - 1].move;
@@ -791,17 +824,17 @@ export async function explainSlip(ply: number, review: Review) {
   const viewer: Color | null = watching() ? null : listener() ?? mover;
   const mine = viewer === null || mover === viewer;
   const theirSlip = !mine && viewer !== null;
-  if (theirSlip && (review.rating === "Miss" || review.rating === "Missed Win")) return void explainEscape(ply, review);
+  if (theirSlip && (review.rating === "Miss" || review.rating === "Missed Win")) return void explainEscape(ply, review, stale);
   // their slip that gives you nothing concrete: what they missed, not a chance for you
   if (theirSlip && !dangerAfter(review, before, after, analyser.evals.get(fenOf(before)), analyser.evals.get(fenOf(after)), !!openingInfo()[ply - 1]?.book, viewer)) {
-    return void explainEscape(ply, review);
+    return void explainEscape(ply, review, stale);
   }
   const reply = after.isEnd() ? undefined : analyser.evals.get(fenOf(after))?.best;
   const shapes = moveShapes(before, played, viewer).slice(0, 1);
   const card = startStory({ position: after, shapes }, "", moodForRating(review.rating), []); // (filled in below, shown once ready)
   // Yours: at the end, a go at finding the better move yourself
   if (!theirSlip) card.extra = { ico: "target", label: "Find it yourself", kind: "accent", labelled: true, run: () => findItYourself(ply) };
-  moveSound(makeSan(before, played), before.turn);
+  if (!card.dry) moveSound(makeSan(before, played), before.turn);
   const frames: StepFrame[] = [];
   const texts: string[] = [];
   const chapterOf: number[] = [];
@@ -836,7 +869,8 @@ export async function explainSlip(ply: number, review: Review) {
       // their best reply and the line it starts, each move the best in its
       // position (after castling, just far enough to find their pawn storm)
       const castled = isCastling(before, played);
-      const punish = await bestLine(after, castled ? 4 : 6, 0.6);
+      const concrete = dangerAfter(review, before, after, analyser.evals.get(fenOf(before)), analyser.evals.get(fenOf(after)), !!openingInfo()[ply - 1]?.book, viewer);
+      const punish = await bestLine(after, castled ? 4 : concrete ? 6 : 3, 0.6, stale);
       const pv = punish?.pv.length ? punish.pv : [reply];
       const victim = after.board.get(reply.to);
       const took = positionAfter(after, reply);
@@ -865,7 +899,11 @@ export async function explainSlip(ply: number, review: Review) {
         const storm = castledIntoStorm(before, played, after, line, viewer);
         if (storm) add("Why", [{ position: after, shapes }], [storm]);
         // a quiet slip: the weakness it made, circled, and why it matters; then how they go after it
-        const reason = !storm && !threat && !danger ? quietReason(review, before, after) : undefined;
+        // (only when it's the bubble's story: when the bubble named something else, like a
+        // piece their reply attacks, that's what the card is about)
+        const said = verdict(review, before, after, analyser.evals.get(fenOf(after)), listener(), ply, watching(), analyser.evals.get(fenOf(before)));
+        const found = !storm && !threat && !danger ? quietReason(review, before, after) : undefined;
+        const reason = found && reasonWords(found, mover, watching() ? null : listener()) === said ? found : undefined;
         if (reason) {
           const marks: DrawShape[] = reason.squares.map((square) => ({ orig: makeSquare(square) as Key, brush: "threat" }));
           if (reason.kind === "open-file" && reason.file !== undefined) {
@@ -873,18 +911,23 @@ export async function explainSlip(ply: number, review: Review) {
             marks.push({ orig: makeSquare(ends[1]) as Key, dest: makeSquare(ends[0]) as Key, brush: "threat" });
           }
           // (the bubble has just said the reason: the card says why it matters)
-          const said = verdict(review, before, after, analyser.evals.get(fenOf(after)), listener(), ply, watching());
-          const words = reasonWords(reason, mover, viewer);
-          add("Why", [{ position: after, shapes: [...shapes, ...marks] }], [said === words ? REASON_LESSON[reason.kind] : `${words} ${REASON_LESSON[reason.kind]}`]);
+          add("Why", [{ position: after, shapes: [...shapes, ...marks] }], [REASON_LESSON[reason.kind]]);
         }
         // (their line only when it goes after the weakness: a piece onto the hole or the
         // open file, or hitting the weak pawn; otherwise it would only be noise)
         const usesIt = () => {
+          // (a piece reason is the lesson itself; only an early queen is shown being chased)
+          if (["king-centre", "same-piece", "blocks-pawn", "rim", "passive"].includes(reason!.kind)) return false;
           let position = after;
           for (const move of line) {
             const piece = position.board.get(move.from);
             position = positionAfter(position, move);
             if (!piece || piece.color === mover) continue;
+            if (reason!.kind === "early-queen") {
+              const queen = [...position.board.pieces(mover, "queen")][0];
+              if (queen !== undefined && attacks(piece, move.to, position.board.occupied).has(queen)) return true;
+              continue;
+            }
             if (reason!.kind === "open-file" ? (move.to & 7) === reason!.file && ["rook", "queen"].includes(piece.role)
               : reason!.squares.includes(move.to) || reason!.squares.some((square) => attacks(piece, move.to, position.board.occupied).has(square))) return true;
           }
@@ -917,13 +960,13 @@ export async function explainSlip(ply: number, review: Review) {
     if (stopsPawn(before, best, viewer)) return; // (stopping their pawn is the point: the rest is ordinary play)
     // How it goes on: the better move's line, from their reply
     // (its line: the better move, then the best move in each position in turn)
-    const then = await bestLine(afterBest, 5, 0.5);
+    const then = await bestLine(afterBest, 3, 0.5, stale);
     const better = then && { score: then.score, pv: [best, ...then.pv] };
     const line = wholeLine(before, better?.pv.length ? better.pv : [best], 3);
     if (line.length < 2) return;
     // the next idea when it's a pawn push or two: what you'd play with a free move (whatever
     // they do, it's the plan), drawn as arrows, not played out
-    const plan = afterBest.isCheck() ? undefined : await bestLine(passMove(afterBest), 3, 0.5);
+    const plan = afterBest.isCheck() ? undefined : await bestLine(passMove(afterBest), 3, 0.5, stale);
     const idea = plan ? nextIdea(afterBest, plan.pv, mover, viewer) : undefined;
     if (idea && better) {
       add("The idea", [idea.frame], [idea.text]);
@@ -933,8 +976,10 @@ export async function explainSlip(ply: number, review: Review) {
     if (better) endWith(pages.texts, lineOutcome(before, line, better.score, mover, viewer));
     add("How it goes on", pages.frames, pages.texts);
   } catch (error) {
-    set.errorText(`Something went wrong: ${error}`);
-    refresh();
+    if (!card.dry) {
+      set.errorText(`Something went wrong: ${error}`);
+      refresh();
+    }
   } finally {
     if (!frames.length) add("Why", [{ position: after, shapes }], ["It's a small slip."]);
     card.frames = frames;
@@ -1013,7 +1058,7 @@ function nextIdea(start: Chess, pv: NormalMove[], side: Color, viewer: Color | n
 
 /** A chance they missed against you: what they could have played, shown
  *  played, and how it would have gone on. */
-export async function explainEscape(ply: number, review: Review) {
+export async function explainEscape(ply: number, review: Review, stale?: () => boolean) {
   const before = game.positionAt(ply - 1);
   const best = parseSan(before, review.bestSan!) as NormalMove | undefined;
   if (!best) return;
@@ -1032,7 +1077,7 @@ export async function explainEscape(ply: number, review: Review) {
   if (hole) shapes.push({ orig: makeSquare(best.to) as Key, brush: "threat" });
   const card = startStory({ position: afterBest, shapes, last: best }, words, moodForRating(review.rating), ["What they missed", "How it would have gone"]);
   try {
-    const then = await bestLine(afterBest, 4, 0.6);
+    const then = await bestLine(afterBest, 2, 0.6, stale);
     const line = then && { score: then.score, pv: [best, ...then.pv] };
     const moves = wholeLine(before, line?.pv.length ? line.pv : [best], 3);
     if (moves.length < 2) return;
@@ -1040,8 +1085,10 @@ export async function explainEscape(ply: number, review: Review) {
     if (line) endWith(pages.texts, lineOutcome(before, moves, line.score, mover, viewer));
     extendPages(card, pages.frames, pages.texts, 1);
   } catch (error) {
-    set.errorText(`Something went wrong: ${error}`);
-    refresh();
+    if (!card.dry) {
+      set.errorText(`Something went wrong: ${error}`);
+      refresh();
+    }
   } finally {
     showStory(card);
   }
@@ -1353,6 +1400,7 @@ export interface Stepper {
   frames?: StepFrame[]; // lesson pages (or illustrations) instead of moves
   chapters?: string[]; // the parts of the story ("Why", "What it allows", "Better was")
   chapterOf?: number[]; // each page's part
+  dry?: boolean; // worked out ahead (to have its searches ready), never shown
 }
 
 export interface StepFrame {

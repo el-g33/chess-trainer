@@ -205,7 +205,23 @@ export const coachAnalysis: CoachEngine = {
 };
 
 /** The coach's best line starting with one of these moves (all moves if none given). */
-export async function coachLine(position: Chess, seconds: number, first: NormalMove[] = []): Promise<{ score: Score; pv: NormalMove[] } | undefined> {
+// Searches already done (or still running), so a card opened again, or one
+// worked out ahead while you read the bubble, doesn't search twice
+const searched = new Map<string, Promise<{ score: Score; pv: NormalMove[] } | undefined>>();
+
+export function coachLine(position: Chess, seconds: number, first: NormalMove[] = []): Promise<{ score: Score; pv: NormalMove[] } | undefined> {
+  const key = `${fenOf(position)}|${seconds}|${first.map((m) => standardUci(position, m)).join(",")}`;
+  let found = searched.get(key);
+  if (!found) {
+    if (searched.size > 600) searched.clear();
+    found = searchLine(position, seconds, first);
+    searched.set(key, found);
+    found.catch(() => searched.delete(key));
+  }
+  return found;
+}
+
+async function searchLine(position: Chess, seconds: number, first: NormalMove[]): Promise<{ score: Score; pv: NormalMove[] } | undefined> {
   const engine = coachEngine ?? set.coachEngine(new Engine())!;
   const [line] = await engine.analyse(fenOf(position), seconds * 1000, 1, first.map((m) => standardUci(position, m)));
   if (!line) return undefined;
@@ -226,12 +242,14 @@ export async function coachLine(position: Chess, seconds: number, first: NormalM
  *  moves shows them, one at a time - rather than one search's guess at the
  *  whole line (whose later moves are often not the best). The score is the
  *  first position's. */
-export async function bestLine(position: Chess, plies: number, seconds: number): Promise<{ score: Score; pv: NormalMove[] } | undefined> {
+export async function bestLine(position: Chess, plies: number, seconds: number, stale?: () => boolean): Promise<{ score: Score; pv: NormalMove[] } | undefined> {
   let walk = position;
   const pv: NormalMove[] = [];
   let first: { score: Score } | undefined;
-  for (let i = 0; i < plies && !walk.isEnd(); i++) {
-    const step = await coachLine(walk, seconds);
+  for (let i = 0; i < plies && !walk.isEnd() && !stale?.(); i++) {
+    // (a position of the game: the review has already found its best move, and looked longer)
+    const known = analyser.evals.get(fenOf(walk));
+    const step = known?.best ? { score: known.score, pv: [known.best] } : await coachLine(walk, seconds);
     if (!step?.pv.length) break;
     first ??= step;
     pv.push(step.pv[0]);

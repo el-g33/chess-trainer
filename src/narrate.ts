@@ -241,9 +241,11 @@ export function ignoredThreat(before: Chess, after: Chess, reply: NormalMove | u
 
 /** The weakness a slip made (that the better move doesn't), for a slip
  *  that loses nothing you can see, when the better move was a quiet one too. */
-export function quietReason(review: Review, before: Chess, after: Chess) {
-  // (a blunder, or a better move that takes or checks, is about tactics, not the pawns)
+export function quietReason(review: Review, before: Chess, after: Chess, beforeEval?: Evaluation, afterEval?: Evaluation) {
+  // (a blunder, or a better move that takes or checks, is about tactics, not the pawns;
+  // so is a move that loses something concrete)
   if (!["Inaccuracy", "Mistake"].includes(review.rating) || !review.bestSan || /[x+#]/.test(review.bestSan)) return undefined;
+  if (afterEval && dangerAfter(review, before, after, beforeEval, afterEval, true)) return undefined;
   const best = parseSan(before, review.bestSan) as NormalMove | undefined;
   const played = moveBetween(before, after);
   return played ? positionalReason(before, played, best) : undefined;
@@ -266,9 +268,9 @@ function moveBetween(before: Chess, after: Chess): NormalMove | undefined {
 /** The coach's verdict, in plain words, on the move that led from `before`
  *  to `after` (played by `mover`; the listener is `you`, or null for neither). */
 export function verdict(review: Review, before: Chess, after: Chess,
-  afterEval: Evaluation | undefined, you: Color | null, seed: number, neutral = false): string {
+  afterEval: Evaluation | undefined, you: Color | null, seed: number, neutral = false, beforeEval?: Evaluation): string {
   const mover = before.turn;
-  if (neutral) return neutralVerdict(review, before, after, afterEval, mover, seed);
+  if (neutral) return neutralVerdict(review, before, after, afterEval, mover, seed, beforeEval);
   const mine = !you || you === mover;
   const them = !you ? (mover === "white" ? "Black" : "White") : mine ? "them" : "you";
   if (PRAISE[review.rating]) {
@@ -315,7 +317,7 @@ export function verdict(review: Review, before: Chess, after: Chess,
   const wing = weakenedWing(before, after, mover);
   if (wing) return mine ? `You've castled into a weakened ${wing}.` : `They've castled into a weakened ${wing}: go after it!`;
   // A quiet slip: the weakness it made that the better move doesn't
-  const reason = quietReason(review, before, after);
+  const reason = quietReason(review, before, after, beforeEval, afterEval);
   if (reason) return reasonWords(reason, mover, you);
   const generic: Record<string, string[]> = {
     Inaccuracy: ["Not bad, but there was something stronger.", "Playable, but there was a better move."],
@@ -353,7 +355,7 @@ const THEIR_SLIP: Record<string, string[]> = {
 const THEY_MISSED = ["Lucky you: they missed a strong move.", "They let you off the hook there.", "You got away with one."];
 
 /** The verdict for someone watching (no "you"): "White has allowed Black to win the rook." */
-function neutralVerdict(review: Review, before: Chess, after: Chess, afterEval: Evaluation | undefined, mover: Color, seed: number): string {
+function neutralVerdict(review: Review, before: Chess, after: Chess, afterEval: Evaluation | undefined, mover: Color, seed: number, beforeEval?: Evaluation): string {
   const me = mover === "white" ? "White" : "Black";
   const other = mover === "white" ? "Black" : "White";
   const praise: Record<string, string> = {
@@ -390,7 +392,7 @@ function neutralVerdict(review: Review, before: Chess, after: Chess, afterEval: 
   }
   const wing = weakenedWing(before, after, mover);
   if (wing) return `${me} has castled into a weakened ${wing}.`;
-  const reason = quietReason(review, before, after);
+  const reason = quietReason(review, before, after, beforeEval, afterEval);
   if (reason) return reasonWords(reason, mover, null);
   // how bad it was, said from the outside, by the colour of the pieces
   const generic: Record<string, string[]> = {

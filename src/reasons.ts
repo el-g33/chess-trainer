@@ -5,19 +5,26 @@
 // holes in front of it, or a weak pawn (isolated, doubled, backward), or a
 // central square no pawn can ever guard again. These are facts about the
 // pawns, and pawns never move back, so each comes with the lesson in a line.
+// Then the pieces: in the opening, the queen out early, the king left in the
+// centre, the same piece moved again, a centre pawn blocked in; and at any
+// time, a knight put on the edge or a piece put where it does much less.
 
+import { attacks } from "chessops/attacks";
 import type { Chess } from "chessops/chess";
 import type { Color, NormalMove } from "chessops/types";
 import { makeSquare, opposite } from "chessops/util";
 
-import { afterMove } from "./coach";
+import { afterMove, isCastling } from "./coach";
 
-export type ReasonKind = "open-file" | "king-hole" | "shield" | "isolated" | "doubled" | "backward" | "centre-hole";
+export type ReasonKind = "open-file" | "king-hole" | "shield" | "isolated" | "doubled" | "backward" | "centre-hole"
+  | "early-queen" | "king-centre" | "same-piece" | "blocks-pawn" | "rim" | "passive";
 
 export interface Reason {
   kind: ReasonKind;
   squares: number[]; // what to circle: the pawns, or the squares
   file?: number;
+  role?: string; // the piece it's about
+  reach?: [number, number]; // squares it reached before, and now
 }
 
 const FILES = "abcdefgh";
@@ -149,6 +156,76 @@ export function positionalReason(before: Chess, played: NormalMove, best: Normal
     const holes = fresh(centreHoles(mine, side), centreHoles(better, side), centreHoles(before, side));
     if (holes.length) return { kind: "centre-hole", squares: emptyFirst(mine, side, holes).slice(0, 1) };
   }
+  return pieceReason(before, played, best, mine, better);
+}
+
+const MINOR_HOMES: Record<Color, number[]> = { white: [1, 2, 5, 6], black: [57, 58, 61, 62] };
+const NAMES: Record<string, string> = { pawn: "pawn", knight: "knight", bishop: "bishop", rook: "rook", queen: "queen", king: "king" };
+
+/** Knights and bishops still on their starting squares. */
+function undeveloped(position: Chess, side: Color): number {
+  return MINOR_HOMES[side].filter((square) => {
+    const piece = position.board.get(square);
+    return piece?.color === side && (piece.role === "knight" || piece.role === "bishop");
+  }).length;
+}
+
+/** The squares a piece reaches from a square (empty ones and the other side's pieces). */
+function reach(position: Chess, square: number): number {
+  const piece = position.board.get(square);
+  if (!piece) return 0;
+  return attacks(piece, square, position.board.occupied).diff(position.board[piece.color]).size();
+}
+
+/** What the move did with the piece, when the better move didn't: the queen
+ *  out early, the king left in the centre, a piece moved again while others
+ *  wait at home, a centre pawn blocked in, a knight on the edge, a piece put
+ *  where it reaches far fewer squares. (Quiet moves only.) The king left in
+ *  the centre counts whatever moved, when the better move was to castle. */
+function pieceReason(before: Chess, played: NormalMove, best: NormalMove, mine: Chess, better: Chess): Reason | undefined {
+  const side = before.turn;
+  const piece = before.board.get(played.from);
+  const king = before.board.kingOf(side);
+  // the king left in the centre, whatever moved instead of castling (in the opening)
+  if (before.fullmoves <= 15 && isCastling(before, best) && !isCastling(before, played) && king !== undefined && [3, 4].includes(fileOf(king))
+    && !before.board.get(played.to)) {
+    return { kind: "king-centre", squares: [king] };
+  }
+  if (!piece || piece.role === "pawn" || before.board.get(played.to)) return undefined;
+  const role = NAMES[piece.role];
+  const bestPiece = before.board.get(best.from);
+  const opening = before.fullmoves <= 12 && undeveloped(before, side) >= 2;
+  const attacked = before.kingAttackers(played.from, opposite(side), before.board.occupied).nonEmpty();
+  if (opening) {
+    // (out, or further out: a queen going back home isn't coming out early)
+    const outward = rel(side, played.to) >= 2 && rel(side, played.to) >= rel(side, played.from);
+    if (piece.role === "queen" && outward && bestPiece?.role !== "queen" && before.fullmoves <= 10 && !attacked) return { kind: "early-queen", squares: [played.to], role };
+    // a piece that's already out moves again, while the better move brings out a new one
+    const fromHome = (square: number) => MINOR_HOMES[side].includes(square) || square === (side === "white" ? 3 : 59);
+    if (piece.role !== "king" && !fromHome(played.from) && !attacked && bestPiece && bestPiece.role !== "pawn" && fromHome(best.from)) {
+      return { kind: "same-piece", squares: [played.to], role };
+    }
+  }
+  // a piece put right in front of an unmoved centre pawn (d- or e-pawn), early on
+  const step = side === "white" ? 8 : -8;
+  const blocked = played.to - step;
+  const pawn = before.board.get(blocked);
+  // (and the better move doesn't leave it blocked too)
+  const stillBlocked = better.board.get(blocked)?.role === "pawn" && !!better.board.get(played.to) && better.board.get(played.to)?.role !== "pawn";
+  if (before.fullmoves <= 15 && [3, 4].includes(fileOf(played.to)) && rel(side, played.to) === 2 && pawn?.role === "pawn" && pawn.color === side
+    && rel(side, blocked) === 1 && !stillBlocked) {
+    return { kind: "blocks-pawn", squares: [blocked, played.to], role, file: fileOf(blocked) };
+  }
+  if (piece.role === "knight" && [0, 7].includes(fileOf(played.to)) && ![0, 7].includes(fileOf(played.from)) && !attacked
+    && !(bestPiece?.role === "knight" && [0, 7].includes(fileOf(best.to)))) {
+    return { kind: "rim", squares: [played.to], role };
+  }
+  // a piece put where it does much less (and not running from an attack)
+  if (["knight", "bishop", "rook", "queen"].includes(piece.role) && !attacked) {
+    const was = reach(before, played.from);
+    const now = reach(mine, played.to);
+    if (now <= was - 3 && now * 3 <= was * 2 && !(best.from === played.from)) return { kind: "passive", squares: [played.to], role, reach: [was, now] };
+  }
   return undefined;
 }
 
@@ -175,6 +252,16 @@ export function reasonWords(reason: Reason, mover: Color, listener: Color | null
       const none = listener === null ? `no ${who} pawn` : "no pawn of yours";
       return that(`That gives up ${square}: ${none} can ever guard it now.`, `They've given up ${square}: no pawn of theirs can ever guard it now.`);
     }
+    case "early-queen": return that(`That brings ${your} queen out early.`, "They've brought their queen out early.");
+    case "king-centre": return that(`That leaves ${your} king in the centre.`, "They've left their king in the centre.");
+    case "same-piece": return that(`That moves ${your} ${reason.role} again while other pieces wait at home.`, `They've moved their ${reason.role} again while other pieces wait at home.`);
+    case "blocks-pawn": return that(`That blocks ${your} ${file}-pawn.`, `They've blocked their ${file}-pawn.`);
+    case "rim": return that(`That puts ${your} knight on the edge.`, "They've put their knight on the edge.");
+    case "passive": {
+      const [was, now] = reason.reach ?? [0, 0];
+      return that(`That puts ${your} ${reason.role} where it does less: it reaches ${now} squares instead of ${was}.`,
+        `They've put their ${reason.role} where it does less: it reaches ${now} squares instead of ${was}.`);
+    }
   }
 }
 
@@ -187,4 +274,10 @@ export const REASON_LESSON: Record<ReasonKind, string> = {
   doubled: "Doubled pawns can't guard each other, and they're hard to move on.",
   backward: "It can't safely step forward, and no pawn can come back to defend it.",
   "centre-hole": "A square no pawn can chase them from is a perfect home for their pieces.",
+  "early-queen": "Their pieces can chase it, gaining time as they come out.",
+  "king-centre": "Castle early: the centre can open fast, and the king is safest tucked away.",
+  "same-piece": "In the opening, bring out a new piece with each move.",
+  "blocks-pawn": "With a centre pawn stuck, the pieces behind it have less room.",
+  rim: "A knight on the edge reaches only half as many squares.",
+  passive: "Pieces are strongest where they reach the most squares.",
 };

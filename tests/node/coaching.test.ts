@@ -80,6 +80,20 @@ export default async function run() {
   check("Backward pawn", reasonOf(["e2e4", "c7c5", "g1f3", "d7d6", "d2d4", "c5d4", "f3d4", "g8f6", "b1c3", "e7e6", "f1e2"], "e6e5", "a7a6"),
     { kind: "backward", squares: [43] });
   check("No weakness: a developing move", reasonOf(italian, "b1c3", "d2d3"), null);
+  // The pieces: what the move did with them that the better one didn't
+  const kindOf = (start: string[] | string, played: string, best: string) => reasonOf(start, played, best)?.kind ?? null;
+  check("Queen out early", kindOf(["e2e4", "e7e5"], "d1h5", "g1f3"), "early-queen");
+  check("King left in the centre", kindOf(["e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5"], "a2a3", "e1g1"), "king-centre");
+  check("Queen going home isn't early", kindOf(["e2e4", "d7d5", "e4d5", "d8d5", "b1c3", "d5a5", "d2d4", "c7c6", "g1f3"], "a5d8", "c8f5"), "same-piece");
+  check("Same piece again", kindOf(["e2e4", "e7e5", "g1f3", "b8c6"], "f3g5", "f1c4"), "same-piece");
+  check("Blocks the d-pawn", kindOf(["e2e4", "e7e5"], "f1d3", "g1f3"), "blocks-pawn");
+  check("Blocks it, when the pawn should go there", kindOf(["e2e4", "e7e5", "g1f3", "b8c6"], "f1d3", "d2d3"), "blocks-pawn");
+  check("Knight on the edge", kindOf(["e2e4", "e7e5"], "b1a3", "g1f3"), "rim");
+  check("Piece does less", reasonOf("r4rk1/ppp2ppp/2n2n2/3p4/3P4/2NB1N2/PPP2PPP/R4RK1 w - - 0 12", "d3e2", "f1e1"),
+    { kind: "passive", squares: [12], file: undefined });
+  check("Said with its reach", reasonWords({ kind: "passive", squares: [12], role: "bishop", reach: [8, 5] }, "white", "white"),
+    "That puts your bishop where it does less: it reaches 5 squares instead of 8.");
+  check("Taking back is fine", kindOf(["e2e4", "e7e5", "g1f3", "d7d6", "f1c4", "c8g4", "b1c3", "g4f3"], "d1f3", "g2f3"), null);
   check("Said plainly", reasonWords({ kind: "isolated", squares: [8], file: 0 }, "white", "white"), "That leaves your a-pawn isolated.");
   check("Two isolated", reasonWords({ kind: "isolated", squares: [8, 18], file: 0 }, "white", "white"), "That leaves your a- and c-pawns isolated.");
   check("Said as your chance", reasonWords({ kind: "doubled", squares: [10, 26], file: 2 }, "white", "black"), "They've doubled their pawns on the c-file.");

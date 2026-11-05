@@ -11,6 +11,13 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.24",
+    items: [
+      { icon: "bulb", title: "Reasons about your pieces", text: "The coach now spots the opening habits that cost you: the queen out early, the king left in the centre, the same piece moved again, a centre pawn blocked in, a knight on the edge, or a piece that does less where it went." },
+      { icon: "play", title: "Faster explanations", text: "The coach gets each explanation ready while you read its comment, so it opens straight away when you tap." },
+    ],
+  },
+  {
     version: "3.23",
     items: [
       { icon: "bulb", title: "The real reason", text: "When a move loses nothing you can see but leaves you worse placed, the coach names why: a hole in front of your king, loosened king cover, or an isolated, doubled or backward pawn, with why it matters." },
