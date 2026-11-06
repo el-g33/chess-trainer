@@ -203,8 +203,14 @@ function moveBetween(from: Chess, to: Chess): [Key, Key] | undefined {
   return undefined;
 }
 
+// A card page that plays its move in: the position before it shows first, then
+// the move is made on the board (so you see the piece go)
+let playIn: { frame: object; done: boolean } | undefined;
+
 export function drawBoard(reviews: (Review | undefined)[], info: OpeningInfo[]) {
-  const position = shown();
+  let position = shown();
+  let playingIn = false; // (the arrows come once the move is made)
+  if (!stepper?.frames) playIn = undefined;
   let last: [Key, Key] | undefined;
   const plan = previewPlan();
   const quizLine = quizLinePositions();
@@ -215,6 +221,22 @@ export function drawBoard(reviews: (Review | undefined)[], info: OpeningInfo[]) 
     const previous = stepper.step > 1 ? stepper.frames[stepper.step - 2].position : base();
     // (a page back in time names its own move: their move before it, say)
     last = frame?.last ? [makeSquare(frame.last.from) as Key, makeSquare(frame.last.to) as Key] : page ? moveBetween(previous, page) : undefined;
+    if (frame?.from) {
+      if (playIn?.frame !== frame) {
+        const shownFrame = { frame, done: false };
+        playIn = shownFrame;
+        setTimeout(() => {
+          if (playIn !== shownFrame) return;
+          shownFrame.done = true;
+          refresh();
+        }, 700);
+      }
+      if (!playIn!.done) {
+        position = frame.from;
+        last = undefined;
+        playingIn = true;
+      }
+    } else playIn = undefined;
   } else if (stepper && stepper.step > 0) {
     const move = stepper.moves[stepper.step - 1];
     last = [makeSquare(move.from) as Key, arrowEnd(stepper.positions[stepper.step - 1], move)];
@@ -234,7 +256,7 @@ export function drawBoard(reviews: (Review | undefined)[], info: OpeningInfo[]) 
   const colour = movableColour();
   const premoving = colour ? undefined : premoveColour(); // your move set up while the coach thinks
   const movesFrom = quizWaiting() ? quiz!.threat!.passed! : position;
-  ground.setAutoShapes(bendKnightArrows(markThreats(stepper ? stepperShapes() : drill ? drillShapes() : practice ? practiceShapes() : puzzle ? puzzleShapes() : editor ? [] : demo ? demoShapes() : [...badgeShapes(reviews, info), ...arrowShapes(), ...replayShapes()])));
+  ground.setAutoShapes(playingIn ? [] : bendKnightArrows(markThreats(stepper ? stepperShapes() : drill ? drillShapes() : practice ? practiceShapes() : puzzle ? puzzleShapes() : editor ? [] : demo ? demoShapes() : [...badgeShapes(reviews, info), ...arrowShapes(), ...replayShapes()])));
   if (editor || demo?.intro) last = undefined;
   ground.set({
     fen: fenOf(position),

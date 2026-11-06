@@ -281,3 +281,44 @@ export const REASON_LESSON: Record<ReasonKind, string> = {
   rim: "A knight on the edge reaches only half as many squares.",
   passive: "Pieces are strongest where they reach the most squares.",
 };
+
+/** Which piece to take back with: when the move and the better one both take
+ *  on the same square, what the better choice gains. A piece it frees (a
+ *  bishop, rook or queen that reaches at least two more squares once the
+ *  better piece has gone), a new piece brought out from home, and the queen
+ *  kept at home (when the move took back with it early on, where their minor
+ *  pieces or pawns could chase it). Undefined when none of these holds. */
+export function recaptureReason(before: Chess, played: NormalMove, best: NormalMove):
+  { role: string; frees?: { role: string; square: number }; develops: boolean; queenHome: boolean } | undefined {
+  if (played.to !== best.to || played.from === best.from || !before.board.get(played.to)) return undefined;
+  const side = before.turn;
+  const them = opposite(side);
+  const mine = afterMove(before, played);
+  const better = afterMove(before, best);
+  const taker = before.board.get(best.from);
+  const usual = before.board.get(played.from);
+  if (!taker || !usual) return undefined;
+  // a long-range piece of yours that gets much more room once the better piece has gone
+  let frees: { role: string; square: number } | undefined;
+  for (const square of better.board[side]) {
+    const piece = better.board.get(square)!;
+    if (!["bishop", "rook", "queen"].includes(piece.role) || square === best.to || square === played.from) continue;
+    if (reach(better, square) >= reach(mine, square) + 2 && (!frees || piece.role === "bishop")) frees = { role: NAMES[piece.role], square };
+  }
+  const develops = ["knight", "bishop"].includes(taker.role) && MINOR_HOMES[side].includes(best.from);
+  // the queen taking back early, where a minor piece or pawn of theirs can come and hit it
+  let queenHome = false;
+  if (usual.role === "queen" && before.fullmoves <= 12) {
+    for (const move of mine.isEnd() ? [] : [...mine.allDests()]) {
+      const [from, dests] = move;
+      const piece = mine.board.get(from);
+      if (!piece || piece.color !== them || !["pawn", "knight", "bishop"].includes(piece.role)) continue;
+      for (const to of dests) {
+        const moved = afterMove(mine, { from, to });
+        if (attacks(moved.board.get(to)!, to, moved.board.occupied).has(played.to)) queenHome = true;
+      }
+    }
+  }
+  if (!frees && !develops && !queenHome) return undefined;
+  return { role: NAMES[taker.role], frees, develops, queenHome };
+}

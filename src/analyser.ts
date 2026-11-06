@@ -327,6 +327,8 @@ export function lineMove(position: Chess, line?: AnalysisLine): NormalMove | und
 /** Stockfish's lines turned into an evaluation from White's point of view. */
 function toEvaluation(position: Chess, lines: AnalysisLine[]): Evaluation {
   const evaluation: Evaluation = { score: lineScore(position, lines[0]), best: lineMove(position, lines[0]) };
+  // (the line it expects, for the coach to say what it wins or loses)
+  if (lines[0]?.pv.length) evaluation.line = lines[0].pv.slice(0, 12).join(" ");
   if (lines[1]?.pv.length) {
     evaluation.second = lineMove(position, lines[1]);
     evaluation.secondScore = lineScore(position, lines[1]);

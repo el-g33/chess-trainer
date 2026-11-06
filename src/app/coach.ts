@@ -27,7 +27,7 @@ import {
   previewPlan, quizLinePositions, quizScore, quizWaiting, ratingsOn,
 } from "../main";
 import { asGerund, controlledSquares, dangerAfter, ignoredThreat, moveInWords, narrateMove, quietReason, stopsPawn, targetsOf, verdict, whyMove } from "../narrate";
-import { REASON_LESSON, isKingHole, reasonWords } from "../reasons";
+import { REASON_LESSON, isKingHole, reasonWords, recaptureReason } from "../reasons";
 import {
   type OpeningInfo, REPERTOIRE, firstMoveOf, goalWords, isStartPosition, mainFamily, systemFor,
 } from "../openings";
@@ -35,6 +35,7 @@ import { SOURCE_NAMES, type Source } from "../online";
 import { readPgn, writePgn } from "../pgn";
 import { ratingName } from "../ratingNames";
 import { type Review, fenOf, isDrawnPosition, isSacrifice, verdictWords, winningChance } from "../review";
+import { pieceRoute } from "../plans";
 import { passMove, planAhead } from "../strategy";
 import { type Style, styleAlternative } from "../style";
 import { Typer, fitsIn, readingTime, splitToFit } from "../talk";
@@ -830,6 +831,12 @@ export async function explainSlip(ply: number, review: Review, token?: number) {
   if (theirSlip && !dangerAfter(review, before, after, analyser.evals.get(fenOf(before)), analyser.evals.get(fenOf(after)), !!openingInfo()[ply - 1]?.book, viewer)) {
     return void explainEscape(ply, review, stale);
   }
+  // taken back with the wrong piece, and nothing lost by it: straight to the better piece, and why
+  const bestMove = parseSan(before, review.bestSan!) as NormalMove | undefined;
+  if (!theirSlip && bestMove && recaptureReason(before, played as NormalMove, bestMove)
+    && !dangerAfter(review, before, after, analyser.evals.get(fenOf(before)), analyser.evals.get(fenOf(after)), !!openingInfo()[ply - 1]?.book, viewer)) {
+    return void showBestLine(ply, true);
+  }
   const reply = after.isEnd() ? undefined : analyser.evals.get(fenOf(after))?.best;
   const shapes = moveShapes(before, played, viewer).slice(0, 1);
   const card = startStory({ position: after, shapes }, "", moodForRating(review.rating), []); // (filled in below, shown once ready)
@@ -950,13 +957,13 @@ export async function explainSlip(ply: number, review: Review, token?: number) {
     if (basics) {
       // the simplest safe idea, not the engine's best line
       const loose = basics.kind === "hung" && basics.role ? `Keep your ${basics.role} safe: move it away, or defend it. ` : "";
-      add("The safe choice", [{ position: before, shapes: [] }, { position: afterBest, shapes: movePicture(before, afterBest, best, mine, viewer) }],
-        ["Back to before your move.", loose + whyBetter(before, after, best, reply, viewer)]);
+      add("The safe choice", [{ position: afterBest, shapes: movePicture(before, afterBest, best, mine, viewer), last: best, from: before }],
+        [loose + whyBetter(before, after, best, reply, viewer)]);
       return;
     }
     const heading = viewer === null ? "The better move" : theirSlip ? "Their better option" : "Your better option";
     // (straight to the better move, played in: its squares lit, and what it's for in one line)
-    add(heading, [{ position: afterBest, shapes: movePicture(before, afterBest, best, mine, viewer), last: best }], [betterWords(before, after, best, reply, viewer, mine)]);
+    add(heading, [{ position: afterBest, shapes: movePicture(before, afterBest, best, mine, viewer), last: best, from: before }], [betterWords(before, after, best, reply, viewer, mine)]);
     if (simple || storyPages) return; // (nothing more to see after a simple take, or a king-safety story)
     if (stopsPawn(before, best, viewer)) return; // (stopping their pawn is the point: the rest is ordinary play)
     // How it goes on: the better move's line, from their reply
@@ -967,8 +974,14 @@ export async function explainSlip(ply: number, review: Review, token?: number) {
     if (line.length < 2) return;
     // the next idea when it's a pawn push or two: what you'd play with a free move (whatever
     // they do, it's the plan), drawn as arrows, not played out
-    const plan = afterBest.isCheck() ? undefined : await bestLine(passMove(afterBest), 3, 0.5, stale);
-    const idea = plan ? nextIdea(afterBest, plan.pv, mover, viewer) : undefined;
+    const plan = afterBest.isCheck() ? undefined : await bestLine(passMove(afterBest), 7, 0.5, stale);
+    // a piece on its way somewhere: its route drawn, and why it's going there
+    const route = plan ? routePage(afterBest, best, plan.pv, mover, viewer) : undefined;
+    if (route) {
+      add("The plan", [route.frame], [route.text]);
+      return;
+    }
+    const idea = plan ? nextIdea(afterBest, plan.pv.slice(0, 3), mover, viewer) : undefined;
     if (idea && better) {
       add("The idea", [idea.frame], [idea.text]);
       return;
@@ -1058,6 +1071,18 @@ function nextIdea(start: Chess, pv: NormalMove[], side: Color, viewer: Color | n
   const why = stop ? stop.replace(/^stops (\S+) (\S+) coming to \S+ to chase/, "to stop $1 $2 chasing")
     : aims.length ? `to attack ${their} ${aims.slice(0, 2).join(" and ")}` : centre ? "to take the centre" : "to gain space";
   return { frame: { position: start, shapes }, text: `${who} ${ideas} ${why}.` };
+}
+
+/** A piece on its way somewhere (see plans.ts): its route drawn as arrows and
+ *  the square circled, with why it goes there. */
+function routePage(start: Chess, best: NormalMove, pv: NormalMove[], side: Color, viewer: Color | null): { frame: StepFrame; text: string } | undefined {
+  const route = pieceRoute(start, best, pv, side, viewer);
+  if (!route) return undefined;
+  const { stops } = route;
+  const shapes: DrawShape[] = [];
+  for (let i = 1; i < stops.length - 1; i++) shapes.push({ orig: makeSquare(stops[i]) as Key, dest: makeSquare(stops[i + 1]) as Key, brush: "you" });
+  shapes.push({ orig: makeSquare(stops[stops.length - 1]) as Key, brush: "best" });
+  return { frame: { position: start, shapes }, text: route.text };
 }
 
 /** A chance they missed against you: what they could have played, shown
@@ -1158,35 +1183,57 @@ export function findItYourself(ply: number) {
 let findingAt: number | null = null; // the move being found again, while you look for it
 
 /** See the best move: for a good move that wasn't the top one, a card that
- *  says why the move is good, then (one tap on) the best move and how the
- *  game would go on. */
-export async function showBestLine(ply: number) {
+ *  goes straight to the better move, played in from the position before, and
+ *  why it's better. Only when there's no reason to give, how it goes on. */
+export async function showBestLine(ply: number, slip = false) {
   const review = ratingsOn() ? reviews()[ply - 1] : undefined;
   if (!review?.bestSan) return;
   const before = game.positionAt(ply - 1);
   const best = parseSan(before, review.bestSan) as NormalMove | undefined;
   if (!best) return;
-  const played = game.moves[ply - 1].move;
+  const played = game.moves[ply - 1].move as NormalMove;
   const mover = game.moverOf(ply);
   const viewer: Color | null = watching() ? null : listener() ?? mover;
   const mine = viewer === null || mover === viewer;
   const after = positionAfter(before, played);
-  const card = startStory({ position: after, shapes: movePicture(before, after, played, mine, viewer) }, ideaWords(before, played, viewer),
-    moodForRating(review.rating), ["This move", "Top move"]);
+  const afterBest = positionAfter(before, best);
+  const choice = recaptureReason(before, played, best);
+  const text = choice ? recaptureWords(choice, mover, viewer) : betterWords(before, after, best, undefined, viewer, mine);
+  const card = startStory({ position: afterBest, shapes: movePicture(before, afterBest, best, mine, viewer), last: best, from: before }, text,
+    moodForRating(review.rating), []);
+  // a slip of yours: at the end, a go at finding the better move yourself
+  if (slip && mine) card.extra = { ico: "target", label: "Find it yourself", kind: "accent", labelled: true, run: () => findItYourself(ply) };
   try {
+    // (with a reason given, the point is made: no line to follow)
+    if (choice) return;
     const line = await coachLine(before, 1.5, [best]);
     const moves = wholeLine(before, line?.pv.length ? line.pv : [best], 3);
-    const pages = linePages(before, moves, viewer);
-    pages.texts[0] = cap(moveInWords(before, best, viewer));
-    if (line && moves.length > 1) endWith(pages.texts, lineOutcome(before, moves, line.score, mover, viewer));
-    // (back to the position before first, so the top move is seen being played)
-    extendPages(card, [{ position: before, shapes: [] }, ...pages.frames], ["Back one move: here's the top move instead.", ...pages.texts], 1);
+    if (moves.length < 2) return;
+    const pages = linePages(afterBest, moves.slice(1), viewer, best);
+    if (line) endWith(pages.texts, lineOutcome(before, moves, line.score, mover, viewer));
+    card.chapters = ["The better move", "How it goes on"];
+    extendPages(card, pages.frames, pages.texts, 1);
   } catch (error) {
     set.errorText(`Something went wrong: ${error}`);
     refresh();
   } finally {
     showStory(card);
   }
+}
+
+/** Taking back with the better piece, in words: "Your better option was taking
+ *  back with the knight. It frees your bishop on c8, and your queen stays at
+ *  home, where it can't be chased." */
+function recaptureWords(choice: NonNullable<ReturnType<typeof recaptureReason>>, mover: Color, viewer: Color | null): string {
+  const mine = viewer === null || viewer === mover;
+  const lead = viewer === null ? "The better move was" : mine ? "Your better option was" : "Their better option was";
+  const your = viewer === null ? `${colourName(mover)}'s` : mine ? "your" : "their";
+  const parts: string[] = [];
+  if (choice.develops) parts.push("brings out a new piece");
+  if (choice.frees) parts.push(`frees ${your} ${choice.frees.role} on ${makeSquare(choice.frees.square)}`);
+  let why = parts.length ? `It ${parts.join(" and ")}` : "";
+  if (choice.queenHome) why += why ? `, and ${your} queen stays at home, where it can't be chased` : `${cap(your)} queen stays at home, where it can't be chased`;
+  return `${lead} taking back with the ${choice.role}. ${why}.`;
 }
 
 export const MATERIAL: Record<string, number> = { pawn: 1, knight: 3, bishop: 3, rook: 5, queen: 9, king: 0 };
@@ -1453,6 +1500,7 @@ export interface StepFrame {
   odds?: LikelyMove[]; // their likely moves, with chances
   others?: number; // the chance of anything else
   last?: NormalMove; // the move to highlight, when it isn't the one from the page before
+  from?: Chess; // shown first, then the move to this page is played on the board
 }
 
 

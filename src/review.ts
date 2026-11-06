@@ -62,6 +62,7 @@ export interface Evaluation {
   best?: NormalMove;
   second?: NormalMove; // the next best move, when there is one
   secondScore?: Score;
+  line?: string; // the moves Stockfish expects from here (UCI, space-separated, the best move first)
 }
 
 export interface Review {
@@ -147,7 +148,14 @@ export function isSacrifice(before: Chess, move: NormalMove, after: Chess): Squa
   const stillHanging = hangingBefore.has(move.from)
     ? newlyHanging.filter((s) => s !== move.to)
     : newlyHanging;
-  return stillHanging.find((s) => PIECE_VALUES[after.board.get(s)!.role] > gained); // not just a trade
+  const offered = stillHanging.find((s) => PIECE_VALUES[after.board.get(s)!.role] > gained); // not just a trade
+  if (offered === undefined) return undefined;
+  // (not a sacrifice when the move hits one of theirs worth as much, left loose:
+  // whatever they take, you take back - a counter-attack, not an offer)
+  const value = PIECE_VALUES[after.board.get(offered)!.role];
+  const theirs = [...hangingPieces(after, opposite(mover))].filter((s) => !hangingPieces(before, opposite(mover)).has(s));
+  if (theirs.some((s) => PIECE_VALUES[after.board.get(s)!.role] >= value)) return undefined;
+  return offered;
 }
 
 /** Rate one move, or undefined if Stockfish hasn't looked at the positions yet.

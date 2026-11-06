@@ -7,9 +7,12 @@ import { parseUci } from "chessops/util";
 import { Chess } from "chessops/chess";
 import { parseFen } from "chessops/fen";
 
+import { pieceRoute } from "../../src/plans";
+import { isSacrifice } from "../../src/review";
+import { forkOf, freeTake, pinWins, replyWins } from "../../src/tactics";
 import { Game } from "../../src/game";
 import { asGerund, ignoredThreat, isTrade, narrateMove, stopsPawn, verdict } from "../../src/narrate";
-import { positionalReason, reasonWords } from "../../src/reasons";
+import { positionalReason, reasonWords, recaptureReason } from "../../src/reasons";
 import type { Review } from "../../src/review";
 
 const uci = (move: string) => parseUci(move) as NormalMove;
@@ -119,6 +122,46 @@ export default async function run() {
   const sample = ["e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5", "e1g1", "g8f6", "g2g3", "d7d6", "d2d3", "e8g8", "c2c3", "a7a6",
     "h2h4", "c5a7", "b2b4", "h7h6", "a2a4", "c8h3", "f1e1"];
   check("Joins the attack", narrateMove(at(sample).after, uci("f6g4"), "white"), "Their knight joins the attack, eyeing f2 and h2 next to your king.");
+
+  // A knight's route: d2, then f1, g3 and f5, where no pawn can chase it
+  const routeStart = Chess.fromSetup(parseFen("6k1/pp3p1p/3p4/8/4P3/8/PP1N1PPP/6K1 b - - 0 1").unwrap()).unwrap();
+  const route = pieceRoute(routeStart, uci("b1d2"), ["d2f1", "a7a6", "f1g3", "a6a5", "g3f5"].map(uci), "white", "white");
+  check("Knight route", route?.text, "Your knight is on its way to f5, where no pawn can chase it away.");
+  check("Route squares", route?.stops, [1, 11, 5, 22, 37]);
+  check("No route for one hop", pieceRoute(routeStart, uci("b1d2"), ["a2a3"].map(uci), "white", "white"), undefined);
+
+  // Which piece takes back: 7...Nxf6 frees the c8 bishop and keeps the queen home (7...Qxf6 can be hit by Bg5)
+  const pirc = at(["e2e4", "d7d6", "f1e2", "g8f6", "b1c3", "b8d7", "e2c4", "e7e5", "c3d5", "f6e4", "d2d3", "e4f6", "d5f6"]);
+  check("Take back with the knight", recaptureReason(pirc.after, uci("d8f6"), uci("d7f6")),
+    { role: "knight", frees: { role: "bishop", square: 58 }, develops: false, queenHome: true });
+  check("Same piece, no choice", recaptureReason(pirc.after, uci("d7f6"), uci("d7f6")), undefined);
+  // the slower route of the King's Indian knight: g5, then e6
+  const kid = Chess.fromSetup(parseFen("r1bq1rk1/pppnn1bp/3p2p1/3Ppp2/2P1P3/2N1BN1P/PP2BPP1/R2Q1RK1 w - - 0 11").unwrap()).unwrap();
+  const kidAfter = kid.clone();
+  kidAfter.play(uci("f3g5"));
+  check("Knight to e6", pieceRoute(kidAfter, uci("f3g5"), ["a7a6", "g5e6"].map(uci), "white", "white")?.text,
+    "Your knight is on its way to e6, where no pawn can chase it away.");
+
+  // Tactics, from the Coach Check review of real games
+  const fen = (text: string) => Chess.fromSetup(parseFen(text).unwrap()).unwrap();
+  const played = (position: Chess, move: string) => { const next = position.clone(); next.play(uci(move)); return next; };
+  // a rook trade is not a dropped rook
+  const rookTrade = fen("3r1rk1/ppp2pbp/4bnp1/1N2B3/P3P3/1P5P/2P1BPP1/R2R2K1 b - - 0 15");
+  check("Rook trade loses nothing", replyWins(rookTrade, uci("d8d1"), played(rookTrade, "d8d1"), uci("a1d1")), 0);
+  // the queen out on h4 can just be taken
+  check("Free queen", freeTake(fen("rnb1kbnr/pppp1ppp/4p3/8/3P3q/5N2/PPP1PPPP/RNBQKB1R w KQkq - 2 3"), uci("f3h4")),
+    { victim: "queen", square: 31, taker: "knight", free: true });
+  // forks: the knight on f2, and a pawn taking on e5
+  const knightFork = forkOf(fen("rn2k2r/pppbppbp/6p1/1B2P1N1/6n1/2N5/PPP2PPP/R1BK3R b kq - 4 9"), uci("g4f2"));
+  check("Knight fork with check", knightFork && { check: knightFork.check, hits: knightFork.hits.map((h) => h.role) }, { check: true, hits: ["rook"] });
+  const pawnFork = forkOf(fen("r1bqk2r/ppp2ppp/2nb1n2/4p3/2pP1B2/2N2NP1/PP2PPBP/R2QK2R w KQkq - 0 8"), uci("d4e5"));
+  check("Pawn fork", pawnFork?.hits.map((h) => h.role).sort(), ["bishop", "knight"]);
+  // a bishop pinning the queen to the king
+  const pinned = fen("r4rk1/pp3ppp/n1n1b3/8/6q1/P1NQB1P1/1P3P1P/3R1K1R w - - 3 20");
+  check("Pin wins the queen", pinWins(played(pinned, "c3b5"), uci("e6c4"))?.role, "queen");
+  // a king move that hits their rook back isn't a sacrifice
+  const kingBack = fen("2kr4/p5pp/PpR1b3/5p2/8/8/3rBPPP/4K2R b K - 0 26");
+  check("Counter-attack is no sacrifice", isSacrifice(kingBack, uci("c8d7"), played(kingBack, "c8d7")), undefined);
 
   return { name: "Coaching reasons", checks, failures };
 }

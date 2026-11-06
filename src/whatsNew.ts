@@ -11,6 +11,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.26",
+    items: [
+      { icon: "hazard", title: "What it costs, a few moves on", text: "The coach now looks further ahead. When a move loses something a few moves later, it says what and how it starts, like your rook falling to a bishop check. It also names what a better move would have won, checkmates a few moves away, and pawns that run through to promote." },
+      { icon: "target", title: "Where your piece is heading", text: "When the better move sets a piece on its way, the coach draws its route and says why it's going there." },
+      { icon: "bulb", title: "Taking back with the right piece", text: "Took back with the wrong piece? The coach shows the better one and why, such as freeing your bishop or keeping your queen safe at home." },
+      { icon: "play", title: "The better move, straight away", text: "Seeing the better move now plays it in on the board from the position before, with why it's better in one line." },
+      { icon: "eye", title: "A streamlined look", text: "Explanations play each move in so you see the piece go, with the arrows after, for a better experience." },
+    ],
+  },
+  {
     version: "3.25",
     items: [
       { icon: "star", title: "Why it's the key move", text: "For a key move, the coach now shows why nothing else works: another move, and the answer that punishes it. When you miss the only good move, the coach tells you." },

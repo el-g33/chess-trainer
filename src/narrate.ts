@@ -6,10 +6,11 @@ import { Chess } from "chessops/chess";
 import { attacks, between } from "chessops/attacks";
 import { parseSan } from "chessops/san";
 import type { Color, NormalMove, Role } from "chessops/types";
-import { makeSquare, opposite } from "chessops/util";
+import { makeSquare, makeUci, opposite } from "chessops/util";
 
 import { PIECE_VALUES } from "./coach";
 import { positionalReason, reasonWords } from "./reasons";
+import { exchangeGain, forkOf, freeTake, materialWon, movePhrase, pieceAt, type Taken, type Won, pinWins, playLine, replyWins } from "./tactics";
 import type { Evaluation, Review } from "./review";
 
 const NAMES: Record<Role, string> = { pawn: "pawn", knight: "knight", bishop: "bishop", rook: "rook", queen: "queen", king: "king" };
@@ -273,6 +274,16 @@ export function verdict(review: Review, before: Chess, after: Chess,
   if (neutral) return neutralVerdict(review, before, after, afterEval, mover, seed, beforeEval);
   const mine = !you || you === mover;
   const them = !you ? (mover === "white" ? "Black" : "White") : mine ? "them" : "you";
+  // a good move that let a checkmate slip by: say so, it's the one thing worth knowing
+  const mateWas = beforeEval?.score.mate;
+  const mateKept = afterEval?.score.mate;
+  const mating = (m: number | undefined) => m !== undefined && (mover === "white" ? m > 0 : m < 0);
+  const best = beforeEval?.best;
+  const mateIn = (n: number) => (n === 1 ? "checkmate" : `the start of a checkmate in ${COUNT[n] ?? n}`);
+  if (["Good", "Excellent"].includes(review.rating) && mating(mateWas) && Math.abs(mateWas!) <= 3 && !mating(mateKept)) {
+    if (best) return mine ? `Good, but ${movePhrase(before, best, "your")} was ${mateIn(Math.abs(mateWas!))}!` : `Good for them, but ${movePhrase(before, best, "their")} was ${mateIn(Math.abs(mateWas!))}.`;
+    return mine ? "Good, but you had a checkmate there!" : "Good for them, but they had a checkmate there.";
+  }
   if (PRAISE[review.rating]) {
     const line = pick(PRAISE[review.rating], seed);
     if (mine) return line;
@@ -284,34 +295,91 @@ export function verdict(review: Review, before: Chess, after: Chess,
     const what = ignored.victim === "pawn" ? `${makeSquare(ignored.move.to)} pawn` : NAMES[ignored.victim];
     return mine ? `You left your ${what} hanging.` : `They left their ${what} hanging!`;
   }
-  if (review.rating === "Missed Win") return mine ? "You had a winning move there!" : pick(THEY_MISSED, seed);
-  if (review.rating === "Miss") return mine ? "You missed a chance to win material." : pick(THEY_MISSED, seed);
-
+  const played = moveBetween(before, after);
   // What the opponent can do now: Stockfish's best reply
   const reply = afterEval?.best;
   const score = afterEval?.score;
   if (score?.mate !== undefined && (mover === "white" ? score.mate < 0 : score.mate > 0)) {
+    const n = Math.abs(score.mate);
+    if (reply && n === 1) {
+      // ("their rook to c1" / "taking on c1": the piece isn't there yet)
+      return mine ? `Careful: that lets them checkmate you: ${movePhrase(after, reply, "their")}.` : `Now ${movePhrase(after, reply, "your")} is checkmate!`;
+    }
+    if (reply && n <= 5) return mine ? `Careful: that walks into a checkmate in ${COUNT[n]}, starting with ${movePhrase(after, reply, "their")}.`
+      : `That lets you checkmate in ${COUNT[n]}, starting with ${movePhrase(after, reply, "your")}!`;
     return mine ? "Careful: that walks into a checkmate." : "That lets you go for checkmate!";
   }
+  // a checkmate you had, and missed
+  if (best && mating(mateWas) && Math.abs(mateWas!) <= 5 && !mating(mateKept)) {
+    const n = Math.abs(mateWas!);
+    return mine ? (n === 1 ? `${cap(movePhrase(before, best, "your"))} was checkmate!` : `You had a checkmate in ${COUNT[n]}, starting with ${movePhrase(before, best, "your")}.`)
+      : `Lucky you: they had a checkmate there.`;
+  }
+  // What the move allows, and what the better move would have won: whichever is worth
+  // more is said (a dropped pawn matters less than a missed free bishop). Captures are
+  // worked out with every take played out, so a trade is never called a loss.
+  const said: { value: number; text: string; best?: boolean }[] = [];
+  const victim = reply ? after.board.get(reply.to) : undefined;
+  const lost = reply && played ? replyWins(before, played, after, reply) : 0;
+  if (reply && victim && victim.color === mover && lost >= Math.min(3, PIECE_VALUES[victim.role])) {
+    if (lost >= PIECE_VALUES[victim.role] && PIECE_VALUES[victim.role] >= 3) {
+      said.push({ value: lost, text: mine ? pick([`Careful: that drops your ${NAMES[victim.role]}.`, `Oops, that lets ${them} win your ${NAMES[victim.role]}.`], seed)
+        : `That lets you win their ${NAMES[victim.role]}!` });
+    } else if (lost >= 2) said.push({ value: lost, text: mine ? `That lets ${them} win material.` : "That lets you win material!" });
+    else if (victim.role === "pawn") said.push({ value: lost, text: mine ? `That gives ${them} a free pawn.` : "That gives you a free pawn." });
+  }
+  // a pin that wins a piece
+  const pin = reply ? pinWins(after, reply) : undefined;
+  if (pin) said.push({ value: PIECE_VALUES[pin.role], text: mine ? `That lets ${them} pin your ${NAMES[pin.role]} to your king and win it.` : `Now you can pin their ${NAMES[pin.role]} to their king and win it!` });
+  // the better move: a piece free to take, or a fork
+  const tookToo = played ? Math.max(0, exchangeGain(before, played)) : 0;
+  const free = best && (!played || best.to !== played.to) ? freeTake(before, best) : undefined;
+  const fork = best ? forkOf(before, best) : undefined;
+  const forkValue = fork ? Math.max(...fork.hits.map((h) => PIECE_VALUES[h.role]), fork.check ? 0 : 0) : 0;
+  if (fork && forkValue > (free ? PIECE_VALUES[free.victim] : 0)) {
+    // "checks their king and hits the rook on h1" / "takes on e5 and hits the bishop on d6 and the knight on f6"
+    const hit = fork.hits.map((h) => `the ${pieceAt(h.role, h.square)}`).join(" and ");
+    const capture = !!before.board.get(best!.to);
+    const how = capture ? `takes on ${makeSquare(fork.to)}${fork.check ? " with check" : ""} and hits ${hit}`
+      : `to ${makeSquare(fork.to)} ${fork.check ? `checks their king and hits ${hit}` : `hits ${hit}`}`;
+    said.push({ value: forkValue, best: true, text: mine ? `You missed a fork: your ${NAMES[fork.piece]} ${how}.`
+      : `They missed a fork on ${makeSquare(fork.to)}.` });
+  } else if (free && exchangeGain(before, best!) > tookToo) {
+    const what = pieceAt(free.victim, free.square);
+    said.push({ value: exchangeGain(before, best!), best: true, text: mine ? (free.free ? `Their ${what} was free: your ${NAMES[free.taker]} could take it.` : `Your ${NAMES[free.taker]} could win their ${what}.`)
+      : `They missed that your ${what} was ${free.free ? "free" : "loose"}.` });
+  }
+  // (what you allowed comes first when it's worth as much - unless the piece they
+  // take was already under attack: then both sides had a piece to take, and taking first was the point)
+  // Further ahead: what Stockfish's lines win or lose a few moves on (a check
+  // first, then a fork, say), when that's clearly more than one move shows
+  // (a free piece or a fork the better move wins is said as that: it's the same move, put more simply)
+  const ahead = lineWords(before, after, played, beforeEval, afterEval, mine);
+  const top = said.length ? Math.max(...said.map((s) => s.value)) : 0;
+  const sameMove = ahead?.kind === "gain" && said.some((s) => s.best);
+  if (ahead && !sameMove && (ahead.value >= top + 2 || (!said.length && ahead.value >= 1))) said.push(ahead);
+  const already = reply && victim ? before.kingAttackers(reply.to, opposite(mover), before.board.occupied).nonEmpty() && reply.to !== played?.to : false;
+  if (said.length) return said.reduce((a, b) => (b.value > a.value || (already && b.value === a.value) ? b : a)).text;
+  if (review.rating === "Missed Win") return mine ? "You had a winning move there!" : pick(THEY_MISSED, seed);
+  if (review.rating === "Miss") {
+    if (mine && best) return `Their last move was a slip: ${movePhrase(before, best, "your")} was the way to punish it.`;
+    return mine ? "Their last move was a slip, and you missed the strongest answer." : pick(THEY_MISSED, seed);
+  }
+
   if (reply) {
-    // (a take that's only a trade wins nothing)
-    const victim = isTrade(after, reply) ? undefined : after.board.get(reply.to);
     const piece = after.board.get(reply.from);
-    if (victim && victim.color === mover && PIECE_VALUES[victim.role] >= 3) {
-      return mine ? pick([`Careful: that drops your ${NAMES[victim.role]}.`, `Oops, that lets ${them} win your ${NAMES[victim.role]}.`], seed)
-        : `That lets you win their ${NAMES[victim.role]}!`;
-    }
     const replyAfter = after.clone();
     replyAfter.play(reply);
-    if (replyAfter.isCheck()) return mine ? `That lets ${them} hit back with a check.` : "That lets you hit back with a check.";
+    // (a check that only trades pieces off says nothing about the check)
+    const capture = !!after.board.get(reply.to);
+    if (replyAfter.isCheck() && !capture) return mine ? `That lets ${them} hit back with a check.` : "That lets you hit back with a check.";
     const hits = targets(replyAfter, reply.to);
-    if (piece && piece.role !== "pawn" && hits.length && !victim) {
+    if (piece && piece.role !== "pawn" && hits.length && !capture) {
       const developing = (piece.color === "white" ? reply.from >> 3 === 0 : reply.from >> 3 === 7);
       if (developing) return mine ? `You've let ${them} develop with tempo.` : "You can develop with tempo now.";
       if (hits.length >= 2) return mine ? `That allows a fork.` : "You've got a fork now!";
       return mine ? `That lets ${them} attack your ${NAMES[hits[0]]}.` : `Now you can attack their ${NAMES[hits[0]]}.`;
     }
-    if (victim && victim.color === mover) return mine ? `That gives ${them} a free ${NAMES[victim.role]}.` : `That gives you a free ${NAMES[victim.role]}.`;
   }
   // A castle next to one of its own pushed pawns: a weakened wing, a target for their pawns
   const wing = weakenedWing(before, after, mover);
@@ -326,6 +394,97 @@ export function verdict(review: Review, before: Chess, after: Chess,
   };
   if (!mine) return pick(THEIR_SLIP[review.rating] ?? ["Not their best move."], seed);
   return pick(generic[review.rating] ?? ["Interesting choice."], seed);
+}
+
+const COUNT: Record<number, string> = { 1: "one", 2: "two", 3: "three", 4: "four", 5: "five" };
+
+/** What the engine's lines show a few moves on: the material the move played
+ *  loses, or the better move would have won, compared with each other (so a
+ *  position that was lost anyway isn't blamed on this move). */
+function lineWords(before: Chess, after: Chess, played: NormalMove | undefined, beforeEval: Evaluation | undefined,
+  afterEval: Evaluation | undefined, mine: boolean): { value: number; text: string; kind: "loss" | "gain" } | undefined {
+  const mover = before.turn;
+  const best = beforeEval?.best;
+  if (!played || !best || after.isEnd() || !afterEval?.line || !beforeEval?.line) return undefined;
+  const playedLine = playLine(before, `${makeUci(played)} ${afterEval.line}`, mover);
+  const bestLine = playLine(before, beforeEval.line, mover);
+  if (!playedLine || !bestLine || playedLine.moves.length < 2) return undefined;
+  const missed = bestLine.net - playedLine.net;
+  if (missed < 1) return undefined;
+  // (the scores must agree: a line that seems to win a rook while the score barely
+  // moves has been misread, or the material comes back later)
+  const pawns = (e: Evaluation) => (e.score.mate !== undefined ? Math.sign(e.score.mate) * 10 : Math.max(-10, Math.min(10, (e.score.cp ?? 0) / 100)));
+  const swing = (mover === "white" ? 1 : -1) * (pawns(beforeEval) - pawns(afterEval));
+  if (swing < 0.6 * Math.min(missed, 5)) return undefined;
+  const checks = (position: Chess, move: NormalMove) => { const t = position.clone(); t.play(move); return t.isCheck(); };
+  if (playedLine.net <= -1 && -playedLine.net >= bestLine.net) {
+    // the move loses something: name it, and the move it starts with
+    const reply = playedLine.moves[1];
+    const lost = materialWon(playedLine.lost, playedLine.won, -playedLine.net);
+    const value = lost.role ? PIECE_VALUES[lost.role] : lost.exchange ? 2 : lost.piece ? 3 : lost.pawns ?? missed;
+    if (mine && lost.role && reply.to === lost.square && playedLine.lost[0]?.square === reply.to) {
+      // (taken straight away)
+      const taker = after.board.get(reply.from)!;
+      return { kind: "loss", value, text: `That just loses your ${NAMES[lost.role]}: their ${NAMES[taker.role]} takes it on ${makeSquare(reply.to)}.` };
+    }
+    const start = `${movePhrase(after, reply, mine ? "their" : "your")}${checks(after, reply) ? " with check" : ""}`;
+    // (where their first move is a quiet one, "it starts with castling" says little: name the piece that falls,
+    // where it stands now, when it's a single piece or pawn)
+    const quiet = !checks(after, reply) && !after.board.get(reply.to) && !(after.board.get(reply.from)?.role === "pawn" && (reply.from & 7) !== (reply.to & 7));
+    const role = lost.role ?? (lost.pawns === 1 ? "pawn" : undefined);
+    const falls = quiet && role ? playedLine.lost.find((t) => t.role === role && (lost.square === undefined || t.square === lost.square) && !retaken(t, playedLine.won)) : undefined;
+    const stands = falls && after.board.get(falls.square);
+    if (falls && stands && stands.role === role && stands.color === mover && !playedLine.promoted.length) {
+      const where = `${NAMES[role!]} on ${makeSquare(falls.square)}`;
+      return { kind: "loss", value, text: mine ? `That costs your ${where} a few moves on.` : `That lets you win their ${where} a few moves on.` };
+    }
+    // (a pawn of theirs that gets through to promote is the story, not the pieces lost on the way)
+    const queening = playedLine.promoted.find((p) => p.side !== mover);
+    if (queening) {
+      // (named by where it promotes: a pawn that takes on the way changes file)
+      const on = makeSquare(queening.square);
+      const runs = after.board.get(reply.from)?.role === "pawn" && Math.abs((reply.to & 7) - (queening.square & 7)) <= 1;
+      if (runs) return { kind: "loss", value, text: mine ? `That lets their pawn run through to promote on ${on}.` : `That lets your pawn run through to promote on ${on}.` };
+      return { kind: "loss", value, text: mine ? `That lets their pawn through to promote on ${on}: it starts with ${start}.`
+        : `That lets your pawn through to promote on ${on}: start with ${start}.` };
+    }
+    return { kind: "loss", value, text: mine ? `That costs ${wonWords(lost, "your")} a few moves on: it starts with ${start}.`
+      : `That lets you win ${wonWords(lost, "their")}: start with ${start}.` };
+  }
+  if (bestLine.net >= 1) {
+    // the better move wins something: name it
+    const won = materialWon(bestLine.won, bestLine.lost, bestLine.net);
+    const value = won.role ? PIECE_VALUES[won.role] : won.exchange ? 2 : won.piece ? 3 : won.pawns ?? missed;
+    const how = `${movePhrase(before, best, mine ? "your" : "their")}${checks(before, best) ? ", with check," : ""}`;
+    // (a quiet first move, like castling, doesn't win anything itself: say what falls, and where, then how it starts)
+    const quiet = !checks(before, best) && !before.board.get(best.to) && !(before.board.get(best.from)?.role === "pawn" && (best.from & 7) !== (best.to & 7));
+    const role = won.role ?? (won.pawns === 1 ? "pawn" : undefined);
+    const falls = quiet && role ? bestLine.won.find((t) => t.role === role && (won.square === undefined || t.square === won.square) && !retaken(t, bestLine.lost)) : undefined;
+    const stands = falls && before.board.get(falls.square);
+    if (quiet && !bestLine.promoted.length) {
+      const where = falls && stands && stands.role === role && stands.color !== mover ? `${mine ? "their" : "your"} ${NAMES[role!]} on ${makeSquare(falls.square)}`
+        : wonWords(won, mine ? "their" : "your");
+      const first = movePhrase(before, best, mine ? "your" : "their");
+      return { kind: "gain", value, text: mine ? `You could have won ${where}, starting with ${first}.`
+        : `They missed a way to win ${where}, starting with ${first}.` };
+    }
+    return { kind: "gain", value, text: mine ? `${cap(how)} would have won ${wonWords(won, "their")}.` : `They missed that ${how} wins ${wonWords(won, "your")}.` };
+  }
+  return undefined;
+}
+
+/** A piece taken and straight away taken back on the same square, for one of the same kind: a trade, not a loss. */
+function retaken(taken: Taken, other: Taken[]): boolean {
+  return other.some((t) => t.square === taken.square && t.ply === taken.ply + 1 && t.role === taken.role);
+}
+
+/** "their knight", "two pawns", "the exchange", "material". */
+function wonWords(won: Won, whose: string): string {
+  if (won.role) return `${whose} ${NAMES[won.role]}`;
+  if (won.exchange) return "the exchange";
+  if (won.pawns) return won.pawns === 1 ? "a pawn" : `${COUNT[won.pawns] ?? won.pawns} pawns`;
+  if (won.piece) return "a piece";
+  return won.lots ? "a lot of material" : "material";
 }
 
 /** "queenside" or "kingside" when the move was a castle that put the king
@@ -375,9 +534,11 @@ function neutralVerdict(review: Review, before: Chess, after: Chess, afterEval: 
     return `${me} left the ${what} hanging.`;
   }
   if (reply) {
-    const victim = isTrade(after, reply) ? undefined : after.board.get(reply.to);
+    const played = moveBetween(before, after);
+    const lost = played ? replyWins(before, played, after, reply) : 0;
+    const victim = lost >= 1 ? after.board.get(reply.to) : undefined;
     const piece = after.board.get(reply.from);
-    if (victim && victim.color === mover && PIECE_VALUES[victim.role] >= 3) return `${me} lets ${other} win the ${NAMES[victim.role]}.`;
+    if (victim && victim.color === mover && PIECE_VALUES[victim.role] >= 3 && lost >= PIECE_VALUES[victim.role]) return `${me} lets ${other} win the ${NAMES[victim.role]}.`;
     const replyAfter = after.clone();
     replyAfter.play(reply);
     if (replyAfter.isCheck()) return `${me} lets ${other} hit back with a check.`;
@@ -636,7 +797,10 @@ function rawDanger(review: Review, before: Chess, after: Chess, beforeEval: Eval
   const loss = was !== undefined && now !== undefined ? Math.max(0, was - now) : 0;
   const reply = afterEval?.best;
   const victim = reply ? after.board.get(reply.to) : undefined;
-  const lost = victim && victim.color === mover && !isTrade(after, reply) ? victim.role : undefined;
+  // (worked out with every capture played out: taking back is only a trade)
+  const played = moveBetween(before, after);
+  const net = reply && played ? replyWins(before, played, after, reply) : 0;
+  const lost = victim && victim.color === mover && net >= Math.min(3, PIECE_VALUES[victim.role]) ? victim.role : undefined;
   const mate = afterEval?.score.mate !== undefined && (mover === "white" ? afterEval.score.mate < 0 : afterEval.score.mate > 0);
   if (mate) return { level: "red", text: "There's a checkmate coming." };
   // What their best reply takes decides the colour first...
