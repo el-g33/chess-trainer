@@ -19,7 +19,7 @@ import { today } from "../pgn";
 import { type Review, fenOf } from "../review";
 import { play } from "../sounds";
 
-import { applyView, closeOverlay, explainMove, recordGame } from "./coach";
+import { applyView, closeOverlay, explainMove, onHome, recordGame } from "./coach";
 import {
   $, colourBox, levelBox, myOpeningBox, rateMovesBox, reviewDepthBox, sfOpeningBox, tcIncrement, tcMinutes,
   timeControlBox,
@@ -243,6 +243,7 @@ export function onFlag(colour: Color) {
 
 /** The match is over: Play games can then be reviewed in Practice mode. */
 export function endMatch(text: string) {
+  const user = match?.user;
   recordGame();
   clock?.stop();
   if (!game.moves[game.length - 1]?.san.includes("#")) void play("gameover"); // (checkmate has its own sound)
@@ -250,11 +251,36 @@ export function endMatch(text: string) {
   set.thinking(false);
   set.canReview(mode === "play" && game.length > 0);
   refresh();
-  const hint =
-    mode === "play"
-      ? canReview ? '\n\nClick "Review this game" to see how every move rated.' : ""
-      : "\n\nStep back through the moves to see where the game turned - the Move review rates every move.";
-  void message("Match over", text + hint);
+  showResult(text, user);
+}
+
+/** The end of a game: the result, then what next - review it (or look
+ *  through it, in Practice), play again with the same settings, or Home. */
+function showResult(text: string, user: Color | undefined) {
+  const dialog = $<HTMLDialogElement>("result-dialog");
+  const result = gameHeaders.Result;
+  const won = user && ((result === "1-0" && user === "white") || (result === "0-1" && user === "black"));
+  $("result-title").textContent = result === "1/2-1/2" ? "A draw" : won ? "You won" : user ? "The coach won" : "Game over";
+  const moves = Math.ceil(game.length / 2);
+  $("result-text").textContent = moves ? `${text} ${moves} move${moves === 1 ? "" : "s"}.` : text;
+  const review = $<HTMLButtonElement>("result-review");
+  review.textContent = canReview ? "Review this game" : "Look through the game";
+  review.onclick = () => {
+    dialog.close();
+    if (canReview) onReviewGame();
+  };
+  $("result-again").onclick = () => {
+    dialog.close();
+    startMatch();
+    refresh();
+    void maybeOpponentMove(); // if you're Black, the coach moves first
+  };
+  $("result-home").onclick = () => {
+    dialog.close();
+    void onHome();
+  };
+  if (!dialog.open) dialog.showModal();
+  review.focus();
 }
 
 /** After a Play game: switch to Practice to see the ratings and the coach. */

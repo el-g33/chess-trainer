@@ -11,6 +11,13 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.32",
+    items: [
+      { icon: "flag", title: "What next, when a game ends", text: "The result comes up with your next steps: review the game, play again with the same settings, or choose another mode." },
+      { icon: "back", title: "Back that goes where you expect", text: "Switching between Board, Statistics and History no longer piles up, and a game opened from Game history goes back to it." },
+    ],
+  },
+  {
     version: "3.31",
     items: [
       { icon: "hazard", title: "Your slips, front and centre", text: "After a review, your slips come up first: how many blunders, mistakes and missed chances, each a tap away, and Go to the first slip to start learning from them." },

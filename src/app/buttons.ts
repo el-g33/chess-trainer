@@ -170,7 +170,8 @@ export function wireButtons() {
   $("moment-next").addEventListener("click", () => momentJump("forward"));
   for (const tab of document.querySelectorAll<HTMLButtonElement>(".view-tabs button")) {
     tab.addEventListener("click", () => {
-      set.currentView(tab.dataset.view as typeof currentView);
+      // (the tabs sit side by side: switching isn't a step Back goes over)
+      set.viewBack(tab.dataset.view as typeof currentView);
       setHistoryFromReview(false);
       refresh();
     });

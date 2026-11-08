@@ -1075,6 +1075,26 @@ dialog::backdrop {
 .slips-dialog::backdrop {
   background: rgba(0, 0, 0, 0.72);
 }
+.result-dialog {
+  text-align: center;
+  min-width: min(320px, 86vw);
+}
+.result-dialog h3 {
+  font-size: 1.4rem;
+  margin-bottom: 2px;
+}
+#result-text {
+  margin: 0 0 16px;
+}
+.result-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.result-actions .link-button {
+  margin-top: 4px;
+  align-self: center;
+}
 #slips-text {
   margin: 0 0 16px;
 }

@@ -705,6 +705,19 @@
       <button type="button" id="wn-ok" class="accent wn-ok">Got it</button>
     </dialog>
 
+    <!-- The end of a game: the result, and what next -->
+    <dialog id="result-dialog" class="result-dialog">
+      <form method="dialog">
+        <h3 id="result-title"></h3>
+        <p id="result-text" class="setup-note"></p>
+        <div class="result-actions">
+          <button type="button" id="result-review" class="accent"></button>
+          <button type="button" id="result-again">Play again</button>
+          <button type="button" id="result-home" class="link-button">Choose another mode</button>
+        </div>
+      </form>
+    </dialog>
+
     <!-- After a review: the slips, in the spotlight -->
     <dialog id="slips-dialog" class="slips-dialog">
       <form method="dialog">

@@ -68,7 +68,7 @@ import {
   orientation, analysis, book, busy, canReview, clock, clockTimes, currentGameId, currentView, deepening, demo, drill, editor,
   errorText, explore, game, gameHeaders, gameOrigin, historyColour, lesson, match, mode, practice, preparing,
   preview, puzzle, quiz, result, reviewSide, reviewTitle, reviewing, savedFromReview, set, silentJump, speech,
-  statsMore, statusMessage, stepper, stripButtons, thinking, viewPly,
+  menuOpen, statsMore, statusMessage, stepper, stripButtons, thinking, viewPly, viewTrail,
 } from "./state";
 import { drawStatus, setBusy, startTask } from "./strategyCoach";
 import { drawTrainScreen, exploreSays, puzzleSays, showLessonList } from "./train";
@@ -2159,7 +2159,13 @@ export function historyRow(saved: SavedGame, showSource = true): HTMLButtonEleme
   text.append(title, element("span", "history-meta", [saved.speed ?? "", saved.opening || "Game", saved.user === "white" ? "White" : "Black",
     saved.source ? "" : timeControlLabel(saved.timeControl), saved.accuracy !== undefined ? `${saved.accuracy}%` : ""].filter(Boolean).join(" · ")));
   item.append(mark, text, element("span", "history-date", shortDate(saved.date)));
-  item.addEventListener("click", () => (saved.source ? reviewImported(saved) : openSavedGame(saved)));
+  item.addEventListener("click", () => {
+    const fromHistory = !menuOpen && currentView === "history";
+    if (saved.source) reviewImported(saved);
+    else openSavedGame(saved);
+    // opened from Game history: Back goes back to it
+    if (fromHistory) viewTrail.splice(0, viewTrail.length, "history");
+  });
   return item;
 }
 

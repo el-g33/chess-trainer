@@ -38,11 +38,14 @@ export function stepBack(): boolean {
     back.click();
     return true;
   }
-  // in a game: the view you came from; a review's board goes back to its summary;
-  // else the screen it was started from, as New game does (asking first if a game is on)
-  const previous = viewTrail.pop() ?? (reviewing && currentView === "board" ? "stats" : undefined);
-  if (previous) {
-    set.viewBack(previous);
+  // in a game: the view you stepped in from (a review's summary, Game history
+  // for a game opened there); else the activity's main view (a review's
+  // summary, a game's board); from there, the screen it was started from, as
+  // New does (asking first if a game is on)
+  const previous = viewTrail.pop();
+  const main = reviewing ? "stats" : "board";
+  if (previous || currentView !== main) {
+    set.viewBack(previous ?? main);
     refresh();
   } else void onNewGame("Leave this game?");
   return true;
