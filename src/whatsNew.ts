@@ -11,6 +11,13 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.29",
+    items: [
+      { icon: "history", title: "Game history in Your profile", text: "Your profile has a Your games section, with Game history one tap away." },
+      { icon: "upload", title: "Import PGN", text: "Add a .pgn file of your Lichess or chess.com games from your device, straight from Game history or Your profile." },
+    ],
+  },
+  {
     version: "3.28",
     items: [
       { icon: "download", title: "Games from a file into Game history", text: "Open a .pgn file of your Lichess or chess.com games in Analyse a game and tap Add to Game history. They count in your stats and progress, and games already there aren't added twice." },

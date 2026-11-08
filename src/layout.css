@@ -1093,10 +1093,14 @@ html body .board-area .board-controls {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap; /* (a phone: the way back on a line of its own when it can't fit) */
   margin-bottom: 10px;
 }
 .history-gap {
   flex: 1;
+}
+.history-top > :last-child {
+  margin-left: auto; /* (on a line of its own, still on the right) */
 }
 .history-back,
 .history-get {

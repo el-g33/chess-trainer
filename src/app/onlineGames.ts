@@ -2,7 +2,7 @@
 // Get my games button, and reviewed from there (or from the Analyse a game screen)
 
 import { OnlineError, SOURCE_NAMES, type OnlineGame, type Source, type Wanted, fetchChesscom, fetchLichess, fromPgnFile, youIn } from "../online";
-import { readPgn } from "../pgn";
+import { type PgnGame, readPgn } from "../pgn";
 
 import { type SavedGame, drawDataCounts, historyRow, loadHistory, saveHistory, setHistoryFromReview } from "./coach";
 import { $, chesscomUserBox, lichessUserBox, profileDialog } from "./dom";
@@ -81,30 +81,66 @@ function addToHistory(games: OnlineGame[]): number {
   return fresh.length;
 }
 
-/** Games from Lichess or chess.com in an opened .pgn file (or pasted), into
- *  Game history. You're found by name (your usernames, or the one player in
- *  every game); otherwise you say which side you are in the first game. */
-export async function addPgnToHistory() {
-  if (!pgnGames.length) return;
-  let you = youIn(pgnGames.map((g) => g.headers), [playerName(), lichessUserBox.value, chesscomUserBox.value]);
+/** Games from Lichess or chess.com in a PGN (an opened .pgn file, or pasted),
+ *  into Game history. You're found by name (your usernames, or the one player
+ *  in every game); otherwise you say which side you are in the first game.
+ *  Returns what happened, in a line (nothing when you cancelled). */
+async function addGamesFromPgn(found: PgnGame[]): Promise<{ text: string; problem: boolean } | null> {
+  if (!found.length) return { text: "No games found in that file.", problem: true };
+  let you = youIn(found.map((g) => g.headers), [playerName(), lichessUserBox.value, chesscomUserBox.value]);
   if (!you) {
-    const side = await pickSide(pgnGames[0].headers);
-    if (side === "cancel" || side === null) return;
-    you = (side === "white" ? pgnGames[0].headers.White : pgnGames[0].headers.Black) ?? "";
-    if (!you || you === "?") return;
+    const side = await pickSide(found[0].headers);
+    if (side === "cancel" || side === null) return null;
+    you = (side === "white" ? found[0].headers.White : found[0].headers.Black) ?? "";
+    if (!you || you === "?") return null;
   }
-  const { games, skipped } = fromPgnFile(pgnGames, you);
+  const { games, skipped } = fromPgnFile(found, you);
   const added = addToHistory(games);
   const already = games.length - added;
-  pgnStatus.classList.toggle("problem", !games.length);
-  pgnStatus.textContent = !games.length
-    ? "None of these games could be added: only finished, standard games of yours from Lichess or chess.com can go into Game history."
-    : [
+  if (!games.length) {
+    return { text: "None of these games could be added: only finished, standard games of yours from Lichess or chess.com can go into Game history.", problem: true };
+  }
+  return {
+    text: [
       added ? `Added ${added} ${added === 1 ? "game" : "games"} to Game history.` : "",
       already ? `${already} ${already === 1 ? "was" : "were"} already there.` : "",
       skipped ? `${skipped} left out (not finished, not standard chess, or not yours).` : "",
-    ].filter(Boolean).join(" ");
+    ].filter(Boolean).join(" "),
+    problem: false,
+  };
+}
+
+/** Analyse a game's Add to Game history: the games in the box. */
+export async function addPgnToHistory() {
+  if (!pgnGames.length) return;
+  const done = await addGamesFromPgn(pgnGames);
+  if (!done) return;
+  pgnStatus.classList.toggle("problem", done.problem);
+  pgnStatus.textContent = done.text;
   drawYourGames();
+  refresh();
+}
+
+/** Import PGN (in Game history and Your profile): a .pgn file from this
+ *  device, its games into Game history, then the history to see them. */
+export function chooseHistoryFile() {
+  $<HTMLInputElement>("history-file").click();
+}
+
+async function importHistoryFile(file: File) {
+  const found = readPgn(await file.text()).filter((g) => g.load().game.length > 0);
+  const done = await addGamesFromPgn(found);
+  if (!done) return;
+  importNote = done.text;
+  if (profileDialog.open) profileDialog.close();
+  showHistory();
+}
+
+/** Game history, from Your profile (the way back is the menu, as usual). */
+export function showHistory() {
+  setHistoryFromReview(false);
+  if (menuOpen) hideMenu();
+  set.currentView("history");
   refresh();
 }
 
@@ -153,6 +189,18 @@ export function showAllGames() {
 export function setupOnlineGames() {
   $("your-games-get").addEventListener("click", () => void importGames());
   $("your-games-all").addEventListener("click", showAllGames);
+  // Your profile: Game history, and games from a .pgn file
+  $("profile-history").addEventListener("click", () => {
+    profileDialog.close();
+    showHistory();
+  });
+  $("profile-import").addEventListener("click", chooseHistoryFile);
+  $<HTMLInputElement>("history-file").addEventListener("change", (event) => {
+    const box = event.target as HTMLInputElement;
+    const file = box.files?.[0];
+    box.value = ""; // (the same file can be chosen again)
+    if (file) void importHistoryFile(file);
+  });
   // Your profile: the chess.com box only while its import is on
   for (const element of [chesscomUserBox, document.querySelector<HTMLElement>('label[for="chesscom-user"]')]) {
     if (element) element.hidden = !CHESSCOM_IMPORT;

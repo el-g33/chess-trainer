@@ -56,7 +56,7 @@ import {
   cap, depthButton, drillSays, lessonNotePages, openingShortName, practiceSays, scheduleDemo, showWhatYouGet, startDemoLine,
   lowerFirst, movePicture, practiseGameSlips,
 } from "./openingDemos";
-import { importGames, importing, importNote, reviewImported } from "./onlineGames";
+import { chooseHistoryFile, importGames, importing, importNote, reviewImported } from "./onlineGames";
 import { openPgnDialog, openSave } from "./pgnScreens";
 import { MOVE_MARKS, barName, gameScores, ratingClass } from "./playerBars";
 import { message } from "./popups";
@@ -2024,6 +2024,14 @@ export function drawHistory() {
     save.addEventListener("click", openSave);
     top.append(save);
   }
+  // Games from a .pgn file on this device
+  const file = element("button", "history-get", "");
+  file.type = "button";
+  file.innerHTML = `${icon("upload", 16)} Import PGN`;
+  file.title = "Add games from a .pgn file (Lichess or chess.com)";
+  file.disabled = importing;
+  file.addEventListener("click", chooseHistoryFile);
+  top.append(file);
   const get = element("button", "history-get", "");
   get.type = "button";
   get.innerHTML = `${icon("download", 16)} ${importing ? "Getting..." : "Get my games"}`;
@@ -2033,7 +2041,7 @@ export function drawHistory() {
   box.append(top);
   if (importNote) box.append(element("p", "stats-note history-import-note", importNote));
   if (!games.length) {
-    tabMessage(box, "No games yet. Play against me, or get your games from Lichess, and your record builds up here.");
+    tabMessage(box, "No games yet. Play against me, get your games from Lichess, or import a .pgn file of your games, and your record builds up here.");
     return;
   }
   // Where from: all, this app, Lichess, chess.com (when there are games from more than one place)

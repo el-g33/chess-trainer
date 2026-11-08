@@ -536,6 +536,15 @@
         <div class="settings-grid">
           <label for="player-name">Your name</label>
           <input type="text" id="player-name" maxlength="30" placeholder="You" autocomplete="nickname" />
+          <div class="settings-section wide">
+            <h4>Your games</h4>
+            <div class="data-buttons">
+              <button type="button" id="profile-history"><span data-ico="history" data-ico-size="18"></span> Game history</button>
+              <button type="button" id="profile-import"><span data-ico="upload" data-ico-size="18"></span> Import PGN</button>
+            </div>
+            <p class="setup-note">Every game you've played here or brought in. Import a .pgn file of your Lichess or chess.com games to add them.</p>
+            <input type="file" id="history-file" accept=".pgn,.txt,application/x-chess-pgn,application/vnd.chess-pgn,text/plain" hidden />
+          </div>
           <div class="settings-section wide" id="online-accounts">
             <h4>Your online games</h4>
             <p class="setup-note" id="online-note"></p>
