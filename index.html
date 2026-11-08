@@ -540,10 +540,8 @@
             <h4>Your games</h4>
             <div class="data-buttons">
               <button type="button" id="profile-history"><span data-ico="history" data-ico-size="18"></span> Game history</button>
-              <button type="button" id="profile-import"><span data-ico="upload" data-ico-size="18"></span> Import PGN</button>
             </div>
-            <p class="setup-note">Every game you've played here or brought in. Import a .pgn file of your Lichess or chess.com games to add them.</p>
-            <input type="file" id="history-file" accept=".pgn,.txt,application/x-chess-pgn,application/vnd.chess-pgn,text/plain" hidden />
+            <p class="setup-note">Every game you've played here or brought in. To add your Lichess or chess.com games from a .pgn file, use Import PGN in Game history.</p>
           </div>
           <div class="settings-section wide" id="online-accounts">
             <h4>Your online games</h4>
@@ -569,6 +567,9 @@
         </div>
       </form>
     </dialog>
+
+    <!-- Game history's Import PGN: a .pgn file from this device -->
+    <input type="file" id="history-file" accept=".pgn,.txt,application/x-chess-pgn,application/vnd.chess-pgn,text/plain" hidden />
 
     <!-- A new version has arrived in the background -->
     <div id="update-toast" class="update-toast" role="status" hidden>

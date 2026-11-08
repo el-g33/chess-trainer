@@ -14,7 +14,7 @@ export const RELEASES: Release[] = [
     version: "3.29",
     items: [
       { icon: "history", title: "Game history in Your profile", text: "Your profile has a Your games section, with Game history one tap away." },
-      { icon: "upload", title: "Import PGN", text: "Add a .pgn file of your Lichess or chess.com games from your device, straight from Game history or Your profile." },
+      { icon: "upload", title: "Import PGN", text: "Add a .pgn file of your Lichess or chess.com games from your device, straight from Game history." },
     ],
   },
   {

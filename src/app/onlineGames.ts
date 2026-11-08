@@ -121,7 +121,7 @@ export async function addPgnToHistory() {
   refresh();
 }
 
-/** Import PGN (in Game history and Your profile): a .pgn file from this
+/** Game history's Import PGN: a .pgn file from this
  *  device, its games into Game history, then the history to see them. */
 export function chooseHistoryFile() {
   $<HTMLInputElement>("history-file").click();
@@ -189,12 +189,11 @@ export function showAllGames() {
 export function setupOnlineGames() {
   $("your-games-get").addEventListener("click", () => void importGames());
   $("your-games-all").addEventListener("click", showAllGames);
-  // Your profile: Game history, and games from a .pgn file
+  // Your profile: Game history; Game history's Import PGN: games from a .pgn file
   $("profile-history").addEventListener("click", () => {
     profileDialog.close();
     showHistory();
   });
-  $("profile-import").addEventListener("click", chooseHistoryFile);
   $<HTMLInputElement>("history-file").addEventListener("change", (event) => {
     const box = event.target as HTMLInputElement;
     const file = box.files?.[0];
