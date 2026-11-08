@@ -7,13 +7,14 @@ import { parseUci } from "chessops/util";
 import { Chess } from "chessops/chess";
 import { parseFen } from "chessops/fen";
 
+import { betterCard } from "../../src/better";
 import { pieceRoute } from "../../src/plans";
 import { isSacrifice } from "../../src/review";
 import { forkOf, freeTake, pinWins, replyWins } from "../../src/tactics";
 import { Game } from "../../src/game";
 import { asGerund, ignoredThreat, isTrade, narrateMove, stopsPawn, verdict } from "../../src/narrate";
 import { positionalReason, reasonWords, recaptureReason } from "../../src/reasons";
-import type { Review } from "../../src/review";
+import type { Evaluation, Review } from "../../src/review";
 
 const uci = (move: string) => parseUci(move) as NormalMove;
 
@@ -162,6 +163,42 @@ export default async function run() {
   // a king move that hits their rook back isn't a sacrifice
   const kingBack = fen("2kr4/p5pp/PpR1b3/5p2/8/8/3rBPPP/4K2R b K - 0 26");
   check("Counter-attack is no sacrifice", isSacrifice(kingBack, uci("c8d7"), played(kingBack, "c8d7")), undefined);
+
+  // Good moves with a better one: how the coach compares them (positions and Stockfish's results from real games)
+  const ev = (cp: number, best: string, line: string, secondCp?: number): Evaluation =>
+    ({ score: { cp }, best: uci(best), line, ...(secondCp === undefined ? {} : { secondScore: { cp: secondCp } }) });
+  const compare = (position: string, move: string, best: string, before: Evaluation, after: Evaluation) => {
+    const card = betterCard(fen(position), uci(move), uci(best), before, after, fen(position).turn);
+    return { tier: card.tier, texts: card.pages.map((page) => `${page.show}: ${page.text}`) };
+  };
+  // what your move allowed: their bishop comes to g4 with a hit on your queen, which h3 stops
+  check("What it allowed", compare("r1bqkb1r/1pp2pp1/p4n1p/4p3/2B1Pn2/2N1BQ2/PPP2PPP/R3K1NR w KQkq - 2 12", "e3f4", "h2h3",
+    ev(45, "h2h3", "h2h3 f4e6 g1e2 c7c5 e1g1", 36), ev(20, "c8g4", "c8g4 f3e3 e5f4 e3f4 f8d6", 274)), { tier: "allowed", texts: [
+    "reply: That lets them answer with their bishop to g4: it develops their bishop and attacks your queen.",
+    "best: Your pawn to h3 first takes that answer away, and it takes a key square away from their knight and bishop.",
+  ] });
+  // the queen out early, with the king still at home: the knight first
+  check("Better order", compare("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", "d1h5", "g1f3",
+    ev(22, "g1f3", "g1f3 b8c6 d2d4 e5d4", 16), ev(-28, "b8c6", "b8c6 f1c4 g7g6 h5d1", -23)), { tier: "order", texts: [
+    "best: Your king is still in the centre, so your knight to f3 comes first: it brings a new piece out. Your queen to h5 can wait.",
+  ] });
+  // taking back with the knight instead of the pawn that frees the bishop
+  check("Right piece to take back with", compare("r1bqk1nr/pp2bppp/2Pp4/nB2p3/4P3/5N2/PPP2PPP/RNBQK2R b KQkq - 0 7", "a5c6", "b7c6",
+    ev(7, "b7c6", "b7c6 b5d3 a5b7", 5), ev(18, "b5a4", "b5a4 c8e6 b1c3 a7a6", 15)).texts, [
+    "best: Your better option was taking back with the pawn. It frees your bishop on c8.",
+  ]);
+  // a knight trade that looks like winning a piece: no reason that holds up, so none is made up
+  check("A little more accurate", compare("r4rk1/p1p1qppp/2p5/3p4/1P2n1b1/P1N2N2/4QPPP/R3KB1R w KQ - 1 16", "c3e4", "e2e3",
+    ev(-63, "e2e3", "e2e3 e7f6 a1c1 f8e8", -106), ev(-118, "d5e4", "d5e4 e2e3 e7f6 e3d4 e4f3 d4f6 g7f6", 184)), { tier: "plain", texts: [
+    "best: Your queen to e3 was a little more accurate here.",
+  ] });
+  // within 1%: no card, the other move named as just as good
+  const start = new Game();
+  const opening = start.positionAt(0);
+  const d4 = played(opening, "d2d4");
+  const close = { rating: "Excellent", symbol: "", text: "", loss: 0, chanceBefore: 53, chanceAfter: 52.5, bestSan: "e4" } as unknown as Review;
+  check("Just as good", verdict(close, opening, d4, ev(22, "g8f6", "g8f6 c2c4"), "white", 1, false, ev(38, "e2e4", "e2e4 e7e5")),
+    "Strong, that keeps things going your way. Your pawn to e4 is just as good.");
 
   return { name: "Coaching reasons", checks, failures };
 }

@@ -11,6 +11,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.27",
+    items: [
+      { icon: "bulb", title: "Why the better move is better", text: "When your move was good but not the best, the coach now compares the two: what your move let them do and how the better move stops it, or why the better move comes first, like getting a new piece out while your king is still in the centre." },
+      { icon: "star", title: "Just as good", text: "When another move was only a touch better, the coach just names it as just as good, with no card to open." },
+      { icon: "shield", title: "No made-up reasons", text: "When there's no clear reason one move is better, the coach says it was a little more accurate rather than giving a reason that doesn't hold up." },
+    ],
+  },
+  {
     version: "3.26",
     items: [
       { icon: "hazard", title: "What it costs, a few moves on", text: "The coach now looks further ahead. When a move loses something a few moves later, it says what and how it starts, like your rook falling to a bishop check. It also names what a better move would have won, checkmates a few moves away, and pawns that run through to promote." },

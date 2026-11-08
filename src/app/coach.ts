@@ -26,7 +26,7 @@ import {
   HINT_TEXT, type Mode, analyser, base, bestLine, brilliantShown, coachAnalysis, coachLine, currentPly, gameMoves, insights,
   previewPlan, quizLinePositions, quizScore, quizWaiting, ratingsOn,
 } from "../main";
-import { asGerund, controlledSquares, dangerAfter, ignoredThreat, moveInWords, narrateMove, quietReason, stopsPawn, targetsOf, verdict, whyMove } from "../narrate";
+import { controlledSquares, dangerAfter, ignoredThreat, moveInWords, narrateMove, quietReason, stopsPawn, targetsOf, verdict, whyMove } from "../narrate";
 import { REASON_LESSON, isKingHole, reasonWords, recaptureReason } from "../reasons";
 import {
   type OpeningInfo, REPERTOIRE, firstMoveOf, goalWords, isStartPosition, mainFamily, systemFor,
@@ -36,6 +36,7 @@ import { readPgn, writePgn } from "../pgn";
 import { ratingName } from "../ratingNames";
 import { type Review, fenOf, isDrawnPosition, isSacrifice, verdictWords, winningChance } from "../review";
 import { pieceRoute } from "../plans";
+import { type BetterPage, betterCard, betterWords, ideaWords, justAsGood, whyBetter } from "../better";
 import { passMove, planAhead } from "../strategy";
 import { type Style, styleAlternative } from "../style";
 import { Typer, fitsIn, readingTime, splitToFit } from "../talk";
@@ -480,12 +481,6 @@ export function explainMove(ply: number, review: Review) {
   void explainGoodMove(ply, review);
 }
 
-/** A move's idea in a few words, straight in: "Brings the knight out and
- *  eyes the centre." (no "Their idea:" - the arrows show whose move it is) */
-export function ideaWords(before: Chess, move: NormalMove, viewer: Color | null): string {
-  return `${cap(whyMove(before, move, viewer).replace(/^it /, ""))}.`;
-}
-
 /** Tell me more on a good move: one picture of what it does - the squares the
  *  piece now controls, the pawn chain, the square it takes away - and a few
  *  words. Only a move that sets something up (a check, or a piece it can now
@@ -525,7 +520,7 @@ export async function explainGoodMove(ply: number, review: Review) {
 
 /** A good move that wasn't Stockfish's top choice. */
 export function notTheBest(ply: number, review: Review | undefined): boolean {
-  if (!review?.bestSan || !["Excellent", "Good"].includes(review.rating)) return false;
+  if (!review?.bestSan || !["Excellent", "Good"].includes(review.rating) || justAsGood(review)) return false;
   return makeSan(game.positionAt(ply - 1), game.moves[ply - 1].move) !== review.bestSan;
 }
 
@@ -963,7 +958,7 @@ export async function explainSlip(ply: number, review: Review, token?: number) {
     }
     const heading = viewer === null ? "The better move" : theirSlip ? "Their better option" : "Your better option";
     // (straight to the better move, played in: its squares lit, and what it's for in one line)
-    add(heading, [{ position: afterBest, shapes: movePicture(before, afterBest, best, mine, viewer), last: best, from: before }], [betterWords(before, after, best, reply, viewer, mine)]);
+    add(heading, [{ position: afterBest, shapes: movePicture(before, afterBest, best, mine, viewer), last: best, from: before }], [betterWords(before, after, best, reply, viewer, mine, analyser.evals.get(fenOf(before)))]);
     if (simple || storyPages) return; // (nothing more to see after a simple take, or a king-safety story)
     if (stopsPawn(before, best, viewer)) return; // (stopping their pawn is the point: the rest is ordinary play)
     // How it goes on: the better move's line, from their reply
@@ -1014,20 +1009,6 @@ function freeTakeWords(after: Chess, take: NormalMove, mover: Color, viewer: Col
   }
   if (viewer === taker) return guarded ? "It's guarded, but taking still wins material, and they've no good way to hit back." : "Nothing guards it, so it's yours, easy. And they've no good way to hit back.";
   return `${guarded ? "It was guarded, but taking still won them material" : "Nothing guarded it, so they could just take it"}, and you'd have no good way to hit back.`;
-}
-
-/** The better move in one coach's line: "Your better option was bringing the
- *  rook into play." A pawn move that stops their pawn chasing a piece says so. */
-function betterWords(before: Chess, after: Chess, best: NormalMove, reply: NormalMove | undefined, viewer: Color | null, mine: boolean): string {
-  const lead = viewer === null ? "The better move was" : mine ? "Your better option was" : "Their better option was";
-  const clause = stopsPawn(before, best, viewer) ?? whyMove(before, best, viewer).replace(/^it /, "");
-  let also = whyBetter(before, after, best, reply, viewer).endsWith("It also stops the reply you just saw.") ? " It also stops the reply you just saw." : "";
-  // (the only good move: the next best was much worse)
-  const known = analyser.evals.get(fenOf(before));
-  if (known?.secondScore && winningChance(known.score, before.turn) - winningChance(known.secondScore, before.turn) >= 25) also += " It was the only good move here.";
-  // (a clause that isn't a verb, like "it's checkmate", is said as it is)
-  if (/^(it's|it is)/.test(clause)) return `${lead} there: ${clause}.${also}`;
-  return `${lead} ${asGerund(clause)}.${also}`;
 }
 
 /** The plan after the better move (`pv`: the best line if they passed), when its next steps are pawn pushes: the
@@ -1147,31 +1128,6 @@ export function lineToGain(start: Chess, pv: NormalMove[], side: Color, amount: 
   return undefined;
 }
 
-/** The better move in a sentence or two, straight in: what it does, and
- *  whether it takes away the reply your move allowed. (Not what your move
- *  cost: the Why pages have just shown that.) */
-export function whyBetter(before: Chess, after: Chess, best: NormalMove, reply: NormalMove | undefined, viewer: Color | null): string {
-  let text = ideaWords(before, best, viewer);
-  if (reply) {
-    // their reply to the move played: after the better one, is it gone, or would it now cost them?
-    const instead = positionAfter(before, best);
-    const same = normalizeMove(instead, reply) as NormalMove;
-    const gone = !instead.isLegal(same) || instead.board.get(same.to)?.role !== after.board.get(reply.to)?.role;
-    let costly = false;
-    if (!gone) {
-      const then = positionAfter(instead, same);
-      const piece = instead.board.get(same.from);
-      const taken = instead.board.get(same.to);
-      const us = opposite(instead.turn);
-      costly = !!piece && then.kingAttackers(same.to, us, then.board.occupied).nonEmpty() && VALUE[piece.role] > (taken ? VALUE[taken.role] : 0);
-    }
-    if (gone || costly) text += " It also stops the reply you just saw.";
-  }
-  return text;
-}
-
-const VALUE: Record<string, number> = { pawn: 1, knight: 3, bishop: 3, rook: 5, queen: 9, king: 100 };
-
 /** Find it yourself: back to just before the move, to play the better one
  *  (a what-if move on the board, rated like any other). */
 export function findItYourself(ply: number) {
@@ -1197,15 +1153,20 @@ export async function showBestLine(ply: number, slip = false) {
   const mine = viewer === null || mover === viewer;
   const after = positionAfter(before, played);
   const afterBest = positionAfter(before, best);
-  const choice = recaptureReason(before, played, best);
-  const text = choice ? recaptureWords(choice, mover, viewer) : betterWords(before, after, best, undefined, viewer, mine);
-  const card = startStory({ position: afterBest, shapes: movePicture(before, afterBest, best, mine, viewer), last: best, from: before }, text,
-    moodForRating(review.rating), []);
+  // how the two moves compare (see betterCard): what yours allowed, then the better move; or the better move alone
+  const afterEval = analyser.evals.get(fenOf(after));
+  const { tier, pages } = betterCard(before, played, best, analyser.evals.get(fenOf(before)), afterEval, viewer);
+  const reply = afterEval?.best;
+  const frameFor = (page: BetterPage): StepFrame => page.show === "reply" && reply
+    ? { position: positionAfter(after, reply), shapes: moveShapes(after, reply, viewer), last: reply, from: after }
+    : { position: afterBest, shapes: movePicture(before, afterBest, best, mine, viewer), last: best, from: before };
+  const card = startStory(frameFor(pages[0]), pages[0].text, moodForRating(review.rating), pages.length > 1 ? ["What it allowed", "The better move"] : []);
+  if (pages.length > 1) extendPages(card, pages.slice(1).map(frameFor), pages.slice(1).map((page) => page.text), 1);
   // a slip of yours: at the end, a go at finding the better move yourself
   if (slip && mine) card.extra = { ico: "target", label: "Find it yourself", kind: "accent", labelled: true, run: () => findItYourself(ply) };
   try {
-    // (with a reason given, the point is made: no line to follow)
-    if (choice) return;
+    // (with the comparison made - what yours allowed, the better order, the right piece to take back with - no line to follow)
+    if (["allowed", "order", "recapture"].includes(tier)) return;
     const line = await coachLine(before, 1.5, [best]);
     const moves = wholeLine(before, line?.pv.length ? line.pv : [best], 3);
     if (moves.length < 2) return;
@@ -1219,21 +1180,6 @@ export async function showBestLine(ply: number, slip = false) {
   } finally {
     showStory(card);
   }
-}
-
-/** Taking back with the better piece, in words: "Your better option was taking
- *  back with the knight. It frees your bishop on c8, and your queen stays at
- *  home, where it can't be chased." */
-function recaptureWords(choice: NonNullable<ReturnType<typeof recaptureReason>>, mover: Color, viewer: Color | null): string {
-  const mine = viewer === null || viewer === mover;
-  const lead = viewer === null ? "The better move was" : mine ? "Your better option was" : "Their better option was";
-  const your = viewer === null ? `${colourName(mover)}'s` : mine ? "your" : "their";
-  const parts: string[] = [];
-  if (choice.develops) parts.push("brings out a new piece");
-  if (choice.frees) parts.push(`frees ${your} ${choice.frees.role} on ${makeSquare(choice.frees.square)}`);
-  let why = parts.length ? `It ${parts.join(" and ")}` : "";
-  if (choice.queenHome) why += why ? `, and ${your} queen stays at home, where it can't be chased` : `${cap(your)} queen stays at home, where it can't be chased`;
-  return `${lead} taking back with the ${choice.role}. ${why}.`;
 }
 
 export const MATERIAL: Record<string, number> = { pawn: 1, knight: 3, bishop: 3, rook: 5, queen: 9, king: 0 };

@@ -286,6 +286,14 @@ export function verdict(review: Review, before: Chess, after: Chess,
   }
   if (PRAISE[review.rating]) {
     const line = pick(PRAISE[review.rating], seed);
+    // (a better move by no more than 1%: not worth a card, just named as just as good)
+    if (mine && best && ["Good", "Excellent"].includes(review.rating) && review.chanceBefore - review.chanceAfter <= 1) {
+      const instead = before.clone();
+      instead.play(best);
+      if (instead.board.occupied.equals(after.board.occupied) === false || [...after.board.occupied].some((square) => instead.board.get(square)?.role !== after.board.get(square)?.role)) {
+        return `${line} ${cap(movePhrase(before, best, "your"))} is just as good.`;
+      }
+    }
     if (mine) return line;
     return you ? THEIR_PRAISE[review.rating] : line.replace("you found", "they found");
   }
@@ -822,7 +830,7 @@ export function asGerund(clause: string): string {
   const ing = (verb: string) => {
     let stem = /(sh|ch|ss|x)es$/.test(verb) ? verb.slice(0, -2) : verb.endsWith("s") ? verb.slice(0, -1) : verb;
     if (/[^e]e$/.test(stem)) stem = stem.slice(0, -1);
-    else if (/^[^aeiou]*[aeiou][bdgklmnprt]$/.test(stem)) stem += stem.slice(-1);
+    else if (/^[^aeiou]*[aeiou][bdgklmnprt]$/.test(stem) || /(control|patrol)$/.test(stem)) stem += stem.slice(-1);
     return `${stem}ing`;
   };
   return clause.replace(/^it /, "").replace(/^(\w+)/, (verb) => ing(verb)).replace(/ and (\w+s)\b/g, (_all, verb: string) => ` and ${ing(verb)}`);
