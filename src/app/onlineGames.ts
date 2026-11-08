@@ -24,6 +24,7 @@ const NEWER_MAX = 200; // the most new games per site in one go
 
 export let importing = false;
 export let importNote = ""; // what the last import found (or what went wrong)
+export const clearImportNote = () => (importNote = "");
 
 const usernames = (): Partial<Record<Source, string>> => ({
   ...(lichessUserBox.value.trim() ? { lichess: lichessUserBox.value.trim() } : {}),
@@ -214,9 +215,11 @@ export function setupOnlineGames() {
 /** The Analyse a game screen: your three latest games, to review with a tap. */
 export function drawYourGames() {
   const box = $("your-games");
-  const games = loadHistory().slice(0, 3);
+  const all = loadHistory();
+  const games = all.slice(0, 3);
+  const places = new Set(all.map((g) => g.source ?? "app")).size;
   const list = box.querySelector<HTMLElement>(".your-games-list")!;
-  list.replaceChildren(...games.map((saved) => historyRow(saved)));
+  list.replaceChildren(...games.map((saved) => historyRow(saved, places > 1)));
   $("your-games-empty").hidden = games.length > 0;
   $("your-games-all").hidden = !games.length;
   const get = $<HTMLButtonElement>("your-games-get");

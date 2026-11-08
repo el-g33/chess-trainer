@@ -1,15 +1,16 @@
 // On a computer (a wide screen) the board takes the full height on the left,
-// and everything that sits above and below it on a phone - the players, the
-// coach, the review bar, the moves, the explanations and the buttons - moves
-// into a sidebar on the right, top to bottom. On a narrower screen each part
-// goes back to where it was.
+// with the players just above and below it, and everything else that sits
+// around it on a phone - the coach, the review bar, the moves, the
+// explanations and the buttons - moves into a sidebar on the right, top to
+// bottom. The summary (Statistics) opens in the sidebar too, so the board
+// stays put. On a narrower screen each part goes back to where it was.
 
 const WIDE = window.matchMedia("(min-width: 1000px) and (orientation: landscape)");
 
 // The sidebar's parts, in order from top to bottom
 const PARTS = [
-  "#bar-top", "#coach-strip", "#review-bar", "#whatif-bar", ".moves-area", "#stepper", "#editor-panel",
-  "#drill-setup", "#demo-panel", "#moment-nav", ".board-controls", "#bar-bottom",
+  ".stats-view", "#coach-strip", "#review-bar", "#whatif-bar", ".moves-area", "#stepper", "#editor-panel",
+  "#drill-setup", "#demo-panel", "#moment-nav", ".board-controls",
 ];
 
 const homes = new Map<HTMLElement, Comment>(); // where each part sits on a phone

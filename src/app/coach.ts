@@ -56,9 +56,10 @@ import {
   cap, depthButton, drillSays, lessonNotePages, openingShortName, practiceSays, scheduleDemo, showWhatYouGet, startDemoLine,
   lowerFirst, movePicture, practiseGameSlips,
 } from "./openingDemos";
-import { chooseHistoryFile, importGames, importing, importNote, reviewImported } from "./onlineGames";
+import { chooseHistoryFile, clearImportNote, importGames, importing, importNote, reviewImported } from "./onlineGames";
 import { openPgnDialog, openSave } from "./pgnScreens";
 import { MOVE_MARKS, barName, gameScores, ratingClass } from "./playerBars";
+import { sidebarOn } from "./sidebar";
 import { message } from "./popups";
 import { analysisReview, moveReviews, openingInfo, reviewPly } from "./ratings";
 import { moveSound, showMenu } from "./startMenu";
@@ -1659,7 +1660,7 @@ export function drawMoveStrip(list: (Review | undefined)[], info: OpeningInfo[])
     if (number) button.append(Object.assign(document.createElement("span"), { className: "ms-num", textContent: number }));
     button.append(`${played.san}${mark && !played.san.endsWith("#") ? mark : ""}`);
     button.className = ply === current ? "cur" : "";
-    if (mark !== undefined) button.classList.add(ratingClass(review!.rating));
+    if (review && !info[i]?.book) button.classList.add(ratingClass(review.rating), mark ? "notable" : "graded");
     if (turning.includes(ply)) button.classList.add("turning"); // underlined while going through them
     button.addEventListener("click", () => goTo(ply));
     return button;
@@ -1673,8 +1674,10 @@ export function applyView() {
   for (const tab of document.querySelectorAll<HTMLButtonElement>(".view-tabs button")) {
     tab.classList.toggle("on", tab.dataset.view === currentView);
   }
+  // (on a computer the summary sits beside the board, so the board stays)
+  const besideBoard = sidebarOn() && currentView === "stats";
   for (const panel of document.querySelectorAll<HTMLElement>("[data-view-panel]")) {
-    panel.hidden = panel.dataset.viewPanel !== currentView;
+    panel.hidden = panel.dataset.viewPanel !== currentView && !(besideBoard && panel.classList.contains("board-area"));
   }
   document.body.dataset.view = currentView;
   if (currentView === "stats") drawStats();
@@ -1747,7 +1750,17 @@ export function drawStats() {
   // Both players side by side (you first when it's your game)
   const first: Color = listener() ?? "white";
   const sides: Color[] = [first, opposite(first)];
-  const name = (colour: Color) => barName(colour);
+  // Each column: who it is ("You" and "Opponent" in your game, the colours in
+  // someone else's), with the full name under it
+  const mine = watching() ? null : listener();
+  const name = (colour: Color) => {
+    const cell = element("span", "stats-cell stats-name");
+    const who = element("b", "", mine ? (colour === mine ? "You" : "Opponent") : colour === "white" ? "White" : "Black");
+    who.prepend(element("span", `side-dot ${colour}`));
+    cell.append(who, element("small", "", barName(colour)));
+    cell.title = barName(colour);
+    return cell;
+  };
 
   const card = element("div", "stats-card");
   const table = element("div", "stats-table");
@@ -1769,7 +1782,7 @@ export function drawStats() {
   };
   // The head: deep review (top left, beside the players), then the overall accuracy;
   // Details opens the rest
-  row(reviewing ? depthButton(pending) : "", sides.map((c) => element("span", "stats-cell stats-name", name(c))), "head");
+  row(reviewing ? depthButton(pending) : "", sides.map((c) => name(c)), "head");
   row("Accuracy", sides.map((c) => percent(overall[c], true)));
   if (statsDetails) {
     row("Opening", sides.map((c) => percent(phases.opening[c])));
@@ -2039,7 +2052,20 @@ export function drawHistory() {
   get.addEventListener("click", () => void importGames());
   top.append(get);
   box.append(top);
-  if (importNote) box.append(element("p", "stats-note history-import-note", importNote));
+  if (importNote) {
+    // what the last import did, until you close it
+    const note = element("p", "stats-note history-import-note", importNote);
+    const close = element("button", "round soft history-note-close", "");
+    close.type = "button";
+    close.innerHTML = icon("close", 14);
+    close.setAttribute("aria-label", "Close");
+    close.addEventListener("click", () => {
+      clearImportNote();
+      drawHistory();
+    });
+    note.append(close);
+    box.append(note);
+  }
   if (!games.length) {
     tabMessage(box, "No games yet. Play against me, get your games from Lichess, or import a .pgn file of your games, and your record builds up here.");
     return;
@@ -2085,10 +2111,25 @@ export function drawHistory() {
     record.append(button);
   }
   const shown = ofColour.filter((g) => !historyResults.size || historyResults.has(g.result));
+  // Month by month, the newest first: a page of games at a time
   const list = element("div", "history-list");
-  for (const saved of shown) list.append(historyRow(saved));
+  let month = "";
+  for (const saved of shown.slice(0, historyShown)) {
+    const named = new Date(saved.date).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    if (named !== month) list.append(element("p", "history-month", (month = named)));
+    list.append(historyRow(saved, sources.size > 1));
+  }
   if (!shown.length) list.append(element("p", "stats-note", "No games match these filters."));
   box.append(...(where.childElementCount ? [where] : []), colours, record, list);
+  if (shown.length > historyShown) {
+    const more = element("button", "soft history-more", `Show more (${shown.length - historyShown} left)`);
+    more.type = "button";
+    more.addEventListener("click", () => {
+      historyShown += HISTORY_PAGE;
+      drawHistory();
+    });
+    box.append(more);
+  }
   if (games.some((g) => g.source)) {
     const older = element("button", "link-button history-older", "Get older games");
     older.type = "button";
@@ -2099,11 +2140,14 @@ export function drawHistory() {
 }
 
 let historySource: "all" | "app" | Source = "all";
+const HISTORY_PAGE = 50;
+let historyShown = HISTORY_PAGE; // games listed so far (Show more adds a page)
 export let historyFromReview = false; // opened with See all games: the way back is to Analyse a game
 export const setHistoryFromReview = (on: boolean) => (historyFromReview = on);
 
 /** One game in the history (and on the Analyse a game screen): tap to replay or review it. */
-export function historyRow(saved: SavedGame): HTMLButtonElement {
+/** A game in the history; where it came from shows when your games come from more than one place. */
+export function historyRow(saved: SavedGame, showSource = true): HTMLButtonElement {
   const item = element("button", "history-game");
   item.type = "button";
   const mark = element("span", `history-mark ${saved.result}`, saved.result === "win" ? "W" : saved.result === "loss" ? "L" : "D");
@@ -2111,7 +2155,7 @@ export function historyRow(saved: SavedGame): HTMLButtonElement {
   const title = element("span", "history-title", saved.source
     ? `${saved.opponent ?? "?"}${saved.opponentRating ? ` (${saved.opponentRating})` : ""}`
     : `vs the coach · ${shortName(LEVELS[saved.level] ?? LEVELS[0])}`);
-  if (saved.source) title.append(element("span", `history-tag ${saved.source}`, SOURCE_NAMES[saved.source]));
+  if (saved.source && showSource) title.append(element("span", `history-tag ${saved.source}`, SOURCE_NAMES[saved.source]));
   text.append(title, element("span", "history-meta", [saved.speed ?? "", saved.opening || "Game", saved.user === "white" ? "White" : "Black",
     saved.source ? "" : timeControlLabel(saved.timeControl), saved.accuracy !== undefined ? `${saved.accuracy}%` : ""].filter(Boolean).join(" · ")));
   item.append(mark, text, element("span", "history-date", shortDate(saved.date)));
@@ -2141,6 +2185,67 @@ export function openSavedGame(saved: SavedGame) {
 export const inProgress = () => match !== null && game.length > 0 && !game.outcome();
 
 /** What New starts again, in the mode you're in: "game", "match", "review"... */
+/** The New button's words for the mode you're in: in full, and shorter for a
+ *  phone's narrow top bar (the arrow's menu spells it out). */
+export function newLabel(): { full: string; phone: string } {
+  switch (newWhat()) {
+    case "match": return { full: "New match", phone: "New match" };
+    case "review": return { full: "Review another game", phone: "New review" };
+    case "drill": return { full: "Another drill", phone: "New drill" };
+    case "lesson": return { full: "Next lesson", phone: "Next lesson" };
+    case "puzzles": return { full: "More puzzles", phone: "More puzzles" };
+    case "position": return { full: "New position", phone: "New position" };
+    default: return { full: "New game", phone: "New game" };
+  }
+}
+
+const MODES: [HomeChoice, string][] = [
+  ["play", "Play against the coach"], ["practice", "Practice match"], ["analysis", "Analyse a game"], ["train", "Training"],
+];
+
+/** New's arrow: the next one in this mode, the other modes, and Home. */
+export function toggleModesMenu(anchor: HTMLElement) {
+  const box = $("help-menu");
+  if (!box.hidden && box.dataset.for === "modes") {
+    box.hidden = true;
+    return;
+  }
+  box.replaceChildren();
+  box.dataset.for = "modes";
+  const item = (text: string, run: () => void, className = "") => {
+    const button = element("button", className, text);
+    button.type = "button";
+    button.setAttribute("role", "menuitem");
+    button.addEventListener("click", () => {
+      box.hidden = true;
+      run();
+    });
+    box.append(button);
+  };
+  const here: HomeChoice | null = gameOrigin === "learn" ? "train" : gameOrigin;
+  item(newLabel().full, () => void onNewGame(), "menu-current");
+  box.append(element("hr", "menu-line"));
+  for (const [mode, label] of MODES) if (mode !== here) item(label, () => void switchMode(mode));
+  box.append(element("hr", "menu-line"));
+  item("Home", () => void switchMode(null), "menu-quiet");
+  const rect = anchor.getBoundingClientRect();
+  box.hidden = false;
+  box.style.top = `${rect.bottom + 6}px`;
+  box.style.right = "";
+  box.style.left = `${Math.max(8, Math.min(rect.left - 120, window.innerWidth - 240))}px`;
+}
+
+/** Another mode (or Home), asking first if a game is being played. */
+export async function switchMode(screen: HomeChoice | null) {
+  if (inProgress() && !(await message("Leave this game?", "Are you sure? This game will end.", true))) return;
+  endGame();
+  showMenu();
+  if (!screen) return;
+  set.homeChoice(screen);
+  showScreen(screen);
+  drawTrainScreen();
+}
+
 export function newWhat(): string {
   switch (gameOrigin) {
     case "practice": return "match";
@@ -2433,9 +2538,11 @@ export function drawButtons() {
   // No take-backs while looking back or previewing: Undo only works on the live game.
   undoButton.disabled = waiting || looking || quizOpen || !game.length;
   newButton.disabled = busy;
-  const what = newWhat();
-  newButton.querySelector(".ng-long")!.textContent = ` ${what}`;
-  newButton.setAttribute("aria-label", `New ${what}`);
+  const label = newLabel();
+  newButton.querySelector(".ng-full")!.textContent = label.full;
+  newButton.querySelector(".ng-phone")!.textContent = label.phone;
+  newButton.setAttribute("aria-label", label.full);
+  $<HTMLButtonElement>("new-more").disabled = busy;
 
   resignButton.hidden = !(match && !analysis);
   resignButton.disabled = busy;

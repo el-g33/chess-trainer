@@ -17,7 +17,7 @@ import { GRADE_JUMP_PAUSE, backToStats, watching, withBook } from "./matches";
 import { goTo } from "./moves";
 import { analysis, currentView, demo, game, reviewing, set } from "./state";
 
-const MOST = 6;
+const MOST = 5; // (any more are left to the full review, with a line saying how many)
 // A big swing in the mover's winning chance (0-100) that also changes who is
 // better: winning to level or losing, or level to losing. A slip that leaves
 // the game where it was (still winning, still lost) isn't a turning point.
@@ -36,18 +36,22 @@ const SIGNS: Record<FundamentalKind, { sign: string; ico: string }> = {
   took: { sign: "chance", ico: "gift" },
 };
 
-/** The game's turning points, in move order (up to six, the biggest swings
+/** The game's turning points, in move order (up to five, the biggest swings
  *  first). A big swing only counts with a reason you can see on the board: a
  *  piece left loose or walked into a fork, a threat ignored that loses
  *  material, a checkmate walked into or missed, or a winning capture missed.
  *  (A swing the engine sees in a quiet move is left to the full review.) With
  *  the fundamentals lens, a piece left loose and taken shows as the take
  *  ("Free knight: you took it") on the move after. */
+function swingsOf(list: (Review | undefined)[], events: Fundamental[]): { ply: number; size: number }[] {
+  const reason = (ply: number) => events.some((e) => e.ply === ply && e.kind !== "took");
+  return list.flatMap((review, i) =>
+    turned(review) && reason(i + 1) ? [{ ply: i + 1, size: review!.chanceBefore - review!.chanceAfter }] : []);
+}
+
 function turningPoints(list: (Review | undefined)[]): { ply: number; event?: Fundamental }[] {
   const events = fundamentalEvents(list);
-  const reason = (ply: number) => events.some((e) => e.ply === ply && e.kind !== "took");
-  const swings = list.flatMap((review, i) =>
-    turned(review) && reason(i + 1) ? [{ ply: i + 1, size: review!.chanceBefore - review!.chanceAfter }] : []);
+  const swings = swingsOf(list, events);
   const biggest = swings.sort((a, b) => b.size - a.size).slice(0, MOST).sort((a, b) => a.ply - b.ply);
   if (!fundamentalsOn()) return biggest.map(({ ply }) => ({ ply }));
   return biggest.map(({ ply }) => {
@@ -119,6 +123,14 @@ export function keyMomentsCard(list: (Review | undefined)[], startReview: () => 
       row.addEventListener("click", () => showMoment(ply, plies));
       box.append(row);
     }
+  }
+  // more than five: the rest are in the full review
+  const more = swingsOf(list, fundamentalEvents(list)).length - plies.length;
+  if (more > 0) {
+    const note = document.createElement("p");
+    note.className = "key-moments-more";
+    note.textContent = `${more} more in the full review`;
+    box.append(note);
   }
   const start = document.createElement("div");
   start.className = "stats-start";
@@ -201,7 +213,7 @@ export function drawMomentsBar() {
   $("moment-move").textContent = `Move ${game.positionAt(list[shown] - 1).fullmoves}`;
   // (no greyed-out button to mistake for the move buttons: the first has no Previous)
   $("moment-prev").hidden = previous === undefined;
-  $("moment-next").textContent = next === undefined ? "Back to summary ›" : "Next turning point ›";
+  $("moment-next").textContent = next === undefined ? "Summary ›" : "Next ›";
 }
 
 /** The review bar's button: from the turning points to the full review (every

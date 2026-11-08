@@ -420,14 +420,18 @@ export function jumpToGrade(colour: Color, grade: string, list: (Review | undefi
   if (gradeJump.key !== key) set.gradeJump({ key, next: 0 });
   const ply = plies[gradeJump.next % plies.length];
   gradeJump.next++;
+  jumpToMove(ply, list[ply - 1]!);
+}
+
+/** To one move of the review: the position before it first, then the move
+ *  plays in with its explanation. */
+export function jumpToMove(ply: number, review: Review) {
   set.currentView("board");
   set.stepper(null);
-  // the position before the move first, then the move plays in with its explanation
   goTo(ply - 1);
   set.silentJump(true);
   set.fromStats(true);
   refresh();
-  const review = list[ply - 1]!;
   setTimeout(() => {
     if (silentJump && currentPly() === ply - 1 && !stepper) explainMove(ply, review);
   }, GRADE_JUMP_PAUSE);

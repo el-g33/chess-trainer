@@ -10,7 +10,7 @@ import { setTypeSpeed } from "../talk";
 import { tourOpen } from "../tour";
 
 import {
-  backUp, checkForUpdates, closeOverlay, closeStepper, onHome, onNewGame, openMore, overlay,
+  backUp, checkForUpdates, closeOverlay, closeStepper, onHome, onNewGame, openMore, overlay, toggleModesMenu,
   overlayOpen, restartIntoUpdate, restoreFromFile, setHistoryFromReview, stepTo, stepTyper, stripTyper,
 } from "./coach";
 import { drawLookRows } from "./lookPickers";
@@ -76,6 +76,10 @@ export function wireButtons() {
     refresh();
   });
   newButton.addEventListener("click", () => void onNewGame());
+  $("new-more").addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleModesMenu(event.currentTarget as HTMLElement);
+  });
   undoButton.addEventListener("click", onUndo);
   resignButton.addEventListener("click", () => void onResign());
   reviewButton.addEventListener("click", onReviewGame);
@@ -138,7 +142,7 @@ export function wireButtons() {
   }
   document.addEventListener("pointerdown", (event) => {
     const menuBox = $("help-menu");
-    if (!menuBox.hidden && !menuBox.contains(event.target as Node) && !(event.target as Element).closest?.(".help-button")) menuBox.hidden = true;
+    if (!menuBox.hidden && !menuBox.contains(event.target as Node) && !(event.target as Element).closest?.(".help-button, .new-more")) menuBox.hidden = true;
   });
 
   showDemoButton.addEventListener("click", () => void onShowDemo());

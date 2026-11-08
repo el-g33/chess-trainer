@@ -161,9 +161,10 @@ export function drawMoveList(reviews: (Review | undefined)[], info: OpeningInfo[
     const review = reviews[index];
     const bookMove = info[index]?.book;
     button.className = "move" + (ply === current ? " current" : "");
-    // Only the moves worth noticing get a colour and a mark (book moves stay plain)
+    // Every graded move shows its grade: a mark and a tint for the ones worth
+    // stopping at, a coloured dot for the rest (book moves stay plain)
     const mark = review && !bookMove ? MOVE_MARKS[review.rating] : undefined;
-    if (mark !== undefined) button.classList.add(ratingClass(review!.rating));
+    if (review && !bookMove) button.classList.add(ratingClass(review.rating), mark ? "notable" : "graded");
     button.textContent = played.san + (mark && !played.san.endsWith("#") ? mark : "");
     button.addEventListener("click", () => goTo(ply));
     moveList.lastElementChild!.append(button);
@@ -316,9 +317,10 @@ export function drawGameReport(reviews: (Review | undefined)[], info: OpeningInf
 /** "Missed Win" -> "r-missed-win", for the rating's colour */
 export const ratingClass = (rating: string) => "r-" + rating.toLowerCase().replace(" ", "-");
 
-/** The ratings worth noticing in the move list, and their marks. */
+/** The ratings worth stopping at in the move list, and their marks (every
+ *  other graded move gets a coloured dot instead). */
 export const MOVE_MARKS: Record<string, string> = {
-  Brilliant: "!!", Great: "!", Best: "◆", Inaccuracy: "?!", Mistake: "?", Miss: "⊘", "Missed Win": "⊘", Blunder: "??",
+  Brilliant: "!!", Great: "!", Inaccuracy: "?!", Mistake: "?", Miss: "⊘", "Missed Win": "⊘", Blunder: "??",
 };
 
 export function drawReview(reviews: (Review | undefined)[], info: OpeningInfo[]) {

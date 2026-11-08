@@ -11,6 +11,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.31",
+    items: [
+      { icon: "hazard", title: "Your slips, front and centre", text: "After a review, your slips come up first: how many blunders, mistakes and missed chances, each a tap away, and Go to the first slip to start learning from them." },
+      { icon: "plus", title: "New, and every other mode", text: "The New button says what comes next in the mode you're in, and its arrow opens the other modes and Home." },
+      { icon: "star", title: "The five turning points that mattered", text: "A review shows up to five turning points, the biggest swings, and says how many more are in the full review." },
+      { icon: "eye", title: "A streamlined look", text: "A calmer move list, the players beside the board and the summary beside it on a computer, Game history by month, clearer names in the accuracy table, and About in your theme, for a better experience." },
+    ],
+  },
+  {
     version: "3.30",
     items: [
       { icon: "eye", title: "A streamlined look", text: "A tidier Your profile, with Import PGN kept in Game history, for a better experience." },

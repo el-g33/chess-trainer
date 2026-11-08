@@ -1071,6 +1071,47 @@ dialog::backdrop {
   backdrop-filter: blur(4px);
 }
 
+/* The slips after a review: the one thing to look at, so the rest goes darker */
+.slips-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.72);
+}
+#slips-text {
+  margin: 0 0 16px;
+}
+.slips-counts {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 12px;
+}
+.slip-count {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 4px;
+  min-height: 0;
+  border: none;
+  border-radius: 12px;
+  font-size: 0.8rem;
+}
+.slip-count b {
+  font-size: 1.5rem;
+  line-height: 1.1;
+}
+.slip-count.red {
+  background: color-mix(in srgb, var(--r-blunder) 16%, transparent);
+  color: var(--r-blunder);
+}
+.slip-count.miss {
+  background: color-mix(in srgb, var(--r-miss) 16%, transparent);
+  color: var(--r-miss);
+}
+.slip-count.orange {
+  background: color-mix(in srgb, var(--r-mistake) 16%, transparent);
+  color: var(--r-mistake);
+}
+
 dialog h3 {
   font-size: 1.15rem;
 }

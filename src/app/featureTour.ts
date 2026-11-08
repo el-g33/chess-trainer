@@ -135,7 +135,8 @@ export async function showReviewSetupTour(asked: boolean) {
 }
 
 /** The ? button: About, and (in a game) a tour of the screen you're on. The
- *  phone's ⋯ button (`more`) also holds Home, your profile and Settings. */
+ *  phone's ≡ button (`more`) also holds your profile and Settings (Home is in
+ *  the New button's arrow). */
 export function toggleHelp(anchor: HTMLElement, more = false) {
   const box = $("help-menu");
   if (!box.hidden) {
@@ -143,6 +144,7 @@ export function toggleHelp(anchor: HTMLElement, more = false) {
     return;
   }
   box.replaceChildren();
+  box.dataset.for = "help";
   const item = (text: string, run: () => void) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -155,7 +157,6 @@ export function toggleHelp(anchor: HTMLElement, more = false) {
     box.append(button);
   };
   if (more) {
-    item("Home", () => $("go-home").click());
     item("Your profile", () => document.querySelector<HTMLElement>(".game-top .profile-button")?.click());
     item("Settings", () => document.querySelector<HTMLElement>(".game-top .gear-button")?.click());
   }

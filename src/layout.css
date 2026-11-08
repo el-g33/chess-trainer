@@ -455,6 +455,54 @@ body[data-view="stats"] .game-top {
   padding: 7px 16px 7px 12px;
   font-weight: 700;
 }
+/* New and its arrow: one pill in two parts */
+.new-split {
+  display: inline-flex;
+  align-items: stretch;
+  min-width: 0;
+}
+.new-split .new-game {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  padding-right: 10px;
+  min-width: 0;
+}
+/* the New button's words: in full, or shorter on a phone */
+.ng-phone {
+  display: none;
+}
+@media (max-width: 480px) {
+  .ng-full {
+    display: none;
+  }
+  .ng-phone {
+    display: inline;
+  }
+}
+.game-top .icon-button,
+.game-top .back-round {
+  flex: none;
+}
+.new-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 0 9px 0 7px;
+  border-radius: 0 999px 999px 0;
+  border-left: 1px solid color-mix(in srgb, var(--on-accent) 45%, transparent);
+}
+.help-menu .menu-line {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 4px 6px;
+}
+.help-menu button.menu-current {
+  font-weight: 700;
+}
+.help-menu button.menu-quiet {
+  color: var(--muted);
+}
 
 .view-tabs {
   display: flex;
@@ -905,10 +953,41 @@ html body .board-area .board-controls {
 }
 
 .stats-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  min-width: 0;
   font-size: 0.85rem;
+  line-height: 1.25;
+}
+.stats-name b {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+/* the full name, over two lines if it needs them */
+.stats-name small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.side-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  flex: none;
+}
+.side-dot.white {
+  background: #f4f1ea;
+}
+.side-dot.black {
+  background: #2b2b2b;
 }
 
 .stats-more {
@@ -1044,6 +1123,37 @@ html body .board-area .board-controls {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+.history-month {
+  grid-column: 1 / -1;
+  margin: 8px 2px 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.history-month:first-child {
+  margin-top: 0;
+}
+.history-more {
+  display: block;
+  margin: 12px auto 0;
+  border-radius: 999px;
+  padding: 6px 16px;
+  min-height: 0;
+  font-size: 0.88rem;
+}
+.history-import-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.history-note-close {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  padding: 0;
+  margin-left: auto;
 }
 
 .history-game {
@@ -1350,6 +1460,43 @@ button.round.hazard.red { background: #d93025; color: #fff; }
 .moment-jump[hidden] {
   display: none;
 }
+.moment-jump.soft {
+  background: var(--button);
+  color: inherit;
+  border: 1px solid var(--line);
+}
+/* Going through the turning points: one row from one to the next (the move
+   strip or list still steps one move at a time) */
+html body .board-area.moments .board-controls {
+  display: none;
+}
+
+/* Every graded move shows its grade: a coloured dot, or for the moves worth
+   stopping at (slips and key moves) a tinted label with its mark */
+html body .move-strip button.graded:not(.cur),
+html body button.move.graded {
+  color: inherit;
+  font-weight: inherit;
+}
+.move-strip button.graded::before,
+button.move.graded::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 4px;
+  border-radius: 50%;
+  vertical-align: 0.12em;
+  background: var(--grade-dot, #9a9ea5);
+}
+.graded.r-best { --grade-dot: var(--r-best); }
+.graded.r-excellent { --grade-dot: #3f7a52; }
+.graded.r-good { --grade-dot: #8fa596; }
+.move-strip button.notable:not(.cur),
+button.move.notable {
+  background: color-mix(in srgb, currentColor 13%, transparent);
+  border-radius: 6px;
+}
 .moment-at {
   display: flex;
   flex-direction: column;
@@ -1372,6 +1519,11 @@ button.round.hazard.red { background: #d93025; color: #fff; }
 /* Turning points: the moments that decided the game, on the summary */
 .key-moments {
   margin-bottom: 12px;
+}
+.key-moments-more {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
 }
 .key-moments-title {
   margin: 0 0 6px;
@@ -3096,9 +3248,9 @@ dialog[open]::backdrop {
      (Board, Statistics, History), so the top bar never moves. */
   html body.sidebar #game,
   html body.sidebar.practice #game {
-    --panel: clamp(320px, 26vw, 420px);
+    --panel: clamp(340px, 30vw, 460px);
     --board: min(
-      calc(100dvh - 2 * var(--gutter) - var(--top) - 16px),
+      calc(100dvh - 2 * var(--gutter) - var(--top) - var(--bars) - 16px),
       calc(100vw - 2 * var(--gutter) - var(--panel) - var(--evalw) - 22px)
     );
     --game-w: calc(var(--board) + var(--evalw) + 22px + var(--panel));
@@ -3126,6 +3278,23 @@ dialog[open]::backdrop {
   }
   body.sidebar .board-side > * {
     margin: 0;
+  }
+  /* The summary in the sidebar, beside the board: only it shows there, one
+     column, scrolling inside */
+  body.sidebar[data-view="stats"] .board-side > :not(.stats-view) {
+    display: none !important;
+  }
+  body.sidebar .board-side > .stats-view {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    width: auto;
+  }
+  body.sidebar .board-side #stats {
+    display: block;
+  }
+  body.sidebar .board-side .stats-card .stats-table {
+    grid-template-columns: minmax(0, 1fr);
   }
   /* the moves fill what's left, and scroll inside */
   body.sidebar .board-side .moves-area {
@@ -3192,11 +3361,6 @@ dialog[open]::backdrop {
     grid-template-columns: minmax(0, 1fr) 64px 64px;
   }
 
-  /* Going through the turning points: the moves panel has its own step
-     buttons, so the turning-point buttons take the action buttons' place */
-  html body .board-area.moments .board-controls {
-    display: none;
-  }
 
   /* History: the games in columns */
   .history-list {

@@ -36,7 +36,7 @@ import {
 } from "./coach";
 import { $, colourBox, demoPick, menuCard, myOpeningBox, opponentBox } from "./dom";
 import { arrowEnd, refresh } from "./draw";
-import { gameKey, keepAnalysis, restoreAnalysis, savedAnalyses, useDepth, watching, withBook } from "./matches";
+import { gameKey, jumpToGrade, jumpToMove, keepAnalysis, restoreAnalysis, savedAnalyses, useDepth, watching, withBook } from "./matches";
 import { goTo } from "./moves";
 import { gameScores, ratingClass } from "./playerBars";
 import { message } from "./popups";
@@ -865,13 +865,48 @@ export function saveGameMistakes(list: (Review | undefined)[]) {
   const earlier = savedFromReview?.key === gameKey() ? savedFromReview.ids.length : 0; // before a deeper look
   const added = addMistakes(found);
   set.savedFromReview({ key: gameKey(), ids: found.map((m) => mistakeId(m.fen, m.best)), added, plies });
-  // New ones: say so once, to be acknowledged (the review marks each as you reach it)
-  if (added) {
-    const one = added === 1;
-    void message(`${earlier ? `${added} more` : one ? "A" : added} slip${one ? "" : "s"} saved to Your mistakes`,
-      (earlier ? `The deeper look found ${one ? "it" : "them"}. ` : "") +
-      `I'll point ${one ? "it" : "them"} out as we go through the game, and you can try ${one ? "it as a puzzle" : "them as puzzles"} at the end.`);
-  }
+  // New ones: said once, in the spotlight (the review marks each as you reach it)
+  if (added) showSlips(list, plies, you, earlier ? added : 0);
+}
+
+const SLIP_KINDS: [string, string, string][] = [
+  ["Blunder", "Blunder", "Blunders"], ["Mistake", "Mistake", "Mistakes"],
+  ["Missed Win", "Missed win", "Missed wins"], ["Miss", "Missed chance", "Missed chances"],
+];
+
+/** The slips pop-up: how many of each kind, each a way straight to those
+ *  moves, and the first slip one tap away. Everything else dims behind it. */
+function showSlips(list: (Review | undefined)[], plies: number[], you: Color, more: number) {
+  const dialog = $<HTMLDialogElement>("slips-dialog");
+  const total = plies.length;
+  $("slips-title").textContent = more
+    ? `${more} more slip${more === 1 ? "" : "s"} found`
+    : `${total} slip${total === 1 ? "" : "s"} to learn from`;
+  const counts = $("slips-counts");
+  counts.replaceChildren(...SLIP_KINDS.flatMap(([rating, one, many]) => {
+    const n = plies.filter((ply) => list[ply - 1]?.rating === rating).length;
+    if (!n) return [];
+    const tile = document.createElement("button");
+    tile.type = "button";
+    tile.className = `slip-count ${rating === "Blunder" ? "red" : rating === "Mistake" ? "orange" : "miss"}`;
+    tile.innerHTML = "<b></b><span></span>";
+    tile.querySelector("b")!.textContent = String(n);
+    tile.querySelector("span")!.textContent = n === 1 ? one : many;
+    tile.addEventListener("click", () => {
+      dialog.close();
+      jumpToGrade(you, rating, list);
+    });
+    return [tile];
+  }));
+  $("slips-text").textContent = `Saved to Your mistakes. I'll point ${total === 1 ? "it" : "them"} out as we go, and you can try ${total === 1 ? "it as a puzzle" : "them as puzzles"} at the end.`;
+  $("slips-go").onclick = (event) => {
+    event.preventDefault();
+    dialog.close();
+    const first = plies[0];
+    if (first) jumpToMove(first, list[first - 1]!);
+  };
+  if (!dialog.open) dialog.showModal();
+  $("slips-go").focus();
 }
 
 /** Try the slips saved from the game on the board, as puzzles. */

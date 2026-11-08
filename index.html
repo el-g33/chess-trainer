@@ -240,7 +240,11 @@
       <header class="game-top">
         <button type="button" id="home-button" class="back-round" aria-label="Back" title="Back"><span data-ico="back"></span></button>
         <button type="button" id="go-home" class="back-round home-round" aria-label="Home" title="Home"><span data-ico="home"></span></button>
-        <button type="button" id="new-game" class="new-game accent"><span data-ico="plus" data-ico-size="18"></span>New<span class="ng-long">&nbsp;game</span></button>
+        <!-- New: the next one in the mode you're in; its arrow opens the other modes and Home -->
+        <div class="new-split">
+          <button type="button" id="new-game" class="new-game accent"><span data-ico="plus" data-ico-size="18"></span><span class="ng-full">New game</span><span class="ng-phone">New game</span></button>
+          <button type="button" id="new-more" class="new-more accent" aria-label="Other modes" title="Other modes" aria-haspopup="menu"><span data-ico="down" data-ico-size="18"></span></button>
+        </div>
         <nav class="view-tabs" aria-label="Views">
           <button type="button" data-view="board" class="on" aria-label="Board" title="Board"><span data-ico="board"></span></button>
           <button type="button" data-view="stats" aria-label="Statistics" title="Statistics"><span data-ico="chart"></span></button>
@@ -339,7 +343,7 @@
         </div>
         <!-- Going through the turning points: big buttons from one to the next -->
         <div id="moment-nav" class="moment-nav" hidden>
-          <button type="button" id="moment-prev" class="moment-jump">&lsaquo; Previous turning point</button>
+          <button type="button" id="moment-prev" class="moment-jump soft">&lsaquo; Previous</button>
           <span class="moment-at"><b id="moment-count"></b><small id="moment-move"></small></span>
           <button type="button" id="moment-next" class="moment-jump"></button>
         </div>
@@ -699,6 +703,19 @@
       </div>
       <div id="wn-items" class="wn-items"></div>
       <button type="button" id="wn-ok" class="accent wn-ok">Got it</button>
+    </dialog>
+
+    <!-- After a review: the slips, in the spotlight -->
+    <dialog id="slips-dialog" class="slips-dialog">
+      <form method="dialog">
+        <h3 id="slips-title"></h3>
+        <div id="slips-counts" class="slips-counts"></div>
+        <p id="slips-text" class="setup-note"></p>
+        <div class="dialog-buttons">
+          <button value="later">Later</button>
+          <button type="button" id="slips-go" class="accent">Go to the first slip</button>
+        </div>
+      </form>
     </dialog>
 
     <dialog id="dialog">
