@@ -34,6 +34,8 @@ export function readPgnText() {
   pgnPick.replaceChildren(...pgnGames.map((g, i) => new Option(`${i + 1}. ${g.title}`, String(i))));
   $("pgn-pick-row").hidden = pgnGames.length < 2;
   $("pgn-clear").hidden = !pgnText.value; // (a quick way to empty the box)
+  // Games from Lichess or chess.com can go into Game history
+  $("pgn-add-row").hidden = !pgnGames.some((g) => /lichess\.org|chess\.com/i.test(`${g.headers.Site ?? ""} ${g.headers.Link ?? ""}`));
   drawHome();
   pgnStatus.classList.toggle("problem", !!text && !pgnGames.length);
   pgnStatus.textContent = !text

@@ -11,6 +11,13 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.28",
+    items: [
+      { icon: "download", title: "Games from a file into Game history", text: "Open a .pgn file of your Lichess or chess.com games in Analyse a game and tap Add to Game history. They count in your stats and progress, and games already there aren't added twice." },
+      { icon: "history", title: "Room for 2,000 games", text: "Game history now keeps up to 2,000 games brought in from other sites, as well as the games you play here." },
+    ],
+  },
+  {
     version: "3.27",
     items: [
       { icon: "bulb", title: "Why the better move is better", text: "When your move was good but not the best, the coach now compares the two: what your move let them do and how the better move stops it, or why the better move comes first, like getting a new piece out while your king is still in the centre." },

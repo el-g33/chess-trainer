@@ -1,6 +1,7 @@
 // Games from Lichess and chess.com: read from answers shaped like theirs (no
 // network): your side, the result, the opening, and which games are wanted.
-import { chesscomOpening, fetchChesscom, fetchLichess, fromChesscom, fromLichess } from "../../src/online";
+import { chesscomOpening, fetchChesscom, fetchLichess, fromChesscom, fromLichess, fromPgnFile, youIn } from "../../src/online";
+import { readPgn } from "../../src/pgn";
 
 const PGN = '[Event "x"]\n[ECOUrl "https://www.chess.com/openings/Italian-Game-Giuoco-Piano-4.c3"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 1-0';
 
@@ -75,5 +76,33 @@ export default async function run() {
   const newer = await fetchChesscom("me", { max: 5, since: Date.UTC(2026, 9, 5) }, fake);
   expect("chess.com: newer games only", newer.map((g) => g.id).join() === "chesscom:4" && !read.some((u) => u.endsWith("2026/09")), newer.map((g) => g.id).join());
 
+  // -- A .pgn file downloaded from chess.com or Lichess
+  const tags = (t: Record<string, string>) => Object.entries(t).map(([k, v]) => `[${k} "${v}"]`).join("\n");
+  const file = [
+    tags({ Event: "Live Chess", Site: "Chess.com", White: "Me_Here", Black: "Ann", Result: "0-1", WhiteElo: "900", BlackElo: "950",
+      TimeControl: "300", EndDate: "2026.10.31", EndTime: "12:00:00", Link: "https://www.chess.com/game/live/111",
+      ECOUrl: "https://www.chess.com/openings/Italian-Game-Giuoco-Piano-4.c3" }) + "\n\n1. e4 {[%clk 0:04:59]} e5 {[%clk 0:04:58]} 0-1",
+    tags({ Event: "Let's Play", Site: "Chess.com", White: "Bo", Black: "me_here", Result: "1/2-1/2", TimeControl: "1/259200",
+      EndDate: "2026.10.01", Link: "https://www.chess.com/game/daily/222" }) + "\n\n1. d4 d5 1/2-1/2",
+    tags({ Event: "Rated Blitz game", Site: "https://lichess.org/abcd1234", White: "me_here", Black: "Cy", Result: "1-0", TimeControl: "180+2",
+      UTCDate: "2026.09.02", UTCTime: "08:00:00", Opening: "Sicilian Defense: Najdorf" }) + "\n\n1. e4 c5 1-0",
+    tags({ Event: "Live Chess", Site: "Chess.com", White: "me_here", Black: "Dee", Result: "*", Link: "https://www.chess.com/game/live/333" }) + "\n\n1. e4 *",
+    tags({ Event: "Live Chess", Site: "Chess.com", White: "me_here", Black: "Ed", Result: "1-0", Variant: "Chess960",
+      Link: "https://www.chess.com/game/live/444", FEN: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", SetUp: "1" }) + "\n\n1. e4 1-0",
+  ].join("\n\n");
+  const parsed = readPgn(file);
+  expect("File: you, the player in every game", youIn(parsed.map((g) => g.headers), []) === "me_here");
+  expect("File: you, from your names", youIn(parsed.slice(0, 1).map((g) => g.headers), ["", "ann"]) === "ann");
+  expect("File: one game and no names, unknown", youIn(parsed.slice(0, 1).map((g) => g.headers), []) === null);
+  const { games: got, skipped } = fromPgnFile(parsed, "ME_HERE");
+  expect("File: unfinished and variant games left out", got.length === 3 && skipped === 2, `${got.length} ${skipped}`);
+  const [live, daily, li2] = got;
+  expect("File: chess.com id as its import made it", live.id === "chesscom:111" && li2.id === "lichess:abcd1234", `${live.id} ${li2.id}`);
+  expect("File: side, result and opponent", live.user === "white" && live.result === "loss" && live.opponent === "Ann" && live.opponentRating === 950);
+  expect("File: date from when it ended", live.date === "2026-10-31T12:00:00.000Z", live.date);
+  expect("File: speed and clock", live.speed === "Blitz" && live.timeControl === "300+0" && daily.speed === "Daily" && daily.timeControl === "" && li2.speed === "Blitz");
+  expect("File: draws, and Black's side", daily.user === "black" && daily.result === "draw");
+  expect("File: openings", live.opening === "Italian Game" && li2.opening === "Sicilian Defense", `${live.opening} / ${li2.opening}`);
+  expect("File: clock times left out of what's kept", !live.pgn.includes("%clk") && live.pgn.includes("1. e4 e5"));
   return { name: "Games from Lichess and chess.com", checks, failures };
 }

@@ -1,15 +1,17 @@
 // Your games from Lichess and chess.com: brought into Game history with the
 // Get my games button, and reviewed from there (or from the Analyse a game screen)
 
-import { OnlineError, SOURCE_NAMES, type OnlineGame, type Source, type Wanted, fetchChesscom, fetchLichess } from "../online";
+import { OnlineError, SOURCE_NAMES, type OnlineGame, type Source, type Wanted, fetchChesscom, fetchLichess, fromPgnFile, youIn } from "../online";
 import { readPgn } from "../pgn";
 
 import { type SavedGame, drawDataCounts, historyRow, loadHistory, saveHistory, setHistoryFromReview } from "./coach";
 import { $, chesscomUserBox, lichessUserBox, profileDialog } from "./dom";
 import { refresh } from "./draw";
 import { startPreparing } from "./matches";
+import { pgnStatus, pickSide } from "./pgnScreens";
+import { playerName } from "./playerBars";
 import { hideMenu, resetBoard } from "./startScreens";
-import { menuOpen, set } from "./state";
+import { menuOpen, pgnGames, set } from "./state";
 
 // chess.com's import is switched off until chess.com gives its written OK: its
 // data API invites it, but its User Agreement (section 4D) asks for written
@@ -79,6 +81,33 @@ function addToHistory(games: OnlineGame[]): number {
   return fresh.length;
 }
 
+/** Games from Lichess or chess.com in an opened .pgn file (or pasted), into
+ *  Game history. You're found by name (your usernames, or the one player in
+ *  every game); otherwise you say which side you are in the first game. */
+export async function addPgnToHistory() {
+  if (!pgnGames.length) return;
+  let you = youIn(pgnGames.map((g) => g.headers), [playerName(), lichessUserBox.value, chesscomUserBox.value]);
+  if (!you) {
+    const side = await pickSide(pgnGames[0].headers);
+    if (side === "cancel" || side === null) return;
+    you = (side === "white" ? pgnGames[0].headers.White : pgnGames[0].headers.Black) ?? "";
+    if (!you || you === "?") return;
+  }
+  const { games, skipped } = fromPgnFile(pgnGames, you);
+  const added = addToHistory(games);
+  const already = games.length - added;
+  pgnStatus.classList.toggle("problem", !games.length);
+  pgnStatus.textContent = !games.length
+    ? "None of these games could be added: only finished, standard games of yours from Lichess or chess.com can go into Game history."
+    : [
+      added ? `Added ${added} ${added === 1 ? "game" : "games"} to Game history.` : "",
+      already ? `${already} ${already === 1 ? "was" : "were"} already there.` : "",
+      skipped ? `${skipped} left out (not finished, not standard chess, or not yours).` : "",
+    ].filter(Boolean).join(" ");
+  drawYourGames();
+  refresh();
+}
+
 /** Your profile: your name, your online usernames and your data. */
 export function openProfile() {
   drawDataCounts();
@@ -132,7 +161,7 @@ export function setupOnlineGames() {
   $("online-note").textContent = (CHESSCOM_IMPORT
     ? "Your usernames, to bring your games into Game history. Only your public games are read; nothing is posted."
     : "Your Lichess username, to bring your games into Game history. Only your public games are read; nothing is posted. " +
-      "Games from Chess.com: copy or download the PGN there, and paste it into Analyse a game.") + independent;
+      "Games from Chess.com: download them there as a .pgn file, open it in Analyse a game, and tap Add to Game history.") + independent;
 }
 
 /** The Analyse a game screen: your three latest games, to review with a tap. */

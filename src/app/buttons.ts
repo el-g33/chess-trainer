@@ -14,7 +14,7 @@ import {
   overlayOpen, restartIntoUpdate, restoreFromFile, setHistoryFromReview, stepTo, stepTyper, stripTyper,
 } from "./coach";
 import { drawLookRows } from "./lookPickers";
-import { openProfile, setupOnlineGames } from "./onlineGames";
+import { addPgnToHistory, openProfile, setupOnlineGames } from "./onlineGames";
 import {
   $, arrowStyleBox, coachFocusBox, coachSpeedBox, demoPick, demoPlay, evalCheck, exitAnalysisButton, fenInput, lineBack, lineExit,
   lineForward, navButtons, newButton, piecesBox, planModeBox, playerNameBox, lichessUserBox, chesscomUserBox,
@@ -183,6 +183,7 @@ export function wireButtons() {
 
   pgnText.addEventListener("input", readPgnText);
   $("pgn-clear").addEventListener("click", clearPgnText);
+  $("pgn-add").addEventListener("click", () => void addPgnToHistory());
   $<HTMLInputElement>("pgn-file").addEventListener("change", async (event) => {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;

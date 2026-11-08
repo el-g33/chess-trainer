@@ -1244,6 +1244,19 @@ cg-board square.check {
   color: var(--danger);
 }
 
+.pgn-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: -4px 0 12px;
+  font-size: 0.85rem;
+}
+
+.pgn-add-row[hidden] {
+  display: none;
+}
+
 .look-row .sound-check {
   grid-column: 3;
 }

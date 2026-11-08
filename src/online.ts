@@ -5,6 +5,8 @@
 
 import type { Color } from "chessops/types";
 
+import { type PgnGame, writePgn } from "./pgn";
+
 export type Source = "lichess" | "chesscom";
 
 export const SOURCE_NAMES: Record<Source, string> = { lichess: "Lichess", chesscom: "chess.com" };
@@ -177,4 +179,80 @@ async function reach(site: string, ask: () => Promise<Response>): Promise<Respon
   } catch {
     throw new OnlineError(`Couldn't reach ${site}. Check your connection and try again.`);
   }
+}
+
+// -- A PGN file -----------------------------------------------------------------
+// Games downloaded from Lichess or chess.com as a .pgn file, brought into Game
+// history from the file itself: the app doesn't contact either site.
+
+/** Who you are in a file of games: one of your names if it plays in them,
+ *  otherwise the one player in every game (a file of your own games). */
+export function youIn(games: Record<string, string>[], known: string[]): string | null {
+  const names = known.map((n) => n.trim().toLowerCase()).filter(Boolean);
+  const count = new Map<string, number>();
+  for (const headers of games) {
+    for (const name of new Set([headers.White, headers.Black].map((n) => (n ?? "").toLowerCase()))) {
+      if (name && name !== "?") count.set(name, (count.get(name) ?? 0) + 1);
+    }
+  }
+  const mine = names.filter((n) => count.has(n)).sort((a, b) => count.get(b)! - count.get(a)!)[0];
+  if (mine) return mine;
+  const everywhere = [...count].filter(([, n]) => n === games.length).map(([name]) => name);
+  return games.length > 1 && everywhere.length === 1 ? everywhere[0] : null;
+}
+
+/** A PGN date and time ("2026.10.31", "12:34:56", in UTC) as ISO. */
+function isoFrom(date?: string, time?: string): string | null {
+  if (!date || !/^\d{4}\.\d{2}\.\d{2}$/.test(date)) return null;
+  const when = new Date(`${date.replace(/\./g, "-")}T${time && /^\d{2}:\d{2}:\d{2}$/.test(time) ? time : "00:00:00"}Z`);
+  return Number.isNaN(when.getTime()) ? null : when.toISOString();
+}
+
+/** How fast: the base time plus 40 moves' increments, as each site counts it. */
+function speedOf(source: Source, timeControl: string, daily: boolean): string {
+  if (daily || !/^\d+(\+\d+)?$/.test(timeControl)) return "Daily";
+  const [base, increment = 0] = timeControl.split("+").map(Number);
+  const estimate = base + 40 * increment;
+  if (estimate < 180) return "Bullet";
+  if (source === "chesscom") return estimate < 600 ? "Blitz" : "Rapid";
+  return estimate < 480 ? "Blitz" : estimate < 1500 ? "Rapid" : "Classical";
+}
+
+/** The games in a file that are yours, finished, standard chess, from Lichess
+ *  or chess.com, ready for Game history (the moves without the clock times). */
+export function fromPgnFile(games: PgnGame[], you: string): { games: OnlineGame[]; skipped: number } {
+  const found: OnlineGame[] = [];
+  for (const parsed of games) {
+    const h = parsed.headers;
+    const source: Source | null = /lichess\.org/i.test(h.Site ?? "") ? "lichess"
+      : /chess\.com/i.test(`${h.Site ?? ""} ${h.Link ?? ""}`) ? "chesscom" : null;
+    const user: Color | null = same(h.White ?? "", you) ? "white" : same(h.Black ?? "", you) ? "black" : null;
+    const result = h.Result;
+    if (!source || !user || !["1-0", "0-1", "1/2-1/2"].includes(result ?? "") || (h.Variant && !/^standard$/i.test(h.Variant))) continue;
+    const { game, problem } = parsed.load();
+    if (problem || !game.length) continue;
+    const date = source === "chesscom"
+      ? isoFrom(h.EndDate, h.EndTime) ?? isoFrom(h.UTCDate, h.UTCTime) ?? isoFrom(h.Date)
+      : isoFrom(h.UTCDate, h.UTCTime) ?? isoFrom(h.Date);
+    if (!date) continue;
+    const site = source === "lichess" ? (h.GameId || (h.Site ?? "").split("/").pop()) : (h.Link ?? "").split("/").pop();
+    const them: Color = user === "white" ? "black" : "white";
+    const rating = parseInt(them === "white" ? h.WhiteElo : h.BlackElo, 10);
+    const timeControl = h.TimeControl ?? "";
+    const daily = /\/daily\//.test(h.Link ?? "") || timeControl.includes("/");
+    found.push({
+      source,
+      id: `${source}:${site || `${date}-${h.White}-${h.Black}`}`,
+      date,
+      pgn: writePgn(game, h),
+      user,
+      opponent: (them === "white" ? h.White : h.Black) || "Anonymous",
+      ...(Number.isFinite(rating) ? { opponentRating: rating } : {}),
+      speed: speedOf(source, timeControl, daily),
+      timeControl: daily || !/^\d+(\+\d+)?$/.test(timeControl) ? "" : timeControl.includes("+") ? timeControl : `${timeControl}+0`,
+      result: result === "1/2-1/2" ? "draw" : (result === "1-0") === (user === "white") ? "win" : "loss",
+      opening: source === "chesscom" ? chesscomOpening(`[ECOUrl "${h.ECOUrl ?? ""}"]`) : (h.Opening ?? "").split(":")[0],
+    });
+  }
+  return { games: found, skipped: games.length - found.length };
 }

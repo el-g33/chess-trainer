@@ -1888,7 +1888,7 @@ export interface SavedGame {
 }
 
 const KEEP_OWN = 500; // your games here
-const KEEP_IMPORTED = 300; // games from Lichess and chess.com (they can be got again)
+const KEEP_IMPORTED = 2000; // games from Lichess and chess.com (they can be got again)
 
 export const HISTORY_KEY = "chess-trainer-history";
 export const historyResults = new Set<SavedGame["result"]>();
@@ -1905,12 +1905,18 @@ export function saveHistory(games: SavedGame[]) {
   // newest first; games brought in never push out your own
   const sorted = [...games].sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
   const own = sorted.filter((g) => !g.source).slice(0, KEEP_OWN);
-  const imported = sorted.filter((g) => g.source).slice(0, KEEP_IMPORTED);
-  const kept = new Set([...own, ...imported]);
-  try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(sorted.filter((g) => kept.has(g))));
-  } catch {
-    // storage full or blocked: the record just isn't kept
+  let imported = sorted.filter((g) => g.source).slice(0, KEEP_IMPORTED);
+  for (;;) {
+    const kept = new Set([...own, ...imported]);
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(sorted.filter((g) => kept.has(g))));
+      return;
+    } catch {
+      // storage full: the oldest games brought in make room (they can be got
+      // again); with none left, or storage blocked, the record isn't kept
+      if (!imported.length) return;
+      imported = imported.slice(0, Math.floor(imported.length * 0.9));
+    }
   }
 }
 
