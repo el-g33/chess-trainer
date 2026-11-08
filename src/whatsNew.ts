@@ -11,6 +11,12 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.30",
+    items: [
+      { icon: "eye", title: "A streamlined look", text: "A tidier Your profile, with Import PGN kept in Game history, for a better experience." },
+    ],
+  },
+  {
     version: "3.29",
     items: [
       { icon: "history", title: "Game history in Your profile", text: "Your profile has a Your games section, with Game history one tap away." },
