@@ -1078,7 +1078,30 @@ export async function practiceMove(move: NormalMove) {
   const before = game.position.clone();
   const played = game.play(move);
   moveSound(played.san, before.turn);
-  if (makeUci(move) === mistake.best) return practiceSolved(before, move);
+  if (makeUci(move) === mistake.best) {
+    // a puzzle with more to it: their reply comes, then your next move to find
+    const [reply, next, ...rest] = mistake.solution ?? [];
+    const answer = reply ? normalizeMove(game.position, parseUci(reply) as NormalMove) as NormalMove : undefined;
+    if (answer && next && game.position.isLegal(answer)) {
+      p.waiting = true;
+      p.note = "Good. Keep going.";
+      p.mood = "happy";
+      refresh();
+      setTimeout(() => {
+        if (practice !== p) return;
+        const at = game.position.clone();
+        const played = game.play(answer);
+        moveSound(played.san, at.turn);
+        p.list[p.index] = { ...mistake, best: next, solution: rest };
+        p.waiting = false;
+        p.note = "Your move again: finish it.";
+        p.mood = "talk";
+        refresh();
+      }, 600);
+      return;
+    }
+    return practiceSolved(before, move);
+  }
   p.waiting = true;
   p.note = "Let me check that move…";
   p.mood = "think";

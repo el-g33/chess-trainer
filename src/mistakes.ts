@@ -19,6 +19,7 @@ export interface Mistake {
   added: number; // day numbers (days since 1970, local time)
   due: number;
   stage: number; // right answers in a row (5 = mastered)
+  solution?: string[]; // a puzzle's moves after the first (UCI: their reply, your next move...), played out in a drill
 }
 
 /** The moves (UCI) from a starting position up to the puzzle's position. */

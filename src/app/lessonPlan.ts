@@ -18,7 +18,7 @@ import { LESSONS, type LessonPhase } from "../lessons";
 import { type Mistake, addMistakes, dueMistakes } from "../mistakes";
 import { readPgn } from "../pgn";
 import {
-  type Diagnosis, FOCUS_LESSONS, FOCUS_PUZZLES, FOCUS_THEMES, FOCUS_WORDS, type Focus, type LessonPlan, type PlanGame,
+  type Diagnosis, FOCUS_LESSONS, FOCUS_PUZZLES, FOCUS_THEMES, FOCUS_WORDS, type Focus, type LessonPlan, type NextStep, type PlanGame,
   type PlanPosition, type PuzzleBand, SESSION_PHASES, SESSIONS, STEPS, WEEK_TITLES, buildPlan, diagnose, measure, planGameOf,
 } from "../plan";
 import { rateGame } from "../rateGame";
@@ -283,11 +283,16 @@ function drawOverview(box: HTMLElement, plan: LessonPlan) {
   } else {
     box.append(element("p", "setup-note", "That's your four weeks done. Check your games again for a new plan: the numbers show what changed."));
   }
-  if (plan.next.length) {
+  // (puzzles from your openings are always there to try, weakest opening or not)
+  const next: NextStep[] = plan.next.some((s) => s.kind === "opening") ? plan.next
+    : [...plan.next, { kind: "opening", title: "Your openings", text: "Tactics and traps from the openings you play most." }];
+  if (next.length) {
     box.append(element("p", "plan-label", "After this"));
-    for (const step of plan.next) {
+    for (const step of next) {
       const card = element("div", "progress-card plan-next");
       card.append(element("h3", "", step.title), element("p", "setup-note", step.text));
+      const set = NEXT_SETS[step.kind];
+      if (set) card.append(button(set.label, "soft", () => void startSet(plan, set.title, set.rows), "puzzle"));
       box.append(card);
     }
   }
@@ -495,7 +500,32 @@ async function checkPlayed(plan: LessonPlan, focus: Focus) {
 
 // -- The drill: your positions first, then puzzles on the same theme ------------------------
 
-let puzzles: Promise<Record<string, Record<PuzzleBand, [string, string, string, number, string][]>>> | null = null;
+type Row = [string, string, string, number, string];
+let puzzles: Promise<Record<string, Record<PuzzleBand, Row[]>>> | null = null;
+let openingPuzzles: Promise<Record<string, Record<PuzzleBand, Row[]>>> | null = null;
+
+const themed = async () => {
+  puzzles ??= fetch(`${import.meta.env.BASE_URL}puzzles/themes.json`).then((r) => r.json());
+  return puzzles.catch(() => ({} as Record<string, Record<PuzzleBand, Row[]>>));
+};
+const byOpening = async () => {
+  openingPuzzles ??= fetch(`${import.meta.env.BASE_URL}puzzles/by-opening.json`).then((r) => r.json());
+  return openingPuzzles.catch(() => ({} as Record<string, Record<PuzzleBand, Row[]>>));
+};
+
+/** An opening's name boiled down, so "Queen's Pawn Opening" (your games) and
+ *  Queens_Pawn_Game (the puzzles) match. */
+const openingKey = (name: string) => name.toLowerCase().replace(/[^a-z]+/g, " ").trim()
+  .replace(/\b(game|opening|defen[cs]e|attack|gambit|system|variation)\b/g, "").replace(/\s+/g, "");
+
+/** Puzzles from the openings you play most (your last 50 games), most played first. */
+async function yourOpeningPuzzles(band: PuzzleBand): Promise<Row[]> {
+  const sets = await byOpening();
+  const counts = new Map<string, number>();
+  for (const g of loadHistory().slice(0, 50)) if (g.opening) counts.set(openingKey(g.opening), (counts.get(openingKey(g.opening)) ?? 0) + 1);
+  const families = Object.keys(sets).filter((f) => counts.has(openingKey(f))).sort((a, b) => counts.get(openingKey(b))! - counts.get(openingKey(a))!);
+  return families.slice(0, 4).flatMap((f) => sets[f][band] ?? []);
+}
 
 async function drillFor(plan: LessonPlan, focus: Focus, session: number): Promise<Mistake[]> {
   const phase = SESSION_PHASES[session % SESSION_PHASES.length];
@@ -505,12 +535,18 @@ async function drillFor(plan: LessonPlan, focus: Focus, session: number): Promis
   const yours = Object.values(loadChecked()).flatMap((c) => c.positions).filter((p) => themes.includes(p.theme));
   const order = (p: PlanPosition) => (seen.has(p.fen) ? 2 : 0) + (phase && p.phase !== phase ? 1 : 0);
   const mine = [...yours].sort((a, b) => order(a) - order(b) || Math.random() - 0.5).slice(0, 5);
-  // then puzzles at your level on the focus's themes, from the same phase when there are some
-  puzzles ??= fetch(`${import.meta.env.BASE_URL}puzzles/themes.json`).then((r) => r.json());
-  const sets = await puzzles.catch(() => ({} as Awaited<NonNullable<typeof puzzles>>));
+  // then puzzles at your level on the focus's themes, from the same phase when there are some;
+  // in an opening session, from the openings you play (on the focus's themes when they can be)
+  const sets = await themed();
   const rows = FOCUS_PUZZLES[focus].flatMap((t) => sets[t]?.[plan.band] ?? []);
   const fits = rows.filter((r) => !seen.has(r[0]) && (!phase || r[4].split(" ").includes(phase)));
-  const pool = (fits.length >= 10 ? fits : rows).sort(() => Math.random() - 0.5).slice(0, 10 - mine.length);
+  let pool = (fits.length >= 10 ? fits : rows).sort(() => Math.random() - 0.5).slice(0, 10 - mine.length);
+  if (phase === "opening" || focus === "opening") {
+    const yours = (await yourOpeningPuzzles(plan.band)).filter((r) => !seen.has(r[0]));
+    const onTheme = yours.filter((r) => FOCUS_PUZZLES[focus].some((t) => r[4].split(" ").includes(t)));
+    const picked = (onTheme.length >= 3 ? onTheme : yours).sort(() => Math.random() - 0.5).slice(0, 10 - mine.length);
+    pool = [...picked, ...pool].slice(0, 10 - mine.length);
+  }
   for (const p of mine) seen.add(p.fen);
   for (const r of pool) seen.add(r[0]);
   keep("chess-trainer-plan-seen", [...seen].slice(-2000));
@@ -530,7 +566,7 @@ function positionMistake(p: PlanPosition): Mistake {
 }
 
 /** A Lichess puzzle as a position to solve: their move first, then yours to find. */
-function puzzleMistake(row: [string, string, string, number, string]): Mistake[] {
+function puzzleMistake(row: Row): Mistake[] {
   const [id, fen, moves] = row;
   const [theirs, yours] = moves.split(" ");
   const parsed = readPgn(`[FEN "${fen}"]\n[SetUp "1"]\n\n*`)[0]?.load().game;
@@ -538,7 +574,10 @@ function puzzleMistake(row: [string, string, string, number, string]): Mistake[]
   if (!parsed || !move || !yours || !parsed.position.isLegal(move)) return [];
   const after = afterMove(parsed.position, move);
   const phase = row[4].includes("endgame") ? "endgame" : row[4].includes("opening") ? "opening" : "middlegame";
-  return [{ id: `puzzle:${id}`, fen: fenOfPosition(after), best: yours, kind: "drill", phase, source: "a puzzle", added: today(), due: today(), stage: 0 }];
+  return [{
+    id: `puzzle:${id}`, fen: fenOfPosition(after), best: yours, kind: "drill", phase, source: "a puzzle", added: today(), due: today(), stage: 0,
+    solution: moves.split(" ").slice(2),
+  }];
 }
 
 function toMistakes(list: PlanPosition[]) {
@@ -546,6 +585,30 @@ function toMistakes(list: PlanPosition[]) {
 }
 
 const fenOfPosition = (position: Chess) => makeFen(position.toSetup());
+
+// -- After the plan: a set of 10 puzzles for each next step -----------------------------------
+
+const NEXT_SETS: Partial<Record<NextStep["kind"], { label: string; title: string; rows: (band: PuzzleBand) => Promise<Row[]> }>> = {
+  quiet: { label: "10 quiet-move puzzles", title: "Quiet moves", rows: async (band) => (await themed()).quietMove?.[band] ?? [] },
+  opening: { label: "10 puzzles from your openings", title: "Your openings", rows: (band) => yourOpeningPuzzles(band) },
+  endgame: {
+    label: "10 endgame puzzles", title: "Endgames",
+    rows: async (band) => {
+      const sets = await themed();
+      return ["rookEndgame", "pawnEndgame", "quietMove", "knightEndgame", "bishopEndgame"]
+        .flatMap((t) => (sets[t]?.[band] ?? []).filter((r) => r[4].split(" ").includes("endgame")));
+    },
+  },
+};
+
+/** A set of 10 puzzles, then back to the plan. */
+async function startSet(plan: LessonPlan, title: string, rows: (band: PuzzleBand) => Promise<Row[]>) {
+  const pool = (await rows(plan.band)).sort(() => Math.random() - 0.5).slice(0, 10);
+  const list = pool.flatMap((r) => puzzleMistake(r));
+  if (!list.length) return;
+  setPlanReturn(() => openPlan());
+  startPractice(list, title);
+}
 
 // -- Home: today's session -------------------------------------------------------------------
 

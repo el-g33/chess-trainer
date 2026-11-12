@@ -11,6 +11,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.34",
+    items: [
+      { icon: "puzzle", title: "Puzzles from your openings", text: "Drills from the opening use puzzles from the openings you actually play, and your lesson plan has a set of 10 to try any time." },
+      { icon: "play", title: "Puzzles played to the end", text: "A puzzle no longer stops after your first move: their reply comes, and you find the next one until it's won." },
+      { icon: "flag", title: "Endgames and quiet moves", text: "New rook, pawn and other endgame puzzles, and quiet-move puzzles (the best move isn't a check or a capture), in your plan's drills and as sets of their own." },
+    ],
+  },
+  {
     version: "3.33",
     items: [
       { icon: "flag", title: "Your lesson plan", text: "I check your last 30 games, find what costs you the most points, and make a 4-week plan: one focus a week, five short sessions each. Or choose what to work on yourself. Find it in Training." },

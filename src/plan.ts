@@ -392,7 +392,7 @@ export const FOCUS_PUZZLES: Record<Focus, string[]> = {
   safety: ["defensiveMove", "hangingPiece", "fork"],
   tactics: ["hangingPiece", "fork", "pin", "skewer", "discoveredAttack", "doubleCheck", "trappedPiece", "capturingDefender", "mateIn1", "mateIn2", "backRankMate", "promotion"],
   conversion: ["hangingPiece", "fork", "mateIn2", "advancedPawn", "promotion"],
-  endgame: ["advancedPawn", "promotion", "skewer", "fork", "mateIn2"],
+  endgame: ["rookEndgame", "pawnEndgame", "quietMove", "advancedPawn", "promotion", "skewer", "fork"],
   opening: ["attackingF2F7", "hangingPiece", "fork", "pin", "trappedPiece"],
   time: ["mateIn1", "hangingPiece", "fork"],
 };
