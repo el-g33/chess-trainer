@@ -11,6 +11,13 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.35",
+    items: [
+      { icon: "eye", title: "See their move first", text: "Puzzles in your lesson plan open a move early: their move plays in, with the square it came from and the square it went to highlighted." },
+      { icon: "quiz", title: "Whose move it is", text: "Every practice position says whether it's White or Black to move." },
+    ],
+  },
+  {
     version: "3.34",
     items: [
       { icon: "puzzle", title: "Puzzles from your openings", text: "Drills from the opening use puzzles from the openings you actually play, and your lesson plan has a set of 10 to try any time." },

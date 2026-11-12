@@ -577,6 +577,8 @@ function puzzleMistake(row: Row): Mistake[] {
   return [{
     id: `puzzle:${id}`, fen: fenOfPosition(after), best: yours, kind: "drill", phase, source: "a puzzle", added: today(), due: today(), stage: 0,
     solution: moves.split(" ").slice(2),
+    // (it opens a move early, so their move is played in and shown, from and to)
+    line: { start: fen, moves: [theirs] },
   }];
 }
 

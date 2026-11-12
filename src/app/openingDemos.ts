@@ -954,7 +954,8 @@ export function showPracticePosition(index: number) {
   set.orientation(game.position.turn);
   Object.assign(p, { index, tries: 0, hints: 0, state: "solving", waiting: false, mood: "talk" });
   const last = line ? `${narrateMove(game.positionAt(game.length - 1), game.moves[game.length - 1].move, game.position.turn)} ` : "";
-  p.note = `From ${mistake.source}. ${last}` + (mistake.kind === "miss" ? "That was a slip. Can you punish it this time?"
+  const toMove = `${game.position.turn === "white" ? "White" : "Black"} to move.`;
+  p.note = `${toMove} From ${mistake.source}. ${last}` + (mistake.kind === "miss" ? "That was a slip. Can you punish it this time?"
     : mistake.kind === "drill" ? "What's the move here?"
       : "Last time this went wrong. Find a better move.");
   refresh();
