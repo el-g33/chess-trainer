@@ -32,6 +32,7 @@ import { message } from "./popups";
 import { openingInfo } from "./ratings";
 import { moveSound } from "./startMenu";
 import { resetBoard } from "./startScreens";
+import { planReturn } from "./planHooks";
 import {
   book, canReview, clock, clockHistory, clockTimes, deepMoves, deepNeeded,
   game, gameHeaders, gradeJump, match, matchCounter, mode, plyNotes, prepProgress, prepWatch, prepWorked, preparing,
@@ -264,10 +265,13 @@ function showResult(text: string, user: Color | undefined) {
   const moves = Math.ceil(game.length / 2);
   $("result-text").textContent = moves ? `${text} ${moves} move${moves === 1 ? "" : "s"}.` : text;
   const review = $<HTMLButtonElement>("result-review");
-  review.textContent = canReview ? "Review this game" : "Look through the game";
+  // (a game your lesson plan started: back to it, where the game gets checked)
+  const back = planReturn;
+  review.textContent = back ? "Back to your plan" : canReview ? "Review this game" : "Look through the game";
   review.onclick = () => {
     dialog.close();
-    if (canReview) onReviewGame();
+    if (back) back();
+    else if (canReview) onReviewGame();
   };
   $("result-again").onclick = () => {
     dialog.close();

@@ -1181,6 +1181,68 @@ export const LESSONS: Record<LessonPhase, Lesson[]> = {
           "text": "Before you sacrifice, check: a bishop on d3, a knight that can reach g5, a queen that can reach h5, and no black piece able to come back and defend. When all of that holds, the sacrifice usually works."
         }
       ]
+    },
+    {
+      "title": "The blunder check",
+      "summary": "Three questions before every move, so you stop leaving pieces where they can be taken.",
+      "themes": ["hangingPiece", "defensiveMove"],
+      "steps": [
+        {
+          "fen": "r4rk1/pp3ppp/2p2q2/2b5/Q7/2N2P1P/PP3P2/R3RK2 b - - 1 17",
+          "text": "Most games at club level are decided by a piece left where it can be taken. The blunder check is three questions, asked before every move. In this game Black wanted to put the queen on h4.",
+          "arrows": [["f6", "h4", "plan"]]
+        },
+        {
+          "fen": "r4rk1/pp3ppp/2p2q2/2b5/Q7/2N2P1P/PP3P2/R3RK2 b - - 1 17",
+          "text": "Question 1: is the new square safe? Look along every line into it. White's queen on a4 sees all the way along the rank to h4, so the queen would just be taken. Taking the pawn on f3 was safe, and strong.",
+          "arrows": [["a4", "h4", "bad"], ["f6", "f3", "good"]]
+        },
+        {
+          "fen": "1r2r1k1/p1qb1Rpp/1p2p3/2p1P3/8/B1P1P1P1/P1P4P/3R1QK1 b - - 0 18",
+          "text": "Question 2: what was this piece guarding? Black's queen is the only guard of the bishop on d7. Taking the pawn on e5 would leave the bishop to the rook on f7.",
+          "arrows": [["c7", "d7", "good"], ["f7", "d7", "bad"]]
+        },
+        {
+          "fen": "1r2r1k1/p1qb1Rpp/1p2p3/2p1P3/8/B1P1P1P1/P1P4P/3R1QK1 b - - 0 18",
+          "text": "So first guard the bishop again: the rook from b8 to d8 does it. Now the queen is free to go.",
+          "arrows": [["b8", "d8", "good"], ["d8", "d7", "good"]]
+        },
+        {
+          "fen": "7r/p1pk3p/1p4p1/3p4/2nP4/P3P2P/1PPN2P1/R5K1 w - - 0 20",
+          "text": "Question 3: what does their last move attack? Black's knight has just come to c4, and it attacks your knight on d2, which nothing guards. Deal with that first: here you can simply take the knight.",
+          "arrows": [["c4", "d2", "bad"], ["d2", "c4", "good"]]
+        },
+        {
+          "fen": "7r/p1pk3p/1p4p1/3p4/2nP4/P3P2P/1PPN2P1/R5K1 w - - 0 20",
+          "text": "Three questions, every move: is the new square safe? What was this piece guarding? What does their last move attack? It takes a few seconds, and it saves most lost games."
+        }
+      ]
+    },
+    {
+      "title": "Checks, captures, threats",
+      "summary": "Spot what they leave: look for checks, captures and threats every move.",
+      "themes": ["hangingPiece", "fork"],
+      "steps": [
+        {
+          "fen": "r1b5/ppp1kpQ1/2n5/3q4/1P1P4/6P1/P3BP2/R3K2R b KQ - 0 20",
+          "text": "Your opponent leaves things too. Every move, look at their pieces: checks first, then captures, then threats. Here White's rook on h1 has nothing guarding it, and taking it is also check.",
+          "arrows": [["d5", "h1", "good"]]
+        },
+        {
+          "fen": "3k4/2pn4/B4p1p/3N1p2/P7/1r6/4rPPP/3R2K1 w - - 5 24",
+          "text": "Captures: look at every piece of theirs your pieces can take, and ask whether anything guards it. The black rook on e2 has no guard: the bishop takes it. A pawn grab elsewhere can wait.",
+          "arrows": [["a6", "e2", "good"]]
+        },
+        {
+          "fen": "5r2/Npp2pkp/4b1p1/8/P3n3/1P5P/2P1BPP1/3R2K1 b - - 0 18",
+          "text": "Threats: a move that attacks two things at once. A knight on c3 would hit the rook on d1 and the bishop on e2 together. They can only save one.",
+          "arrows": [["e4", "c3", "plan"], ["c3", "d1", "good"], ["c3", "e2", "good"]]
+        },
+        {
+          "fen": "5r2/Npp2pkp/4b1p1/8/P3n3/1P5P/2P1BPP1/3R2K1 b - - 0 18",
+          "text": "Checks, captures, threats: for them first (what's coming at you), then for you (what they left). A piece they leave loose is the easiest point you'll ever win."
+        }
+      ]
     }
   ],
   endgame: [

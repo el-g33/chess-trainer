@@ -11,6 +11,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "3.33",
+    items: [
+      { icon: "flag", title: "Your lesson plan", text: "I check your last 30 games, find what costs you the most points, and make a 4-week plan: one focus a week, five short sessions each. Or choose what to work on yourself. Find it in Training." },
+      { icon: "play", title: "Today's session", text: "On Home: a warm-up of your mistakes, a lesson, a drill of positions from your own games and puzzles on the same theme, a practice game, then that game checked against the week's focus." },
+      { icon: "puzzle", title: "Thousands of new puzzles", text: "Puzzles on loose pieces, forks, pins, mates and more, at every level from first steps up, for the plan's drills." },
+      { icon: "book", title: "Two new lessons", text: "The blunder check (three questions before every move) and Checks, captures, threats, both from real games." },
+    ],
+  },
+  {
     version: "3.32",
     items: [
       { icon: "flag", title: "What next, when a game ends", text: "The result comes up with your next steps: review the game, play again with the same settings, or choose another mode." },

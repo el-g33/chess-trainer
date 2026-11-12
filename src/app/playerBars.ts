@@ -65,7 +65,7 @@ export function drawPlayerBars() {
   for (const [bar, colour] of bars) {
     const name = bar.querySelector<HTMLElement>(".pb-name")!;
     name.textContent = demo && bar.id === "bar-top" ? demoTitle()
-      : practice && bar.id === "bar-top" ? `Your mistakes · ${Math.min(practice.index + 1, practice.list.length)} of ${practice.list.length}`
+      : practice && bar.id === "bar-top" ? `${gameHeaders.Event ?? "Your mistakes"} · ${Math.min(practice.index + 1, practice.list.length)} of ${practice.list.length}`
       : drill && bar.id === "bar-top" ? `${openingShortName(drill.demo.opening)} drill · Round ${drill.round}`
       : puzzle?.check && bar.id === "bar-top" ? `Find your level · ${puzzle.index + 1} of ${puzzle.list.length}`
       : puzzle && bar.id === "bar-top" ? `${puzzle.phase === "openings" ? "Opening trap" : "Puzzle"} · ${PUZZLE_LEVELS.find(([v]) => v === puzzle!.level)?.[1]}${puzzle.streak ? ` · ${puzzle.streak} in a row` : ""}`

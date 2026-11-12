@@ -38,6 +38,8 @@ import {
   viewPly,
 } from "./state";
 import { setBusy } from "./strategyCoach";
+import { planReturn } from "./planHooks";
+import { drawPlanRow } from "./lessonPlan";
 
 export type PuzzleLevel = "beginner" | "club" | "advanced" | "expert" | "master";
 export const PUZZLE_LEVELS: [PuzzleLevel, string][] = [["beginner", "Beginner"], ["club", "Club"], ["advanced", "Advanced"], ["expert", "Expert"], ["master", "Master"]];
@@ -89,6 +91,7 @@ export function drawTrainScreen() {
     tab.setAttribute("aria-selected", String(on));
   }
   drawMistakesCard();
+  drawPlanRow();
   // Every tab: its principles first. Openings: then the lessons by colour and the
   // opening traps; the phases: then puzzles. (Your position is on the Analyse a game screen.)
   const openings = trainTab === "openings";
@@ -859,7 +862,10 @@ export function startLesson(phase: LessonPhase, index: number) {
   };
   set.stepper({
     positions: frames.map((f) => f.position), moves: [], texts: item.steps.map((s) => s.text),
-    step: 1, mood: "talk", extra: item.themes.length ? tryIt : undefined, frames,
+    step: 1, mood: "talk", frames,
+    // (a lesson your plan opened: back to it; else puzzles on its idea)
+    extra: planReturn ? ((back: () => void): CoachButton => ({ ico: "flag", label: "Back to your plan", kind: "accent", labelled: true, run: () => { closeStepper(); set.lesson(null); back(); } }))(planReturn)
+      : item.themes.length ? tryIt : undefined,
   });
   set.orientation(frames[0].position.turn);
   refresh();

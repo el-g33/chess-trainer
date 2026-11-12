@@ -29,8 +29,9 @@ import {
   demo, fenPosition, freshViewTrail, greeting, homeChoice, learnColour, learnOpening, matchColour, mode, pgnGames, set,
 } from "./state";
 import { closeLessonList, drawTrainScreen, levelCheckDone, setupTrain } from "./train";
+import { drawPlanToday, loadPlan, setupPlan } from "./lessonPlan";
 
-export type HomeScreen = "welcome" | "play" | "practice" | "analysis" | "train" | "progress";
+export type HomeScreen = "welcome" | "play" | "practice" | "analysis" | "train" | "progress" | "plan";
 export type HomeChoice = "play" | "practice" | "analysis" | "train";
 
 // Where the game on screen came from, so New game goes back to that setup
@@ -118,7 +119,8 @@ export function drawHome() {
   // Welcome
   setFace($("home-face"), homeChoice ? "talk" : "wave", 96);
   $("home-bubble").textContent = homeChoice ? MODE_LINES[homeChoice] : greeting;
-  $("level-check").hidden = levelCheckDone() || homeChoice !== null;
+  $("level-check").hidden = levelCheckDone() || homeChoice !== null || !!loadPlan();
+  drawPlanToday();
   for (const button of menu.querySelectorAll<HTMLButtonElement>(".mode-choice")) {
     const on = button.dataset.choice === homeChoice;
     button.classList.toggle("on", on);
@@ -213,6 +215,7 @@ export function setupHome() {
     drawProgress();
   });
   setupTrain();
+  setupPlan();
   for (const button of menu.querySelectorAll<HTMLButtonElement>(".train-home")) {
     button.addEventListener("click", () => {
       closeLessonList();

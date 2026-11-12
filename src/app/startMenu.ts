@@ -22,6 +22,7 @@ import { loadSettings } from "./settings";
 import { drawHome, pickGreeting, setupHome, showScreen } from "./startScreens";
 import { orientation, set } from "./state";
 import { PUZZLE_LEVELS, type PuzzleLevel } from "./train";
+import { setPlanReturn } from "./planHooks";
 
 declare const __BUILD__: string; // see vite.config.ts
 export const menuMode = (): Mode =>
@@ -147,6 +148,7 @@ export function updateMenu() {
 }
 
 export function showMenu() {
+  setPlanReturn(null); // (left whatever your plan started)
   set.menuOpen(true);
   set.homeChoice(null);
   set.greeting(pickGreeting());

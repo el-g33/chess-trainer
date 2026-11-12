@@ -68,6 +68,8 @@
           </div>
           <div id="home-face" class="home-face" aria-hidden="true"></div>
           <p id="home-bubble" class="home-bubble" aria-live="polite"></p>
+          <!-- Your lesson plan: today's session, while a plan is on -->
+          <div id="plan-today" class="plan-today" hidden></div>
           <div class="mode-choices" role="radiogroup" aria-label="What would you like to do?">
             <button type="button" class="mode-choice" data-choice="play" role="radio" aria-checked="false"><span class="mc-icon" data-ico="knight" data-ico-size="22"></span>Play against the coach</button>
             <button type="button" class="mode-choice" data-choice="practice" role="radio" aria-checked="false"><span class="mc-icon" data-ico="school" data-ico-size="22"></span>Practice match</button>
@@ -184,6 +186,15 @@
           <div id="progress" class="progress"></div>
         </section>
 
+        <section class="screen" data-screen="plan" hidden>
+          <div class="setup-head">
+            <button type="button" class="back-round home-link plan-back" aria-label="Back" title="Back"><span data-ico="back"></span></button>
+            <h2>Your lesson plan</h2>
+            <span></span>
+          </div>
+          <div id="plan-body" class="plan-body"></div>
+        </section>
+
         <section class="screen" data-screen="train" hidden>
           <!-- The heading and tabs stay at the top while a long list scrolls under them -->
           <div class="train-top">
@@ -199,6 +210,11 @@
             </div>
           </div>
           <div id="train-cards" class="train-cards">
+            <button type="button" class="train-row plan-row" id="train-plan">
+              <span class="tc-ico" data-ico="flag" data-ico-size="20"></span>
+              <span class="tr-label"><b>Your lesson plan</b><small id="plan-row-note"></small></span>
+              <span class="tr-go">Open</span>
+            </button>
             <!-- Only there while some of your mistakes are waiting -->
             <button type="button" class="train-row" id="train-mistakes" hidden>
               <span class="tc-ico" data-ico="target" data-ico-size="20"></span>

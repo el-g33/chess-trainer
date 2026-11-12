@@ -49,6 +49,7 @@ import {
 } from "./state";
 import { setBusy } from "./strategyCoach";
 import { PUZZLE_LEVELS, drawTrainScreen, showLessonList, startPuzzles } from "./train";
+import { planReturn } from "./planHooks";
 
 export const DEMO_MOVE_DELAY = 1100; // ms between moves while it plays on
 
@@ -918,10 +919,10 @@ export function practiseGameSlips() {
 }
 
 /** Practise these positions, one after another. */
-export function startPractice(list: Mistake[]) {
+export function startPractice(list: Mistake[], title = "Your mistakes") {
   if (!list.length) return;
   findLines(list);
-  resetBoard(new Game(), { White: "?", Black: "?", Event: "Your mistakes" });
+  resetBoard(new Game(), { White: "?", Black: "?", Event: title });
   set.mode("play"); // no eval bar to give it away
   set.gameOrigin("train");
   set.currentView("board");
@@ -1141,7 +1142,10 @@ export function practiceSays(): CoachSay {
   const p = practice!;
   const key = `practice:${p.index}:${p.state}:${p.tries}:${p.hints}:${p.note.length}`;
   if (p.state === "done") {
-    return { mood: p.mood, text: p.note, key, buttons: [{ ico: "school", label: "Back to Training", kind: "accent", run: leavePractice }] };
+    const back = planReturn;
+    return { mood: p.mood, text: p.note, key, buttons: [back
+      ? { ico: "flag", label: "Back to your plan", kind: "accent", run: () => { set.practice(null); back(); } }
+      : { ico: "school", label: "Back to Training", kind: "accent", run: leavePractice }] };
   }
   if (p.state !== "solving") {
     const last = p.index + 1 >= p.list.length;

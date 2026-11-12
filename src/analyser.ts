@@ -38,8 +38,11 @@ const POISON_LIMIT = 8.0;
 // with time limits to match
 const DEEP_REVIEW_EXTRA = 4;
 const DEEP_REVIEW_TIME = 4;
+// ...and a light check this much shallower (a quarter of the work, or less)
+const LIGHT_REVIEW_LESS = -3;
 
-export type ReviewDepth = "quick" | "deep";
+// "light": shallower, for checking many games in the background (the lesson plan)
+export type ReviewDepth = "quick" | "deep" | "light";
 
 // How many copies of Stockfish work at once: the spare cores, at most three
 const POOL = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 2) - 1));
@@ -119,8 +122,8 @@ export class Analyser {
   }
 
   private limits() {
-    const extra = this.reviewDepth === "deep" ? DEEP_REVIEW_EXTRA : 0;
-    const time = this.reviewDepth === "deep" ? DEEP_REVIEW_TIME : 1;
+    const extra = this.reviewDepth === "deep" ? DEEP_REVIEW_EXTRA : this.reviewDepth === "light" ? LIGHT_REVIEW_LESS : 0;
+    const time = this.reviewDepth === "deep" ? DEEP_REVIEW_TIME : this.reviewDepth === "light" ? 0.5 : 1;
     return {
       think: { depth: THINK_DEPTH + extra, time: THINK_LIMIT * time * 1000 },
       deep: { depth: DEEP_DEPTH + extra, time: DEEP_LIMIT * time * 1000 },

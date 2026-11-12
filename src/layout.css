@@ -3368,3 +3368,141 @@ dialog[open]::backdrop {
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   }
 }
+
+/* -- Your lesson plan ------------------------------------------------------------- */
+.plan-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.plan-body .progress-card p {
+  margin: 4px 0 0;
+}
+.plan-hero {
+  border: 2px solid var(--accent);
+}
+.plan-label {
+  margin: 6px 2px 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.plan-goals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+.plan-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  border-radius: 999px;
+  padding: 6px 14px;
+}
+.plan-body > .plan-button,
+.plan-hero .plan-button {
+  width: 100%;
+  margin-top: 4px;
+}
+.plan-number {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.plan-week.current {
+  border: 2px solid var(--accent);
+}
+.plan-week.past {
+  opacity: 0.75;
+}
+.plan-dots {
+  display: flex;
+  gap: 5px;
+  margin-top: 2px;
+}
+.plan-dots span {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+}
+.plan-dots span.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.plan-steps {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--card-radius);
+  background: var(--button);
+}
+.plan-step {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 9px 12px;
+  border-top: 1px solid var(--line);
+}
+.plan-step:first-child {
+  border-top: 0;
+}
+.plan-step-mark {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  border: 1.5px solid var(--line-strong);
+}
+.plan-step.done .plan-step-mark {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+.plan-step.now .plan-step-mark {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+}
+.plan-step-words {
+  display: flex;
+  flex-direction: column;
+}
+.plan-step-words small {
+  color: var(--muted);
+}
+.plan-check-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--card-radius);
+  background: var(--soft);
+}
+/* Today, on Home */
+.plan-today {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: var(--card-radius);
+  border: 2px solid var(--accent);
+  background: var(--button);
+}
+.plan-today[hidden] {
+  display: none;
+}
+.plan-today-words {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.plan-today-words small {
+  color: var(--muted);
+}
